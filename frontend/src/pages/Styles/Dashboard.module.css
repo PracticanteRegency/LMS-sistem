@@ -1,0 +1,518 @@
+.dashboardContainer {
+  padding: 20px;
+  background: #f5f5f5;
+  min-height: 100vh;
+}
+
+.header {
+  margin-bottom: 30px;
+}
+
+.header h1 {
+  font-size: 32px;
+  font-weight: bold;
+  color: #262626;
+  margin: 0 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: #999;
+  margin: 0;
+}
+
+/* KPI Grid */
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.kpiCard {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  transition: transform 0.2s, box-shadow 0.2s;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+}
+
+.kpiCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.kpiContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+}
+
+.kpiContent > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.kpiLabel {
+  font-size: 12px;
+  color: #999;
+  margin: 0;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.kpiValue {
+  font-size: 28px;
+  font-weight: bold;
+  color: #262626;
+  margin: 8px 0;
+}
+
+.kpiTrend {
+  font-size: 12px;
+  color: #4CAF50;
+  margin: 0;
+  font-weight: 500;
+}
+
+.kpiIcon {
+  font-size: 32px;
+  opacity: 0.8;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* Charts Grid */
+.chartsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.chartCard {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+}
+
+.chartTitle {
+  font-size: 18px;
+  font-weight: bold;
+  color: #262626;
+  margin: 0 0 16px 0;
+}
+
+.hierarchyInfo {
+  font-size: 12px;
+  color: #999;
+  margin: 0 0 16px 0;
+}
+
+/* Courses List */
+.coursesList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.courseItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.courseItem:last-child {
+  border-bottom: none;
+}
+
+.courseName {
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+  margin: 0 0 4px 0;
+}
+
+.courseInfo {
+  font-size: 12px;
+  color: #999;
+  margin: 0;
+}
+
+.completionBadge {
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4CAF50;
+  background: rgba(76, 175, 80, 0.1);
+  padding: 4px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Organizational Tree */
+.orgTree {
+  background: #fafafa;
+  border-radius: 6px;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  overflow-y: auto;
+  max-height: 300px;
+}
+
+.orgRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  transition: background-color 0.2s;
+  font-size: 13px;
+}
+
+.orgRow:hover {
+  background-color: #fff;
+}
+
+.orgRow:last-child {
+  border-bottom: none;
+}
+
+.itemLeft {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.expandBtn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: #C0281B;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: all 0.2s;
+  transform: rotate(-90deg);
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.expandBtn:hover {
+  background-color: rgba(192, 40, 27, 0.1);
+}
+
+/* Make interactive elements consistent and respect disabled/pending states */
+button,
+.expandBtn,
+.completionBadge {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+button:disabled,
+.expandBtn:disabled {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.expandBtn.expanded {
+  transform: rotate(0deg);
+}
+
+.arrow {
+  color: #999;
+  font-size: 10px;
+  width: 20px;
+  text-align: center;
+}
+
+.icon {
+  font-size: 14px;
+  display: inline-block;
+  width: 20px;
+  text-align: center;
+}
+
+.itemName {
+  font-size: 12px;
+  color: #262626;
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progressContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
+.progressBar {
+  flex: 1;
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 60px;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(to right, #C0281B, #E84836);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.progressText {
+  font-size: 11px;
+  font-weight: bold;
+  color: #262626;
+  min-width: 30px;
+  text-align: right;
+}
+
+@media (max-width: 1200px) {
+  .kpiGrid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+  }
+
+  .kpiCard {
+    padding: 18px;
+    min-height: 110px;
+  }
+
+  .kpiValue {
+    font-size: 26px;
+  }
+
+  .kpiIcon {
+    font-size: 30px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .chartsGrid {
+    grid-template-columns: 1fr;
+  }
+  
+  .kpiGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+
+  .kpiCard {
+    padding: 16px;
+    min-height: 100px;
+  }
+
+  .kpiValue {
+    font-size: 24px;
+  }
+
+  .kpiIcon {
+    font-size: 28px;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboardContainer {
+    padding: 12px;
+  }
+
+  .header h1 {
+    font-size: 22px;
+  }
+
+  .subtitle {
+    font-size: 14px;
+  }
+
+  .kpiGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .kpiCard {
+    padding: 14px;
+    min-height: 95px;
+  }
+
+  .kpiValue {
+    font-size: 20px;
+    margin: 6px 0;
+  }
+
+  .kpiIcon {
+    font-size: 26px;
+  }
+
+  .kpiLabel {
+    font-size: 10px;
+  }
+
+  .kpiTrend {
+    font-size: 11px;
+  }
+
+  .chartCard {
+    padding: 12px;
+  }
+
+  .chartTitle {
+    font-size: 16px;
+  }
+
+  .orgTree {
+    max-height: 250px;
+    padding: 8px;
+  }
+
+  .coursesList {
+    gap: 0;
+  }
+
+  .courseItem {
+    padding: 8px 0;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .completionBadge {
+    margin-top: 8px;
+  }
+}
+
+@media (max-width: 640px) {
+  .kpiGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .kpiCard {
+    padding: 12px;
+    min-height: 90px;
+  }
+
+  .kpiContent {
+    gap: 8px;
+  }
+
+  .kpiValue {
+    font-size: 18px;
+    margin: 5px 0;
+  }
+
+  .kpiIcon {
+    font-size: 24px;
+  }
+
+  .kpiLabel {
+    font-size: 10px;
+  }
+
+  .kpiTrend {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboardContainer {
+    padding: 8px;
+  }
+
+  .header h1 {
+    font-size: 18px;
+  }
+
+  .subtitle {
+    font-size: 12px;
+  }
+
+  .kpiGrid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .kpiCard {
+    padding: 12px;
+    min-height: auto;
+  }
+
+  .kpiContent {
+    flex-direction: row;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .kpiValue {
+    font-size: 22px;
+    margin: 4px 0;
+  }
+
+  .kpiIcon {
+    font-size: 28px;
+  }
+
+  .kpiLabel {
+    font-size: 11px;
+  }
+
+  .kpiTrend {
+    font-size: 11px;
+  }
+
+  .chartsGrid {
+    gap: 12px;
+  }
+
+  .chartCard {
+    padding: 10px;
+  }
+
+  .chartTitle {
+    font-size: 14px;
+  }
+
+  .orgTree {
+    max-height: 200px;
+    font-size: 11px;
+  }
+
+  .orgRow {
+    padding: 4px 0;
+    font-size: 11px;
+  }
+
+  .itemName {
+    font-size: 11px;
+  }
+
+  .progressText {
+    font-size: 10px;
+    min-width: 25px;
+  }
+}
+

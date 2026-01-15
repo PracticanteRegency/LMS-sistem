@@ -1,0 +1,940 @@
+/* Container */
+.container {
+  padding: 20px;
+  background: #f5f5f5;
+  min-height: 100%;
+}
+
+/* Header */
+.header {
+  margin-bottom: 30px;
+}
+
+.headerContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.header h1 {
+  font-size: 32px;
+  font-weight: bold;
+  color: #262626;
+  margin: 0 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: #999;
+  margin: 0;
+}
+
+.btnCreate {
+  background: #C0281B;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.btnCreate:hover {
+  background: #8B1F14;
+  box-shadow: 0 4px 12px rgba(192, 40, 27, 0.3);
+  transform: translateY(-2px);
+}
+
+.btnCreate:active {
+  transform: translateY(0);
+}
+
+/* Search Section */
+.searchSection {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 250px;
+  padding: 12px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.3s ease;
+  background: white;
+  color-scheme: black;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.smallSelect {
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+  background: white;
+  font-size: 14px;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: #C0281B;
+  box-shadow: 0 0 0 3px rgba(192, 40, 27, 0.1);
+}
+
+.resultCount {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Table Wrapper */
+.tableWrapper {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow-x: auto;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-top: 1px solid #e0e0e0;
+  background: #fafafa;
+}
+
+.pageBtn {
+  padding: 8px 12px;
+  background: #262626;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pageBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pageBtn:hover:not(:disabled) {
+  background: #C0281B;
+}
+
+.pageInfo {
+  font-size: 13px;
+  color: #333;
+  font-weight: 600;
+}
+
+/* Table */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.thead {
+  background: #f8f8f8;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.thead th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #262626;
+  white-space: nowrap;
+}
+
+/* Table Body */
+.tbody tr {
+  border-bottom: 1px solid #e0e0e0;
+  transition: background-color 0.2s ease;
+}
+
+.tbody tr:hover {
+  background-color: #fafafa;
+}
+
+.tbody tr:last-child {
+  border-bottom: none;
+}
+
+/* Table Cells */
+.row td {
+  padding: 14px 16px;
+  vertical-align: middle;
+}
+
+.tdId {
+  font-weight: 600;
+  color: #C0281B;
+  width: 60px;
+  text-align: center;
+}
+
+.tdNumber {
+  text-align: center;
+  font-weight: 600;
+  color: #333;
+  width: 90px;
+}
+
+.tdTitulo {
+  max-width: 250px;
+  font-weight: 500;
+}
+
+.titleContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.thumbnail {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: #f0f0f0;
+}
+
+.tdDescripcion {
+  max-width: 300px;
+  color: #666;
+  font-size: 13px;
+}
+
+.description {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tdFecha {
+  font-size: 13px;
+  color: #666;
+  width: 110px;
+  white-space: nowrap;
+}
+
+.tdEstado {
+  width: 100px;
+}
+
+/* Badges */
+.badgeActive {
+  display: inline-block;
+  padding: 4px 8px;
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badgeInactive {
+  display: inline-block;
+  padding: 4px 8px;
+  background-color: #ffebee;
+  color: #c62828;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badgeDraft {
+  display: inline-block;
+  padding: 4px 8px;
+  background-color: #fff3e0;
+  color: #e65100;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+
+/* Actions */
+.tdAcciones {
+  position: relative;
+  width: 50px;
+  text-align: center;
+  z-index: 1;
+  pointer-events: auto;
+}
+
+.actionMenu {
+  position: relative;
+  display: inline-block;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.menuButton {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 12px 16px;
+  border-radius: 4px;
+  font-size: 18px;
+  color: #C0281B;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.menuButton:hover {
+  background-color: rgba(192, 40, 27, 0.1);
+  transform: scale(1.1);
+}
+
+
+.dropdownMenu {
+  /* Default absolute fallback; when rendered with inline style, it will be fixed */
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 140px;
+  overflow: visible;
+  pointer-events: auto;
+}
+
+.btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 12px 16px;
+  border-radius: 0;
+  font-size: 13px;
+  transition: all 0.2s ease;
+  display: flex;
+  width: 100%;
+  text-align: left;
+  font-weight: 500;
+  min-height: 44px;
+  align-items: center;
+}
+
+.btnView {
+  color: #1976d2;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.btnView:hover {
+  background-color: rgba(25, 118, 210, 0.08);
+}
+
+.btnEdit {
+  color: #f57c00;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.btnEdit:hover {
+  background-color: rgba(245, 124, 0, 0.08);
+}
+
+.btnDelete {
+  color: #d32f2f;
+}
+
+.btnDelete:hover {
+  background-color: rgba(211, 47, 47, 0.08);
+}
+
+/* Empty State */
+.emptyState {
+  padding: 60px 20px;
+  text-align: center;
+  color: #999;
+}
+
+.emptyState p {
+  font-size: 16px;
+  margin: 0;
+}
+
+/* Loading & Error */
+.loading,
+.error {
+  text-align: center;
+  padding: 40px 20px;
+  font-size: 16px;
+  border-radius: 8px;
+  background: white;
+  margin: 20px 0;
+}
+
+.loading {
+  color: #666;
+}
+
+.error {
+  color: #d32f2f;
+  background-color: #ffebee;
+  border: 1px solid #ef5350;
+}
+
+/* Consistent interactive / pending behavior */
+button,
+.menuButton,
+.btn,
+.btnCreate {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+button:disabled,
+.menuButton:disabled,
+.btn:disabled,
+.btnCreate:disabled {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .container {
+    padding: 18px;
+  }
+
+  .header h1 {
+    font-size: 28px;
+  }
+
+  .table {
+    font-size: 13px;
+  }
+
+  .thead th,
+  .row td {
+    padding: 11px 14px;
+  }
+
+  .tdDescripcion {
+    max-width: 220px;
+  }
+
+  .searchInput {
+    min-width: 280px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .container {
+    padding: 15px;
+  }
+
+  .header h1 {
+    font-size: 26px;
+  }
+
+  .headerContent {
+    gap: 15px;
+  }
+
+  .searchInput {
+    min-width: 250px;
+  }
+
+  .table {
+    font-size: 13px;
+  }
+
+  .thead th,
+  .row td {
+    padding: 10px 12px;
+  }
+
+  .tdDescripcion {
+    max-width: 200px;
+  }
+
+  .btnCreate {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+
+  .menuButton {
+    padding: 10px 12px;
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 12px;
+  }
+
+  .header h1 {
+    font-size: 24px;
+  }
+
+  .header {
+    margin-bottom: 20px;
+  }
+
+  .headerContent {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .subtitle {
+    font-size: 13px;
+  }
+
+  .searchSection {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .searchInput {
+    min-width: 200px;
+    padding: 10px 12px;
+    font-size: 13px;
+    flex: 1;
+  }
+
+  .resultCount {
+    font-size: 12px;
+    text-align: center;
+    width: 100%;
+  }
+
+  .btnCreate {
+    padding: 10px 14px;
+    font-size: 13px;
+    min-height: 40px;
+  }
+
+  .tableWrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 6px;
+  }
+
+  .table {
+    font-size: 12px;
+    min-width: 550px;
+  }
+
+  .thead th {
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+
+  .row td {
+    padding: 9px 8px;
+  }
+
+  .tdId {
+    width: 55px;
+    font-size: 12px;
+  }
+
+  .tdNumber {
+    width: 80px;
+    font-size: 12px;
+  }
+
+  .tdTitulo {
+    max-width: 140px;
+    font-size: 12px;
+  }
+
+  .titleContainer {
+    gap: 6px;
+  }
+
+  .thumbnail {
+    width: 30px;
+    height: 30px;
+  }
+
+  .tdDescripcion {
+    max-width: 140px;
+    font-size: 11px;
+  }
+
+  .tdFecha {
+    width: 85px;
+    font-size: 11px;
+  }
+
+  .tdEstado {
+    width: 90px;
+  }
+
+  .badgeActive,
+  .badgeInactive,
+  .badgeDraft {
+    padding: 3px 6px;
+    font-size: 11px;
+  }
+
+  .menuButton {
+    padding: 8px 10px;
+    font-size: 14px;
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .dropdownMenu {
+    min-width: 130px;
+    right: 0;
+  }
+
+  .btn {
+    padding: 10px 12px;
+    font-size: 12px;
+    min-height: 38px;
+  }
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 10px;
+  }
+
+  .header {
+    margin-bottom: 15px;
+    padding-bottom: 12px;
+  }
+
+  .header h1 {
+    font-size: 22px;
+  }
+
+  .subtitle {
+    font-size: 12px;
+  }
+
+  .headerContent {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .searchSection {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .searchInput {
+    width: 100%;
+    min-width: unset;
+    padding: 9px 10px;
+    font-size: 13px;
+  }
+
+  .resultCount {
+    font-size: 11px;
+    text-align: center;
+  }
+
+  .btnCreate {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 12px;
+    min-height: 40px;
+  }
+
+  .table {
+    font-size: 11px;
+    min-width: 520px;
+  }
+
+  .thead {
+    background: #f0f0f0;
+  }
+
+  .thead th {
+    padding: 8px 6px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .row td {
+    padding: 8px 6px;
+  }
+
+  .tdId {
+    width: 50px;
+    font-size: 11px;
+  }
+
+  .tdNumber {
+    width: 70px;
+    font-size: 11px;
+  }
+
+  .tdTitulo {
+    max-width: 130px;
+    font-size: 11px;
+    font-weight: 400;
+  }
+
+  .titleContainer {
+    gap: 4px;
+  }
+
+  .thumbnail {
+    width: 28px;
+    height: 28px;
+    border-radius: 3px;
+  }
+
+  .tdDescripcion {
+    max-width: 120px;
+    font-size: 10px;
+    display: none;
+  }
+
+  .tdFecha {
+    width: 80px;
+    font-size: 10px;
+  }
+
+  .tdEstado {
+    width: 85px;
+  }
+
+  .badgeActive,
+  .badgeInactive,
+  .badgeDraft {
+    padding: 2px 4px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .menuButton {
+    padding: 6px 8px;
+    font-size: 13px;
+    min-width: 36px;
+    min-height: 36px;
+  }
+
+  .dropdownMenu {
+    min-width: 120px;
+    right: -8px;
+    top: calc(100% + 4px);
+  }
+
+  .btn {
+    padding: 8px 10px;
+    font-size: 11px;
+    min-height: 36px;
+  }
+
+  .emptyState {
+    padding: 40px 12px;
+  }
+
+  .emptyState p {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 8px;
+  }
+
+  .header {
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+  }
+
+  .header h1 {
+    font-size: 20px;
+  }
+
+  .subtitle {
+    font-size: 11px;
+  }
+
+  .headerContent {
+    gap: 8px;
+  }
+
+  .searchSection {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .searchInput {
+    width: 100%;
+    padding: 8px 8px;
+    font-size: 14px;
+  }
+
+  .resultCount {
+    font-size: 10px;
+  }
+
+  .btnCreate {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 11px;
+    min-height: 38px;
+  }
+
+  .tableWrapper {
+    border-radius: 4px;
+  }
+
+  .table {
+    font-size: 10px;
+    min-width: 480px;
+  }
+
+  .thead {
+    background: #efefef;
+  }
+
+  .thead th {
+    padding: 6px 4px;
+    font-size: 9px;
+    font-weight: 500;
+  }
+
+  .row td {
+    padding: 6px 4px;
+  }
+
+  .tdId {
+    width: 45px;
+    font-size: 10px;
+    text-align: center;
+  }
+
+  .tdNumber {
+    width: 60px;
+    font-size: 10px;
+  }
+
+  .tdTitulo {
+    max-width: 110px;
+    font-size: 10px;
+  }
+
+  .titleContainer {
+    gap: 3px;
+  }
+
+  .thumbnail {
+    width: 24px;
+    height: 24px;
+  }
+
+  .tdDescripcion {
+    display: block
+  }
+
+  .tdFecha {
+    width: 70px;
+    font-size: 9px;
+  }
+
+  .tdEstado {
+    width: 75px;
+  }
+
+  .badgeActive,
+  .badgeInactive,
+  .badgeDraft {
+    padding: 2px 3px;
+    font-size: 8px;
+    min-width: 50px;
+    text-align: center;
+    display: inline-block;
+  }
+
+  .menuButton {
+    padding: 4px 6px;
+    font-size: 12px;
+    min-width: 32px;
+    min-height: 32px;
+  }
+
+  .dropdownMenu {
+    min-width: 110px;
+    right: -6px;
+    top: calc(100% + 2px);
+  }
+
+  .btn {
+    padding: 6px 8px;
+    font-size: 10px;
+    min-height: 32px;
+  }
+
+  .btnView {
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .btnEdit {
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .emptyState {
+    padding: 30px 8px;
+  }
+
+  .emptyState p {
+    font-size: 12px;
+  }
+
+  .loading,
+  .error {
+    padding: 30px 12px;
+    font-size: 14px;
+  }
+}
+
+/* Scrollbar Styling */
+.tableWrapper::-webkit-scrollbar {
+  height: 6px;
+}
+
+.tableWrapper::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.tableWrapper::-webkit-scrollbar-thumb {
+  background: #C0281B;
+  border-radius: 10px;
+}
+
+.tableWrapper::-webkit-scrollbar-thumb:hover {
+  background: #8B1F14;
+}

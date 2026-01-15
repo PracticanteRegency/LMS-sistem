@@ -1,0 +1,242 @@
+/* Página A4 */
+@page {
+    size: A4;
+    margin: 2.5cm;
+}
+
+/* body */
+body {
+    font-family: "DejaVu Sans", "Arial", sans-serif;
+    line-height: 1.15;
+    color: #111;
+    margin: 0;
+    background: white;
+}
+
+/* Contenedor general del certificado */
+.certificate {
+    width: 100%;
+    height: 100%;
+    border: 12px solid #e6e6e6;
+    padding: 40px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    text-align: center;
+    position: relative;
+}
+
+/* Logo */
+.logo {
+    max-height: 80px;
+    margin-bottom: 10px;
+}
+
+/* Títulos */
+.title {
+    font-size: 34px;
+    letter-spacing: 2px;
+    margin: 10px 0 6px;
+}
+
+.subtitle {
+    font-size: 18px;
+    margin: 0 0 30px;
+    font-weight: normal;
+    color: #444;
+}
+
+/* Contenido */
+.content {
+    margin-top: 10px;
+    margin-bottom: 30px;
+}
+
+.label {
+    font-size: 14px;
+    color: #555;
+    margin-bottom: 6px;
+}
+
+.recipient {
+    font-size: 26px;
+    font-weight: 700;
+    margin: 6px 0 12px;
+}
+
+.meta {
+    font-size: 16px;
+    color: #222;
+    margin: 6px 0;
+}
+
+.course {
+    font-weight: 600;
+    margin-top: 8px;
+    font-size: 18px;
+}
+
+.text-date {
+    margin-top: 28px;
+    font-size: 14px;
+    color: #444;
+}
+
+/* Pie de página */
+.footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 55px;
+}
+
+.sign {
+    text-align: left;
+}
+
+.signature-line {
+    margin-top: 6px;
+    border-top: 1px solid #222;
+    width: 220px;
+    padding-top: 6px;
+    font-size: 13px;
+}
+
+.sign-role {
+    font-size: 12px;
+    color: #666;
+    margin-top: 6px;
+}
+
+.date {
+    text-align: right;
+    font-size: 14px;
+    color: #333;
+}
+
+/* Marca de agua */
+.watermark {
+    position: absolute;
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-30deg);
+    font-size: 48px;
+    color: rgba(0, 0, 0, 0.04);
+    z-index: 0;
+    pointer-events: none;
+}
+
+.content,
+.footer,
+header {
+    position: relative;
+    z-index: 1;
+}
+
+/* --- Styles from templates/certificados/protinco.html --- */
+
+/* Reset sencillo */
+*{box-sizing:border-box}
+body{font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; margin:0; padding:0; background:#f3f3f3}
+
+.page{width:100%; display:flex; align-items:center; justify-content:center; padding:30px}
+.certificado{
+  position:relative;
+  width:1000px;
+  max-width:100%;
+  border-radius:6px;
+  box-shadow:0 6px 30px rgba(0,0,0,0.15);
+  padding:46px 72px 72px 72px;
+
+  background-image: url('/templates/img/regency.png');
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+}
+
+/* Cabecera gráfica: usar imagen con fondo curvo */
+.cabecera{
+  position:absolute; top:0; left:0; right:0; height:160px; z-index:1; overflow:hidden;
+  background-repeat:no-repeat; background-size:cover; background-position:center;
+}
+
+/* Imagen de fondo completa (dentro del certificado) */
+.fondo{
+  position:absolute; inset:0; z-index:0; background-repeat:no-repeat; background-size:cover; background-position:center; opacity:0.12;
+  filter:brightness(1.0);
+}
+
+/* Colocar logo a la derecha dentro de la cabecera */
+.logo{
+  position:absolute; right:56px; top:18px; z-index:2; width:120px; height:auto;
+}
+
+.contenido{
+  position:relative; z-index:3; text-align:center; padding-top:80px;
+}
+
+h1{font-size:38px; letter-spacing:2px; margin:6px 0 0 0}
+h2{font-size:14px; margin:6px 0 16px 0; color:#777}
+
+.intro{color:#666; margin-top:18px; font-size:14px}
+
+.nombre{
+  margin:24px auto 8px auto; font-size:34px; font-weight:700; color:#222; letter-spacing:1px;
+}
+
+.curso{margin:16px auto; font-size:22px; font-weight:600; color:#333}
+
+.detalle{color:#666; margin:8px 0 0 0}
+
+.fecha{margin-top:30px; color:#444}
+
+/* Firma area */
+.firma{margin-top:40px; display:flex; align-items:center; justify-content:center; gap:24px;}
+.firma .sig{width:240px}
+.firma .cargo{font-size:12px; color:#555}
+
+/* Responsive */
+@media (max-width:700px){
+  .certificado{padding:28px}
+  .logo{right:24px; width:90px}
+  h1{font-size:30px}
+  .nombre{font-size:24px}
+}
+
+/* --- Additional variant styles (wrapper/certificate layout) --- */
+@page { size: A4 landscape; margin: 0; }
+html,body{height:100%;margin:0;font-family: 'Helvetica Neue', Arial, sans-serif;color:#222}
+.wrapper{box-sizing:border-box;padding:40px;min-height:100%;display:flex;align-items:center;justify-content:center}
+.certificate{
+  position:relative;
+  width:1122px; /* landscape A4 approx */
+  height:794px;
+  background: url("{% static 'certificados/img/regency.svg' %}") no-repeat top right;
+  background-size:260px auto;
+  box-shadow:0 2px 10px rgba(0,0,0,0.08);
+  overflow:hidden;
+}
+/* decorative top curved band */
+.certificate::before{
+  content:'';
+  position:absolute;left:0;right:0;top:0;height:160px;
+  background:linear-gradient(180deg,#9f0f15 0%, #a61b1f 100%);
+  transform:skewY(-3deg);
+  transform-origin:0 0;
+}
+.inner{position:relative;padding:60px 90px;text-align:center}
+h1{margin:0;font-size:56px;letter-spacing:3px;font-weight:300}
+.subtitle{margin-top:6px;font-size:14px;letter-spacing:2px}
+.congrats{margin-top:28px;color:#666}
+.name{font-size:36px;margin:16px 0;font-weight:700}
+.idline{font-weight:600;color:#000}
+.course{font-size:22px;margin-top:18px;font-weight:600}
+.footer-note{margin-top:30px;color:#777;font-size:13px}
+.signature{position:absolute;left:0;right:0;bottom:36px;text-align:center}
+.signature img{height:60px}
+.signature .title{font-size:12px;color:#333}
+@media (max-width:1200px){
+  .certificate{width:calc(100% - 80px);height:auto}
+}
+

@@ -1,0 +1,505 @@
+.completoForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+.completoRow {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+@media (max-width: 700px) {
+  .completoForm {
+    max-width: 100%;
+    padding: 0 8px;
+  }
+  .completoRow {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .input, .select {
+    width: 100%;
+    min-width: 0;
+  }
+}
+.crearContainer {
+  padding: 20px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+.crearHeader {
+  margin-bottom: 16px;
+}
+.crearRow {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+/* Inputs and selects: same style and width */
+.input, .select {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  width: 100%;
+  min-width: 180px;
+  box-sizing: border-box;
+  font-size: 16px;
+  background: white;
+  color: #111;
+}
+@media (max-width: 700px) {
+  .input, .select {
+    width: 100%;
+    min-width: 0;
+    font-size: 15px;
+  }
+}
+.btnPrimary {
+  background: #2563eb;
+  color: white;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.badgeSmall {
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #efefef;
+}
+.paginationFixed {
+  position: relative;
+  left: 0;
+  right: 0;
+  width: 100%;
+  min-width: 0;
+  margin-top: 0;
+  background: #fafafa;
+  z-index: 2;
+  box-sizing: border-box;
+}
+/* Container */
+.container {
+  padding: 20px;
+  background: #f5f5f5;
+  min-height: 100%;
+}
+
+/* Header */
+.header {
+  margin-bottom: 30px;
+}
+
+.headerContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.header h1 {
+  font-size: 32px;
+  font-weight: bold;
+  color: #262626;
+  margin: 0 0 8px 0;
+}
+
+.subtitle {
+  font-size: 16px;
+  color: #999;
+  margin: 0;
+}
+
+/* Search Section */
+.searchSection {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 250px;
+  padding: 12px 16px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.3s ease;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: #C0281B;
+  box-shadow: 0 0 0 3px rgba(192, 40, 27, 0.1);
+}
+
+.resultCount {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Table Wrapper */
+.tableWrapper {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow-x: auto;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-top: 1px solid #e0e0e0;
+  background: #fafafa;
+}
+
+.pageBtn {
+  padding: 8px 12px;
+  background: #262626;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pageBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pageBtn:hover:not(:disabled) {
+  background: #C0281B;
+}
+
+.pageInfo {
+  font-size: 13px;
+  color: #333;
+  font-weight: 600;
+}
+
+/* Table */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.thead {
+  background: #f8f8f8;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.thead th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #262626;
+  white-space: nowrap;
+}
+
+/* Table Body */
+.tbody tr {
+  border-bottom: 1px solid #e0e0e0;
+  transition: background-color 0.2s ease;
+}
+
+.tbody tr:hover {
+  background-color: #fafafa;
+}
+
+.tbody tr:last-child {
+  border-bottom: none;
+}
+
+.row td {
+  padding: 14px 16px;
+  vertical-align: middle;
+}
+
+/* Cells */
+.tdNumber {
+  text-align: center;
+  font-weight: 600;
+  color: #333;
+  width: 110px;
+}
+
+.tdTitulo {
+  font-weight: 500;
+  max-width: 220px;
+}
+
+.tdDescripcion {
+  max-width: 280px;
+  font-size: 13px;
+  color: #666;
+  word-break: break-all;
+}
+
+.tdEstado {
+  width: 100px;
+  text-align: center;
+}
+
+/* Badges */
+.badgeActive {
+  display: inline-block;
+  padding: 4px 8px;
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badgeInactive {
+  display: inline-block;
+  padding: 4px 8px;
+  background-color: #fff3e0;
+  color: #bf360c;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* CrearUsuario specific helpers */
+.crearContainer {
+  padding: 20px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.crearHeader {
+  margin-bottom: 16px;
+}
+
+.crearSection {
+  margin-bottom: 18px;
+}
+
+.crearRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.input {
+  padding: 10px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  min-width: 180px;
+}
+
+.select {
+  padding: 10px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background: white;
+}
+
+.btnPrimary {
+  padding: 8px 12px;
+  background: #C0281B;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.btnSecondary {
+  padding: 8px 12px;
+  background: #f0f0f0;
+  color: #333;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+/* Error badge */
+.badgeError {
+  display: inline-block;
+  padding: 4px 8px;
+  background-color: #ffebee;
+  color: #c62828;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badgeDraft {
+  display: inline-block;
+  padding: 4px 8px;
+  background-color: #fff3e0;
+  color: #e65100;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Actions */
+.tdAcciones {
+  position: relative;
+  width: 50px;
+  text-align: center;
+  z-index: 1;
+  pointer-events: auto;
+}
+
+.actionMenu {
+  position: relative;
+  display: inline-block;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.menuButton {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 12px 16px;
+  border-radius: 4px;
+  font-size: 18px;
+  color: #C0281B;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.menuButton:hover {
+  background-color: rgba(192, 40, 27, 0.1);
+  transform: scale(1.1);
+}
+
+.dropdownMenu {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 140px;
+  overflow: visible;
+}
+
+.btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  width: 100%;
+  text-align: left;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.btnView {
+  color: #1976d2;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.btnView:hover {
+  background-color: rgba(25, 118, 210, 0.08);
+}
+
+.btnEdit {
+  color: #f57c00;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.btnEdit:hover {
+  background-color: rgba(245, 124, 0, 0.08);
+}
+
+.btnDelete {
+  color: #d32f2f;
+}
+
+.btnDelete:hover {
+  background-color: rgba(211, 47, 47, 0.08);
+}
+
+/* Empty State */
+.emptyState {
+  padding: 60px 20px;
+  text-align: center;
+  color: #999;
+}
+
+.emptyState p {
+  font-size: 16px;
+  margin: 0;
+}
+
+/* Loading & Error */
+.loading,
+.error {
+  text-align: center;
+  padding: 40px 20px;
+  font-size: 16px;
+  border-radius: 8px;
+  background: white;
+  margin: 20px 0;
+}
+
+.loading {
+  color: #666;
+}
+
+.error {
+  color: #d32f2f;
+  background-color: #ffebee;
+  border: 1px solid #ef5350;
+}
+
+/* Scrollbar */
+.tableWrapper::-webkit-scrollbar {
+  height: 6px;
+}
+
+.tableWrapper::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+
+.tableWrapper::-webkit-scrollbar-thumb {
+  background: #C0281B;
+  border-radius: 10px;
+}
+
+.tableWrapper::-webkit-scrollbar-thumb:hover {
+  background: #8B1F14;
+}
+
+/* Responsive (misma estructura que tu CSS original) */
+@media (max-width: 1200px) { .container { padding: 18px; } }
+@media (max-width: 1024px) { .container { padding: 15px; } }
+@media (max-width: 768px) { .container { padding: 12px; } }
+@media (max-width: 640px) { .container { padding: 10px; } }
+@media (max-width: 480px) { .container { padding: 8px; } }

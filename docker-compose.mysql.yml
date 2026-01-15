@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: formularios
+      MYSQL_USER: lms_user
+      MYSQL_PASSWORD: ""
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/scripts/mysql.sql:/docker-entrypoint-initdb.d/mysql.sql
+    ports:
+      - "3307:3306"
+    networks:
+      - shared_net
+
+volumes:
+  mysql_data:
+
+networks:
+  shared_net:
+    external: true

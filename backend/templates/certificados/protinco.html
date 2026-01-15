@@ -1,0 +1,68 @@
+{% load static %}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Certificado</title>
+  <style>
+    @page { size: A4 landscape; margin: 0; }
+    html,body{height:100%;margin:0;font-family: 'Helvetica Neue', Arial, sans-serif;color:#222}
+    .wrapper{box-sizing:border-box;padding:40px;min-height:100%;display:flex;align-items:center;justify-content:center}
+    .certificate{
+      position: fixed;
+      position:relative;
+      width:1122px; /* landscape A4 approx */
+      height:794px;
+      background: url("{% static 'certificados/img/regency.svg' %}") no-repeat top right;
+      box-shadow:0 2px 10px rgba(0,0,0,0.08);
+      overflow:hidden;
+    }
+    /* decorative top curved band */
+    .certificate::before{
+      content:'';
+      position:absolute;left:0;right:0;top:0;height:160px;
+      background:linear-gradient(180deg,#9f0f15 0%, #a61b1f 100%);
+      transform:skewY(-3deg);
+      transform-origin:0 0;
+    }
+    .inner{position:relative;padding:60px 90px;text-align:center}
+    h1{margin:0;font-size:56px;letter-spacing:3px;font-weight:300}
+    .subtitle{margin-top:6px;font-size:14px;letter-spacing:2px}
+    .congrats{margin-top:28px;color:#666}
+    .name{font-size:36px;margin:16px 0;font-weight:700}
+    .idline{font-weight:600;color:#000}
+    .course{font-size:22px;margin-top:18px;font-weight:600}
+    .footer-note{margin-top:30px;color:#777;font-size:13px}
+    .signature{position:absolute;left:0;right:0;bottom:36px;text-align:center}
+    .signature img{height:60px}
+    .signature .title{font-size:12px;color:#333}
+    /* responsive small scaling */
+    @media (max-width:1200px){
+      .certificate{width:calc(100% - 80px);height:auto}
+    }
+  </style>
+</head>
+<body>
+    <div class="certificate" role="document" aria-label="Certificado">
+      <div class="inner">
+        <h1>CERTIFICADO</h1>
+        <div class="subtitle">DE PARTICIPACIÓN Y APROBACIÓN</div>
+
+        <div class="congrats">Felicitamos al señor(a)</div>
+
+        <div class="name">{{ NOMBRE }}</div>
+        <div class="idline">Con documento de identidad CC {{ IDENTIFICACION }}</div>
+
+        <div class="course">Por su aprobación de</div>
+        <div class="course">{{ CURSO }}</div>
+
+        <div class="footer-note">En constancia de lo anterior se firma el {{ FECHA }}</div>
+
+        <div class="signature">
+          <img src="{% static '/templates/img/regency.png' %}" alt="firma">
+          <div class="title">Gerente Gestión Humana<br>Gustavo Fernandez.</div>
+        </div>
+      </div>
+    </div>
+</body>

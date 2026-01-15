@@ -1,0 +1,94 @@
+version: "3.9"
+
+services:
+  backend:
+    build: ./backend
+    container_name: backend
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./backend:/app
+    env_file:
+      - .env
+    environment:
+      - DB_ENGINE=django.db.backends.mysql
+      - DB_NAME=formularios
+      - DB_USER=lms_user
+      - DB_PASSWORD=lms_password
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - REDIS_HOST=redis
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - shared_net
+
+  frontend:
+    image: node:20
+    container_name: frontend
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    command: sh -c "npm install && npm run dev -- --host"
+    networks:
+      - shared_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - shared_net
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - shared_net
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "no"
+      MYSQL_DATABASE: formularios
+      MYSQL_USER: lms_user
+      MYSQL_PASSWORD: lms_password
+      MYSQL_ROOT_PASSWORD: root_password
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/scripts/mysql.sql:/docker-entrypoint-initdb.d/mysql.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - shared_net
+
+volumes:
+  redis_data:
+  mysql_data:
+
+networks:
+  shared_net:
+    external: false

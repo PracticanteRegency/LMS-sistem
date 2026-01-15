@@ -1,0 +1,41 @@
+version: "3.9"
+
+services:
+  backend:
+    container_name: backend
+    build: ./backend
+    command: gunicorn app.wsgi:application --bind 0.0.0.0:8000
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    expose:
+      - "8000"
+
+  frontend:
+    container_name: frontend
+    build: ./frontend
+    expose:
+      - "80"
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - shared_net
+
+volumes:
+  redis_data:

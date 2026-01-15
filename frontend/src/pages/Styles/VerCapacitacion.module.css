@@ -1,0 +1,623 @@
+.container {
+  max-width: flex;
+  margin: 0 auto;
+  padding: 0;
+  background-color: #f0f0f0;
+  min-height: 100vh;
+}
+
+/* Header Section */
+.header {  
+  background-color: #b0b0b0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  margin: 10px;
+  padding: 16px;
+}
+
+.headerTop {
+  background-color: #b0b0b0;
+  padding: 8px 12px;
+  border-radius: 4px 4px 0 0;
+}
+
+.headerTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.imageContainer {
+  width: 100%;
+  height: 240px; /* increased to show images larger */
+  background-color: #d32f2f;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  border-radius: 4px;
+}
+
+.headerImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.imagePlaceholder {
+  width: 100%;
+  height: 100%;
+  background-color: #d32f2f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.headerContent {
+  padding: 0;
+}
+
+.descriptionTitle {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.description {
+  margin: 0 0 16px 0;
+  color: #555;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* Progress Section */
+.progressSection {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.progressLabel {
+  font-size: 13px;
+  color: #333;
+  font-weight: 500;
+  white-space: nowrap;
+  min-width: 70px;
+}
+
+.progressBarContainer {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.progressBar {
+  flex: 1;
+  height: 6px;
+  background-color: #ddd;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background-color: #d32f2f;
+  transition: width 0.3s ease;
+}
+
+.progressPercent {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+  white-space: nowrap;
+  min-width: 180px;
+  text-align: right;
+}
+
+/* Módulos List */
+.modulosList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.moduloCard {
+  background-color: #A1A1A1;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.moduloHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background-color: #f5f5f5;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  user-select: none;
+}
+
+.moduloHeader:hover {
+  background-color: #efefef;
+}
+
+.moduloHeaderLeft {
+  flex: 1;
+}
+
+.moduloTitle {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.moduloInfo {
+  margin: 0;
+  font-size: 12px;
+  color: #999;
+}
+
+.moduloProgress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 180px;
+}
+
+.progressBarSmall {
+  flex: 1;
+  height: 5px;
+  background-color: #e0e0e0;
+  border-radius: 2px;
+  overflow: hidden;
+  min-width: 100px;
+}
+
+.progressFillSmall {
+  height: 100%;
+  background-color: #d32f2f;
+  transition: width 0.3s ease;
+}
+
+.progressPercentSmall {
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  min-width: 30px;
+  text-align: right;
+}
+
+.expandIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: #666;
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+/* Lecciones List */
+.leccionesList {
+  padding: 12px 16px;
+  background-color: #fafafa;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.leccionItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background-color: white;
+  border-radius: 4px;
+  border-left: 3px solid #d32f2f;
+  transition: all 0.2s ease;
+}
+
+.leccionItem:hover {
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.leccionCheckbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.checkmark {
+  font-size: 14px;
+  color: #d32f2f;
+  font-weight: bold;
+}
+
+.circleEmpty {
+  font-size: 14px;
+  color: #999;
+}
+
+.leccionInfo {
+  flex: 1;
+}
+
+.leccionThumbnail {
+  margin-top: 8px;
+}
+
+.leccionThumbnail img {
+  width: 100px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.leccionTitle {
+  margin: 0 0 2px 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.leccionDuration {
+  font-size: 11px;
+  color: #999;
+}
+
+.btnReproducir {
+  padding: 6px 14px;
+  background-color: #f0f0f0;
+  color: #333;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  min-height: 32px;
+}
+
+.btnReproducir:hover {
+  background-color: #e0e0e0;
+}
+
+.btnDisabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: #f5f5f5;
+  color: #999;
+}
+
+.hint {
+  font-size: 12px;
+  color: #777;
+  margin-top: 6px;
+}
+
+.noLecciones {
+  text-align: center;
+  color: #999;
+  padding: 16px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.noModulos {
+  text-align: center;
+  color: #999;
+  padding: 24px 16px;
+  margin: 0;
+  font-size: 14px;
+}
+
+/* Loading and Error States */
+.loading,
+.error {
+  text-align: center;
+  padding: 40px 20px;
+  font-size: 16px;
+}
+
+.loading {
+  color: #666;
+}
+
+.error {
+  color: #d32f2f;
+}
+
+.errorBox {
+  background-color: white;
+  border-radius: 8px;
+  padding: 30px;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin: 16px;
+}
+
+.btnBack {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 8px 12px;
+  margin: 16px;
+  transition: all 0.3s ease;
+}
+
+.btnBack:hover {
+  color: #333;
+  transform: translateX(-4px);
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .container {
+    padding: 0;
+  }
+
+  .header {
+    margin: 12px;
+    border-radius: 10px;
+  }
+
+  .imageContainer {
+    height: 200px;
+  }
+
+  .moduloCard {
+    border-radius: 6px;
+  }
+
+  .moduloTitle {
+    font-size: 15px;
+  }
+
+  .leccionTitle {
+    font-size: 13px;
+  }
+
+  .btnReproducir {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0;
+  }
+
+  .header {
+    margin: 12px;
+    padding: 12px;
+    border-radius: 8px;
+  }
+
+  .imageContainer {
+    height: 140px;
+    margin-bottom: 12px;
+  }
+
+  .headerTitle {
+    font-size: 15px;
+  }
+
+  .modulosList {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .moduloHeader {
+    padding: 12px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .moduloHeaderLeft {
+    flex: 1 1 auto;
+    min-width: 150px;
+  }
+
+  .moduloTitle {
+    font-size: 15px;
+  }
+
+  .moduloProgress {
+    width: 100%;
+    min-width: auto;
+  }
+
+  .progressSection {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .progressLabel {
+    min-width: auto;
+  }
+
+  .progressBarContainer {
+    width: 100%;
+    flex-direction: row;
+    gap: 12px;
+  }
+
+  .progressPercent {
+    min-width: 40px;
+    text-align: right;
+  }
+
+  .leccionItem {
+    flex-wrap: wrap;
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .leccionInfo {
+    flex: 1 1 100%;
+  }
+
+  .btnReproducir {
+    width: 100%;
+    padding: 8px 12px;
+  }
+
+  .descriptionTitle {
+    font-size: 14px;
+  }
+
+  .description {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 640px) {
+  .header {
+    margin: 10px;
+    padding: 10px;
+  }
+
+  .imageContainer {
+    height: 110px;
+    margin-bottom: 10px;
+  }
+
+  .headerTitle {
+    font-size: 14px;
+  }
+
+  .modulosList {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .moduloHeader {
+    padding: 10px;
+    flex-direction: column;
+  }
+
+  .moduloTitle {
+    font-size: 13px;
+  }
+
+  .moduloInfo {
+    font-size: 11px;
+  }
+
+  .leccionItem {
+    padding: 8px;
+    gap: 8px;
+    flex-direction: column;
+  }
+
+  .leccionCheckbox {
+    width: 20px;
+    height: 20px;
+  }
+
+  .leccionTitle {
+    font-size: 12px;
+  }
+
+  .btnReproducir {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    margin: 8px;
+    padding: 8px;
+  }
+
+  .imageContainer {
+    height: 100px;
+    margin-bottom: 8px;
+  }
+
+  .headerTitle {
+    font-size: 13px;
+  }
+
+  .descriptionTitle {
+    font-size: 12px;
+  }
+
+  .description {
+    font-size: 12px;
+  }
+
+  .modulosList {
+    padding: 8px;
+    gap: 8px;
+  }
+
+  .moduloHeader {
+    padding: 8px;
+  }
+
+  .moduloTitle {
+    font-size: 12px;
+  }
+
+  .moduloInfo {
+    font-size: 10px;
+  }
+
+  .progressLabel {
+    font-size: 12px;
+  }
+
+  .progressPercent {
+    font-size: 11px;
+    min-width: 35px;
+  }
+
+  .leccionItem {
+    padding: 6px;
+    gap: 6px;
+  }
+
+  .leccionCheckbox {
+    width: 18px;
+    height: 18px;
+  }
+
+  .leccionTitle {
+    font-size: 11px;
+  }
+
+  .leccionDuration {
+    font-size: 10px;
+  }
+
+  .btnReproducir {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+}

@@ -1,0 +1,289 @@
+/* ========================================
+   ESTILOS PARA RESPONDER LECCIÓN (ResponderLeccion.tsx)
+   Diseño responsivo y accesible para todas las pantallas
+   ======================================== */
+
+/* ========== CONTENEDOR PRINCIPAL ==========
+   Define el ancho máximo del formulario y espaciado general
+   - max-width: 1200px - ancho máximo más grande para mejor visibilidad
+   - margin: 0 auto - centra el contenedor horizontalmente
+   - padding: 24px - espacio interno mayor
+   - background-color: #1a1a1a - fondo oscuro
+   - min-height: 100vh - altura mínima de la pantalla
+*/
+.container {
+  max-width: 1200px;
+  padding: 24px;
+  background-color: #A1A1A1;
+  color: #e0e0e0;
+  box-sizing: border-box;
+}
+
+/* ========== SECCIÓN DE ENCABEZADO ==========
+   Estilos para la sección superior con título y descripción
+   - padding: 24px - espacio interno más generoso
+   - margin-bottom: 32px - separación clara con el formulario
+   - border-bottom: 2px solid - línea divisoria
+*/
+.header {
+  padding: 24px;
+  margin-bottom: 32px;
+  border-bottom: 2px solid #333;
+}
+
+/* ========== TÍTULO PRINCIPAL ==========
+   Título de la lección a responder
+   - font-size: 28px - tamaño más grande para mejor legibilidad
+   - font-weight: 700 - más grueso para mayor impacto
+   - color: #ffffff - blanco puro para contraste
+*/
+.headerTitle {
+  margin: 0 0 12px 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+/* ========== DESCRIPCIÓN ==========
+   Texto descriptivo de la lección
+   - font-size: 15px - tamaño legible
+   - color: #b0b0b0 - gris claro para contraste
+   - line-height: 1.6 - espaciado de líneas cómodo
+*/
+.description {
+  margin: 0;
+  font-size: 15px;
+  color: #b0b0b0;
+  line-height: 1.6;
+}
+
+.formularioContainer {
+  background-color: #313134;
+  padding: 18px;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.6);
+}
+
+.preguntaCard {
+  margin-bottom: 16px;
+  padding: 14px;
+  background-color: #2f2f2f;
+  border-radius: 10px;
+}
+
+.preguntaHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.questionLabel {
+  font-size: 13px;
+  color: #cfcfcf;
+}
+
+.badge {
+  background-color: #C0281B;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.questionBox {
+  background: #fff;
+  color: #222;
+  padding: 10px 12px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.preguntaMedia {
+  margin-bottom: 10px;
+  text-align: center;
+  /* permitir scroll interno si la imagen supera el alto disponible */
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.preguntaImage {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #111; /* helps when image has transparent/odd background */
+}
+
+.answersList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 12px;
+}
+
+.respuestaCard {
+  background: #232323;
+  padding: 8px;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.respuestaMediaTop {
+  max-width: 100%;
+  max-height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto; /* permitir scroll si la imagen es más grande */
+}
+
+.respuestaImage {
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 100%;
+  object-fit: contain; /* mostrar la imagen completa dentro del recuadro */
+  border-radius: 6px;
+  background: #111;
+}
+
+@media (max-width: 720px) {
+  .answersList {
+    grid-template-columns: 1fr;
+  }
+  .respuestaImage {
+    height: 220px;
+    max-height: 40vh;
+  }
+  .preguntaImage {
+    height: 220px;
+    max-height: 50vh;
+  }
+  .answerRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .selector {
+    align-self: flex-start;
+  }
+}
+
+.respuestaItem {
+  display: block;
+  padding: 6px 0;
+}
+
+.answerLabel {
+  font-size: 13px;
+  color: #cfcfcf;
+  margin-bottom: 6px;
+}
+
+.answerRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+}
+
+.selector {
+  width: 24px;
+  height: 24px;
+  aspect-ratio: 1 / 1;
+  border: 2px solid #ddd;
+  background-color: #A1A1A1;
+  display: inline-block;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  margin-top: 4px;
+}
+
+/* Selector circular para opción única */
+.circle {
+  border-radius: 50%;
+}
+
+/* Selector cuadrado para opción múltiple */
+.square {
+  border-radius: 0px;
+}
+
+.selected { background: #C0281B; border-color: #C0281B; }
+
+.answerField {
+  background: #fff;
+  color: #222;
+  border: none;
+  padding: 10px 12px;
+  border-radius: 8px;
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-family: inherit;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  line-height: 1.5;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.respuestaMedia {
+  margin-left: 6px;
+}
+
+.respuestaImage {
+  max-width: 120px;
+  max-height: 90px;
+  border-radius: 6px;
+}
+
+.formActions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 14px;
+  position: sticky;
+  bottom: 0;
+  background: rgba(49,49,52,0.96);
+  padding: 12px 0;
+  z-index: 30;
+}
+
+/* Evitar que la barra de acciones oculte el contenido final */
+.formularioContainer {
+  padding-bottom: 96px;
+}
+
+.btnCancel {
+  padding: 8px 14px;
+  background-color: #333;
+  color: #fff;
+  border: 1px solid #444;
+  border-radius: 8px;
+}
+
+.btnSubmit {
+  padding: 8px 16px;
+  background-color: #C0281B;
+  color: white;
+  border: none;
+  border-radius: 8px;
+}
+
+.loading {
+  text-align: center;
+  color: #a0a0a0;
+  padding: 40px 20px;
+  font-size: 16px;
+}

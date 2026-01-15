@@ -1,0 +1,400 @@
+.container {
+  width: 100%;
+  height: 100vh;
+  background-color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.playerContainer {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: #1a1a1a;
+  color: white;
+  /* espacio inferior para el botón fijo */
+}
+
+.header {
+  background-color: #2a2a2a;
+  padding: 20px;
+  border-bottom: 1px solid #404040;
+  text-align: center;
+}
+
+.title {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: white;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: #d32f2f;
+  font-weight: 500;
+}
+
+.videoWrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #000;
+  position: relative;
+  overflow: hidden;
+}
+
+.youtubeWrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.videoPlayer,
+.youtubePlayer {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background-color: #000;
+}
+
+/* Force iframe created by YouTube API to fill the container */
+.youtubePlayer iframe {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+/* Botón fijo de marcar lección */
+.fixedMarkContainer {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 18px;
+  z-index: 2147483646; /* very high to ensure visibility */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.fixedMarkBtn {
+  padding: 12px 28px;
+  background-color: #d32f2f;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+  z-index: 2147483647; /* ensure button stays above other overlays */
+}
+
+.fixedMarkBtn[disabled], .fixedMarkBtn[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.fixedNote {
+  color: #ffdede;
+  font-size: 13px;
+  background: rgba(0,0,0,0.5);
+  padding: 6px 12px;
+  border-radius: 6px;
+}
+
+.mediaWrapper { padding-bottom: 0; }
+
+.youtubePlayer {
+  border: none;
+}
+
+.descriptionBox {
+  background-color: #2a2a2a;
+  padding: 20px;
+  border-top: 1px solid #404040;
+  max-height: 200px;
+  overflow-y: auto;
+  display: none;
+}
+
+.descriptionBox::-webkit-scrollbar {
+  width: 8px;
+}
+
+.descriptionBox::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+.descriptionBox::-webkit-scrollbar-thumb {
+  background: #404040;
+  border-radius: 4px;
+}
+
+.descriptionBox::-webkit-scrollbar-thumb:hover {
+  background: #505050;
+}
+
+.descriptionTitle {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+}
+
+.description {
+  margin: 0;
+  font-size: 14px;
+  color: #ccc;
+  line-height: 1.6;
+}
+
+.completedBox {
+  background-color: #2a2a2a;
+  padding: 30px;
+  border-top: 1px solid #404040;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.successIcon {
+  width: 60px;
+  height: 60px;
+  background-color: #4caf50;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  color: white;
+  font-weight: bold;
+}
+
+.completedText {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #4caf50;
+}
+
+.btnFinalizar {
+  padding: 12px 32px;
+  background-color: #d32f2f;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-height: 44px;
+}
+
+.btnFinalizar:hover {
+  background-color: #b71c1c;
+  transform: translateY(-2px);
+}
+
+.btnMarcarCompletado {
+  padding: 10px 24px;
+  background-color: #d32f2f;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-height: 40px;
+}
+
+.btnMarcarCompletado:hover {
+  background-color: #b71c1c;
+}
+
+.warningBox {
+  background-color: #3a2a2a;
+  padding: 16px;
+  border-top: 1px solid #d32f2f;
+  text-align: center;
+}
+
+.warningText {
+  margin: 0;
+  font-size: 14px;
+  color: #ff9999;
+  font-weight: 500;
+}
+
+.mediaWrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px;
+}
+
+.imageContent {
+  max-width: 90%;
+  max-height: 80vh;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+
+.pdfViewer {
+  width: 100%;
+  max-width: 900px;
+  height: 75vh;
+  min-height: 350px;
+  margin: 0 auto;
+  display: block;
+  background: #f8f8f8;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px 0 rgba(0,0,0,0.10), 0 1.5px 4px 0 rgba(0,0,0,0.08);
+  transition: box-shadow 0.2s;
+}
+
+@media (max-width: 1000px) {
+  .pdfViewer {
+    max-width: 98vw;
+    height: 60vh;
+  }
+}
+
+@media (max-width: 600px) {
+  .pdfViewer {
+    max-width: 100vw;
+    height: 45vh;
+    border-radius: 6px;
+  }
+}
+
+.btnDescargar {
+  padding: 8px 16px;
+  background-color: #d32f2f;
+  color: white;
+  border-radius: 6px;
+  text-decoration: none;
+}
+
+.unsupported {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  color: #ccc;
+}
+
+.loading,
+.error {
+  text-align: center;
+  font-size: 16px;
+  color: #999;
+}
+
+.error {
+  color: #ff6b6b;
+}
+
+.errorBox {
+  background-color: #2a2a2a;
+  border-radius: 8px;
+  padding: 30px;
+  text-align: center;
+  margin: auto;
+}
+
+.btnBack {
+  margin-top: 20px;
+  padding: 10px 20px;
+  background-color: #d32f2f;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-height: 40px;
+}
+
+.btnBack:hover {
+  background-color: #b71c1c;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .title {
+    font-size: 18px;
+  }
+
+  .subtitle {
+    font-size: 12px;
+  }
+
+  .completedBox {
+    padding: 20px;
+  }
+
+  .successIcon {
+    width: 50px;
+    height: 50px;
+    font-size: 28px;
+  }
+
+  .completedText {
+    font-size: 16px;
+  }
+
+  .btnFinalizar {
+    padding: 10px 24px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    padding: 16px;
+  }
+
+  .title {
+    font-size: 16px;
+  }
+
+  .completedBox {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .successIcon {
+    width: 45px;
+    height: 45px;
+    font-size: 24px;
+  }
+
+  .completedText {
+    font-size: 14px;
+  }
+
+  .btnFinalizar {
+    width: 100%;
+    padding: 10px 16px;
+  }
+}

@@ -1,0 +1,1465 @@
+.container {
+  width: 100%;
+  /* allow more horizontal space for the create-form UI */
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Header */
+.header {
+  margin-bottom: 30px;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 20px;
+}
+
+.headerContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  color: #333;
+}
+
+.backButton {
+  background: none;
+  border: none;
+/* .fileName removed — filename is not shown in UI */
+  font-size: 24px;
+  cursor: pointer;
+  color: #333;
+  padding: 5px;
+}
+
+.backButton:hover {
+  color: #666;
+}
+
+.btnGuardar {
+  background: #C0281B;
+  color: white;
+  border: none;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 160px;
+  white-space: nowrap;
+}
+
+.btnGuardar:hover:not(:disabled) {
+  background: #8B1F14;
+}
+
+.btnGuardar:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btnLimpiar {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.btnLimpiar:hover {
+  background: #5a6268;
+}
+
+/* Form Container */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.sectionformupload {
+  width: flex;
+  min-height: 220px;
+  border: 2px dashed #555;
+  border-radius: 12px;
+  background-color: #8d8b8b;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  transition: all 0.25s ease;
+}
+
+
+
+
+/* Label como dropzone */
+.dropzoneLabel {
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  text-align: center;
+}
+
+
+/* Icono */
+.dropzoneIcon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 12px;
+  color: #000000;
+}
+
+/* Texto principal */
+.dropzoneText {
+  font-size: 14px;
+  color: #000000;
+  margin-bottom: 4px;
+}
+
+.dropzoneText span {
+  font-weight: 600;
+}
+
+/* Subtexto */
+.dropzoneSubtext {
+  font-size: 12px;
+  color: #25272a;
+}
+
+/* Input oculto */
+.hiddenInput {
+  display: none;
+}
+
+/* Vista previa de imagen */
+.previewThumb {
+  margin-top: 10px;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.withPreview {
+  padding: 12px;
+  min-height: unset;
+  border-style: solid;
+}
+
+
+
+/* Sección */
+
+.smallSelect {
+  padding: 6px 8px;
+  color: #1a1a1a;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  background: white;
+  font-size: 12px;
+}
+.section {
+  background: #f5f5f5;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  padding: 20px;
+}
+
+.section h2 {
+  margin: 0 0 20px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.sectionDescription {
+  margin: 0 0 15px 0;
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.sectionHeader h2 {
+  margin: 0;
+}
+
+.sectionRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  text-transform: lowercase;
+}
+
+.label::first-letter {
+  text-transform: capitalize;
+}
+
+.input,
+.textarea {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  color: black;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: Arial, sans-serif;
+  background: white;
+  color-scheme: black;
+  transition: border-color 0.3s ease;
+}
+
+.input:focus,
+.textarea:focus {
+  outline: none;
+  border-color: #C0281B;
+  box-shadow: 0 0 0 2px rgba(192, 40, 27, 0.1);
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.helpText {
+  font-size: 12px;
+  color: #999;
+  margin: 0;
+}
+
+.btnCargar {
+  background: #333;
+  color: white;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.3s ease;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.btnCargar:hover {
+  background: #1a1a1a;
+}
+
+/* Error */
+.error {
+  background: #ffebee;
+  color: #c62828;
+  padding: 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  margin: 0;
+  border-left: 4px solid #c62828;
+}
+
+/* Módulos */
+.modulo {
+  background: white;
+  border: 2px solid #333;
+  border-radius: 4px;
+  margin-bottom: 15px;
+  overflow: hidden;
+}
+
+.moduloHeader {
+  background: #333;
+  color: white;
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.moduloHeader:hover {
+  background: #1a1a1a;
+}
+
+.expandIcon {
+  font-size: 12px;
+}
+
+.moduloHeader h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.btnAgregarLeccion {
+  background: #C0281B;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.btnAgregarLeccion:hover {
+  background: #8B1F14;
+}
+
+.moduloContent {
+  padding: 15px;
+  background: white;
+}
+
+.leccion {
+  background: #e8e8e8;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.leccion p {
+  margin: 0;
+  color: #333;
+}
+
+.leccionForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.fieldRow {
+  display: flex;
+  flex-direction: column; /* CLAVE */
+  gap: 12px;
+}
+
+
+.formPlaceholder {
+  border: 1px dashed #ccc;
+  padding: 12px;
+  border-radius: 6px;
+  background: #fafafa;
+  color: #666;
+  font-size: 13px;
+}
+
+.formCard {
+  background: #323234;
+  color: #fff;
+  padding: 18px;
+  border-radius: 12px;
+  justify-content: center;
+  margin-top: 8px;
+
+}
+
+/* Thumbnail preview for images in create form */
+.previewThumb {
+  display: inline-block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background: #fafafa;
+  
+}
+
+.previewThumbSmall {
+  width: 50%;
+  height: 100%;
+}
+
+.previewTiny {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+  background: #fff;
+}
+
+.questionCard {
+  background: transparent;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 12px;
+  width: min(100%, 900px);
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.questionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.questionHeader > div:last-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.btnSmall {
+  background: #C0281B;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  margin-right: 8px;
+}
+
+.trashBtn {
+  background: #C0281B;
+  color: white;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  margin-left: 8px;
+}
+
+.answersList {
+  display: flex;
+  flex-direction: column;
+  gap: 5%;
+  margin-top: 10px;
+}
+
+.answerRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 100%;
+}
+
+.answerRow input {
+  flex: 1 1 220px;
+  min-width: 0;
+  order: 1;
+}
+
+.answerRow .selector,
+.answerRow .trashBtn,
+.answerRow label {
+  flex-shrink: 0;
+}
+
+.answerRow .selector {
+  order: 0;
+}
+
+.answerRow label,
+.answerRow .trashBtn,
+.answerRow img {
+  order: 2;
+}
+
+.selector {
+  width: 24px;
+  height: 24px;
+  aspect-ratio: 1 / 1;
+  border: 2px solid #ddd;
+  background-color: #A1A1A1;
+  display: inline-block;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+/* Selector circular para opción única */
+.circle {
+  border-radius: 50%;
+}
+
+/* Selector cuadrado para opción múltiple */
+.square {
+  border-radius: 0px;
+}
+
+.selected {
+  background: #C0281B;
+  border-color: #C0281B;
+}
+
+/* Modal / Large card for creating a lección */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+
+.modalCard {
+  width: 100%;
+  max-width: 980px;
+  background: #f3f3f3;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+  overflow: hidden;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: #e6e6e6;
+  border-bottom: 1px solid #ddd;
+}
+
+.modalBody {
+  padding: 20px;
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.changeImageBtn {
+  background: #C0281B;
+  color: white;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+}
+
+.modalFooter {
+  display: flex;
+  gap: 12px;
+  padding: 16px 20px;
+  justify-content: flex-end;
+  background: #f5f5f5;
+  border-top: 1px solid #ddd;
+}
+
+.previewWrapper {
+  position: relative;
+  width: fit-content;
+}
+
+.previewButton {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+}
+
+/* Texto overlay al pasar el mouse */
+.overlayText {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0;
+  border-radius: 8px;
+  transition: opacity 0.2s ease;
+}
+
+.previewButton:hover .overlayText {
+  opacity: 1;
+}
+
+
+
+.leccionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.leccionActions {
+  display: flex;
+  gap: 8px;
+}
+
+.leccionTitulo {
+  font-size: 14px;
+  color: #333;
+}
+
+
+.btnSmall {
+  background: #C0281B;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btnAgregarModulo {
+  background: #C0281B;
+  color: white;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+}
+
+.btnAgregarModulo:hover {
+  background: #8B1F14;
+}
+
+/* CSV Section */
+.csvSection {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.csvLink {
+  background: #C0281B;
+  color: white;
+  padding: 10px 16px;
+  border-radius: 4px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.3s ease;
+  cursor: pointer;
+}
+
+.csvLink:hover {
+  background: #8B1F14;
+}
+
+.btnSubirCsv {
+  background: #C0281B;
+  color: white;
+  padding: 12px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  border: none;
+  display: inline-block;
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.btnSubirCsv:hover {
+  background: #8B1F14;
+}
+
+/* Colaboradores Table */
+.colaboradoresTable {
+  margin-top: 20px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.colaboradoresHeader {
+  padding: 15px;
+  border-bottom: 1px solid #ddd;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.colaboradoresHeader h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  flex: 1;
+  min-width: 200px;
+}
+
+.searchInput {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  min-width: 250px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: #2196F3;
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+}
+
+.noResults {
+  padding: 20px;
+  text-align: center;
+  color: #999;
+  font-size: 14px;
+  margin: 0;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table thead {
+  background: #f5f5f5;
+  border-bottom: 2px solid #ddd;
+}
+
+.table th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+}
+
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.table tbody tr:hover {
+  background: #f9f9f9;
+}
+
+.usuarioCell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.usuarioCell strong {
+  font-size: 14px;
+  color: #333;
+}
+
+.usuarioCell small {
+  font-size: 12px;
+  color: #999;
+}
+
+.btnEllipsis {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: #666;
+  padding: 8px 10px;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+
+.btnEllipsis:hover {
+  color: #333;
+}
+
+/* Delete/Remove button for collaborators list */
+.btnEliminar {
+  background: none;
+  border: 1px solid #e74c3c;
+  cursor: pointer;
+  font-size: 16px;
+  color: #e74c3c;
+  padding: 6px 10px;
+  min-width: 40px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.btnEliminar:hover {
+  background: #ffe6e6;
+  border-color: #c0392b;
+  color: #c0392b;
+}
+
+/* Consistent interactive / pending behavior for CrearCapacitacion */
+button,
+.btnGuardar,
+.btnCargar,
+.btnSubirCsv,
+.btnAgregarModulo,
+.btnAgregarLeccion {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+button:disabled,
+.btnGuardar:disabled,
+.btnCargar:disabled,
+.btnSubirCsv:disabled {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .container {
+    padding: 18px;
+    max-width: 100%;
+  }
+
+  .header h1 {
+    font-size: 26px;
+  }
+
+  .sectionRow {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .fieldRow {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .modalCard {
+    max-width: 900px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .container {
+    padding: 16px;
+  }
+
+  .sectionRow {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .headerContent {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .btnGuardar {
+    align-self: flex-end;
+    width: auto;
+  }
+
+  .fieldRow {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .modalCard {
+    max-width: 800px;
+  }
+
+  .modalBody {
+    max-height: 65vh;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 12px;
+  }
+
+  .header h1 {
+    font-size: 22px;
+  }
+
+  .backButton {
+    font-size: 20px;
+  }
+
+  .sectionRow {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .fieldRow {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .section {
+    padding: 15px;
+    margin-bottom: 15px;
+  }
+
+  .section h2 {
+    font-size: 15px;
+  }
+
+  .headerLeft {
+    width: 100%;
+    gap: 15px;
+  }
+
+  .headerContent {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .btnGuardar {
+    width: 100%;
+    min-width: unset;
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+
+  .table {
+    font-size: 12px;
+  }
+
+  .table th,
+  .table td {
+    padding: 8px 6px;
+  }
+
+  .moduloHeader {
+    font-size: 14px;
+    padding: 12px;
+  }
+
+  .moduloHeader h3 {
+    font-size: 14px;
+  }
+
+  .btnAgregarLeccion {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .modalCard {
+    max-width: 90vw;
+    margin: 10px;
+  }
+
+  .modalHeader {
+    padding: 12px 16px;
+  }
+
+  .modalBody {
+    padding: 15px;
+    max-height: 60vh;
+  }
+
+  .modalFooter {
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    gap: 8px;
+  }
+
+  .btnSmall {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .container {
+    padding: 10px;
+  }
+
+  .header {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+  }
+
+  .header h1 {
+    font-size: 20px;
+  }
+
+  .backButton {
+    font-size: 18px;
+  }
+
+  .headerContent {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .headerLeft {
+    width: 100%;
+    gap: 10px;
+  }
+
+  .btnGuardar {
+    width: 100%;
+    min-width: unset;
+    font-size: 12px;
+    padding: 8px 12px;
+    min-height: 40px;
+  }
+
+  .section {
+    padding: 12px;
+    border-radius: 6px;
+  }
+
+  .section h2 {
+    font-size: 14px;
+    margin-bottom: 15px;
+  }
+
+  .sectionDescription {
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+
+  .formGroup {
+    gap: 6px;
+  }
+
+  .label {
+    font-size: 13px;
+  }
+
+  .input,
+  .textarea {
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+
+  .fieldRow {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .csvSection {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .csvLink,
+  .btnSubirCsv {
+    width: flex;
+    text-align: center;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .modulo {
+    margin-bottom: 10px;
+  }
+
+  .moduloHeader {
+    padding: 10px 12px;
+    font-size: 13px;
+    gap: 8px;
+  }
+
+  .moduloHeader h3 {
+    font-size: 13px;
+  }
+
+  .expandIcon {
+    font-size: 11px;
+  }
+
+  .btnAgregarModulo {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 12px;
+    min-height: 40px;
+  }
+
+  .btnAgregarLeccion {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .modalCard {
+    max-width: 95vw;
+    margin: 8px;
+    border-radius: 10px;
+  }
+
+  .modalHeader {
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+
+  .modalBody {
+    padding: 12px;
+    max-height: 55vh;
+  }
+
+  .modalFooter {
+    padding: 10px 14px;
+    gap: 6px;
+  }
+
+  .formCard {
+    padding: 12px;
+  }
+
+  .questionHeader {
+    font-size: 12px;
+  }
+
+  .btnSmall {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  .trashBtn {
+    font-size: 14px;
+  }
+
+  .table {
+    font-size: 11px;
+  }
+
+  .table th,
+  .table td {
+    padding: 6px 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 8px;
+  }
+
+  .header {
+    margin-bottom: 15px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #ddd;
+  }
+
+  .headerContent {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .headerLeft {
+    width: 100%;
+    gap: 8px;
+    flex-direction: column;
+  }
+
+  .header h1 {
+    font-size: 18px;
+  }
+
+  .backButton {
+    font-size: 16px;
+  }
+
+  .btnGuardar {
+    width: 100%;
+    font-size: 12px;
+    padding: 8px 10px;
+    min-height: 38px;
+  }
+
+  .section {
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+  }
+
+  .section h2 {
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+
+  .sectionDescription {
+    font-size: 12px;
+  }
+
+  .sectionHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .sectionRow {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .formGroup {
+    gap: 5px;
+  }
+
+  .label {
+    font-size: 12px;
+  }
+
+  .input,
+  .textarea {
+    padding: 8px 8px;
+    font-size: 14px;
+  }
+
+  .helpText {
+    font-size: 11px;
+  }
+
+  .btnCargar {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-height: 36px;
+  }
+
+  .csvSection {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .csvLink,
+  .btnSubirCsv {
+    width: flex;
+    padding: 8px 10px;
+    font-size: 11px;
+    min-height: 38px;
+  }
+
+  .modulo {
+    margin-bottom: 8px;
+    border-radius: 4px;
+  }
+
+  .moduloHeader {
+    padding: 8px 10px;
+    font-size: 12px;
+    gap: 6px;
+  }
+
+  .moduloHeader h3 {
+    font-size: 12px;
+  }
+
+  .btnAgregarModulo {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 11px;
+    min-height: 36px;
+  }
+
+  .btnAgregarLeccion {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+
+  .leccion {
+    padding: 8px;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+
+  .leccionForm {
+    gap: 8px;
+  }
+
+  .fieldRow {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .modalCard {
+    max-width: 100%;
+    margin: 4px;
+    border-radius: 8px;
+  }
+
+  .modalHeader {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .modalBody {
+    padding: 10px;
+    max-height: 50vh;
+  }
+
+  .modalFooter {
+    padding: 8px 12px;
+    gap: 4px;
+    flex-direction: column;
+  }
+
+  .modalFooter button {
+    width: 100%;
+  }
+
+  .formCard {
+    padding: 10px;
+    border-radius: 10px;
+  }
+
+  .questionCard {
+    padding: 8px 0;
+    margin-bottom: 8px;
+    width: 100%;
+    max-width: 100%;
+  }
+
+
+  .questionHeader {
+    font-size: 11px;
+    gap: 4px;
+  }
+
+  .btnSmall {
+    padding: 4px 6px;
+    font-size: 10px;
+    margin-right: 4px;
+  }
+
+  .trashBtn {
+    font-size: 12px;
+  }
+
+  .answersList {
+    font-size: 12px;
+  }
+
+  .answerRow {
+    gap: 6px;
+    font-size: 12px;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .selector {
+    width: 18px;
+    height: 18px;
+  }
+
+  .table {
+    font-size: 10px;
+  }
+
+  .table th,
+  .table td {
+    padding: 4px 3px;
+  }
+
+  .colaboradoresTable {
+    margin-top: 12px;
+  }
+
+  .usuarioCell strong {
+    font-size: 12px;
+  }
+
+  .usuarioCell small {
+    font-size: 10px;
+  }
+
+  .btnEllipsis {
+    padding: 4px 6px;
+    font-size: 14px;
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
+
+
+.previewImage {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-top: 8px;
+  border: 1px solid #ccc;
+}
