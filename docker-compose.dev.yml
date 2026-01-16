@@ -78,7 +78,7 @@ services:
     image: nginx:alpine
     container_name: nginx
     volumes:
-      - nginx/nginx.dev.conf:/etc/nginx/nginx.conf
+      - nginx/nginx.prod.conf:/etc/nginx/nginx.conf
     ports:
       - "80:80"
     depends_on:
