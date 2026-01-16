@@ -1,19 +1,26 @@
 version: "3.9"
 
 services:
-  mysql:
+    mysql:
     image: mysql:8.0
     container_name: mysql
+    restart: always
     environment:
-      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_ALLOW_EMPTY_PASSWORD: "no"
       MYSQL_DATABASE: formularios
       MYSQL_USER: lms_user
-      MYSQL_PASSWORD: ""
+      MYSQL_PASSWORD: lms_password
+      MYSQL_ROOT_PASSWORD: root_password
+    ports:
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./backend/scripts/mysql.sql:/docker-entrypoint-initdb.d/mysql.sql
-    ports:
-      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - shared_net
 
