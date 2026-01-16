@@ -4,8 +4,10 @@ from core.config.base import *
 
 ALLOWED_HOSTS = [
     'localhost',
+    'http://62.72.7.176',
     'juvenescent-tamelessly-dennis.ngrok-free.dev',
     'nginx',
+    '62.72.7.176',
 ]
 
 DEBUG = True

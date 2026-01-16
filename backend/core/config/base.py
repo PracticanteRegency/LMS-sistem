@@ -46,6 +46,8 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = [
     'localhost',
+    'http://62.72.7.176',
+    '62.72.7.176',
     '.ngrok.io',
     'juvenescent-tamelessly-dennis.ngrok-free.dev',
     '127.0.0.1',
