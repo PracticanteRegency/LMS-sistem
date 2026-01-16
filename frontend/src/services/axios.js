@@ -1,6 +1,6 @@
 import axios from "axios";
 
-export const API_URL = "http://localhost:8000/";
+export const API_URL = "http://62.72.7.176:8080/api/";
 
 // Crear instancia principal
 const api = axios.create({
