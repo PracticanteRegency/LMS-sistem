@@ -75,10 +75,8 @@ services:
       - shared_net
 
   nginx:
-    image: nginx:alpine
+    build: ./nginx
     container_name: nginx
-    volumes:
-      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf
     ports:
       - "80:80"
     depends_on:
