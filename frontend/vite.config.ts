@@ -11,7 +11,8 @@ export default defineConfig({
   server: {
     allowedHosts: (process.env.ALLOWED_HOSTS
       ? process.env.ALLOWED_HOSTS.split(",").map((h) => h.trim())
-      : ["juvenescent-tamelessly-dennis.ngrok-free.dev"]),
+      : ['formacion.cloudregencyapps.com',
+          'localhost']),
     // Configure HMR to work when accessing the dev server through an external HTTPS tunnel (e.g. ngrok).
     // This ensures the client connects to the tunnel domain over wss (port 443) instead of trying to open
     // a websocket directly to localhost which may fail with SSL errors.
@@ -21,7 +22,7 @@ export default defineConfig({
     // isn't available locally).
     hmr: {
       protocol: process.env.HMR_PROTOCOL || 'wss',
-      host: process.env.HMR_HOST || 'juvenescent-tamelessly-dennis.ngrok-free.dev',
+      host: process.env.HMR_HOST || 'formacion.cloudregencyapps.com',
       port: process.env.HMR_PORT ? parseInt(process.env.HMR_PORT, 10) : undefined,
     },
   },
