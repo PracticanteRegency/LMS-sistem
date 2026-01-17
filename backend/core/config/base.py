@@ -48,6 +48,10 @@ ALLOWED_HOSTS = [
     'localhost',
     'http://62.72.7.176',
     '62.72.7.176',
+    'http://formacion.cloudregencyapps.com'
+    'https://formacion.cloudregencyapps.com',
+    'formacion.cloudregencyapps.com',
+    '127.0.0.1',
     '.ngrok.io',
     'juvenescent-tamelessly-dennis.ngrok-free.dev',
     '127.0.0.1',
