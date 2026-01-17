@@ -5,6 +5,7 @@ from core.config.base import *
 ALLOWED_HOSTS = [
     'localhost',
     'http://62.72.7.176',
+    'http://formacion.cloudregencyapps.com',
     'juvenescent-tamelessly-dennis.ngrok-free.dev',
     'nginx',
     '62.72.7.176',
