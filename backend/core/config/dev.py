@@ -8,6 +8,8 @@ ALLOWED_HOSTS = [
     'juvenescent-tamelessly-dennis.ngrok-free.dev',
     'nginx',
     '62.72.7.176',
+    'formacion.cloudregencyapps.com',
+    '127.0.0.1'
 ]
 
 DEBUG = True
