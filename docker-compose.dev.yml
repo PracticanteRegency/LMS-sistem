@@ -13,7 +13,7 @@ services:
       - DB_ENGINE=django.db.backends.mysql
       - DB_NAME=formularios
       - DB_USER=lms_user
-      - DB_PASSWORD=lms_password
+      - DB_PASSWORD=lms_form@cionGH2026*
       - DB_HOST=mysql
       - DB_PORT=3306
       - REDIS_HOST=redis

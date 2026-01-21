@@ -238,6 +238,54 @@ docker compose -f docker-compose.prod.yml logs -f
 
 ---
 
+## 🛠️ Solución error "failed to prepare extraction snapshot" (Docker)
+
+Si al levantar los contenedores ves un error como:
+
+```
+failed to prepare extraction snapshot ... failed to stat parent: stat /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/XXX/fs: no such file or directory
+```
+
+Sigue estos pasos:
+
+1. **Verifica espacio en disco:**
+
+```bash
+df -h
+```
+
+2. **Limpia recursos de Docker:**
+
+```bash
+docker system prune -a
+```
+
+3. **Reinicia Docker:**
+
+```bash
+systemctl restart docker
+```
+
+4. **Vuelve a intentar levantar los contenedores:**
+
+```bash
+docker compose -f docker-compose.dev.yml up
+```
+
+> ⚠️ Si tienes un contenedor importante (como Plesk), asegúrate de que esté corriendo antes de limpiar. Si está detenido, podrías perderlo.
+
+5. **Si el error persiste y NO tienes datos importantes:**
+
+```bash
+rm -rf /var/lib/docker
+rm -rf /var/lib/containerd
+systemctl restart docker
+```
+
+Esto borra TODO lo de Docker (contenedores, imágenes, volúmenes, redes).
+
+---
+
 ## 🧠 Reglas mentales finales
 
 - ❌ No usar `localhost` entre contenedores
