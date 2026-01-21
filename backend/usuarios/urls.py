@@ -10,5 +10,6 @@ urlpatterns = [
     path("lista-usuarios/", views.ListaUsuarios.as_view(), name="lista_usuarios"),
     path("perfil/<int:colaborador_id>/capacitacion/<int:capacitacion_id>/",views.PerfilCapacitacionView.as_view()),
     path("cargo-Nivel-Regional/", views.CargoNivelRegionalView.as_view(), name="cargo-nivel-regional"),
+    path("filtrar-usuarios/", views.FiltrarUsuariosView.as_view(), name="filtrar-usuarios"),
 ]
 

@@ -260,7 +260,7 @@ class ListaUsuarios(APIView):
                 page_size = 10
 
             search = request.GET.get('search', '').strip()
-            
+
             base_qs = (
                 Colaboradores.objects
                 .exclude(estadocolaborador=2)
@@ -326,7 +326,6 @@ class ListaUsuarios(APIView):
             return Response(response)
         except Exception as e:
             return Response({'error': str(e)}, status=500)
- 
 
 class PerfilCapacitacionView(APIView):
     permission_classes = [IsAuthenticated]
@@ -372,3 +371,40 @@ class CargoNivelRegionalView(APIView):
             "niveles": niveles_data,
             "regionales": regionales_data
         })
+
+class FiltrarUsuariosView(APIView):
+    """
+    Vista para filtrar usuarios por nombre o CC.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        query = request.GET.get('q', '').strip()
+        page = int(request.GET.get('page', 1))
+        page_size = int(request.GET.get('page_size', 10))
+        if page < 1:
+            page = 1
+        if page_size < 1 or page_size > 100:
+            page_size = 10
+
+        base_qs = Colaboradores.objects.exclude(estadocolaborador=2)
+        if query:
+            base_qs = base_qs.filter(
+                Q(nombrecolaborador__icontains=query) |
+                Q(apellidocolaborador__icontains=query) |
+                Q(cccolaborador__icontains=query)
+            )
+
+        total = base_qs.count()
+        start = (page - 1) * page_size
+        end = start + page_size
+        items = list(base_qs[start:end])
+        results = ColaboradorListadoSerializer(items, many=True).data
+
+        response = {
+            'count': total,
+            'page': page,
+            'page_size': page_size,
+            'results': results,
+        }
+        return Response(response)

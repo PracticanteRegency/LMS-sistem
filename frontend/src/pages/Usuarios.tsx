@@ -71,7 +71,12 @@ export default function Usuarios() {
   const loadUsuarios = async (pageToLoad: number) => {
     try {
       setLoading(true);
-      const data: any = await Perfil.getListUsers(pageToLoad, pageSize);
+      let data: any;
+      if (searchTerm.trim()) {
+        data = await Perfil.getFiltrarUsuarios(searchTerm, pageToLoad, pageSize);
+      } else {
+        data = await Perfil.getListUsers(pageToLoad, pageSize);
+      }
       const list: Usuario[] = Array.isArray(data) ? data : data?.results ?? [];
       const count: number = Array.isArray(data) ? list.length : (data?.count ?? list.length);
       setUsuarios(list);
@@ -189,6 +194,7 @@ export default function Usuarios() {
           value={pendingSearch}
           onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={handleInputKeyDown}
+          style={{ color: 'black' }}
         />
         <button
           className={styles.searchButton}

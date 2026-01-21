@@ -1,3 +1,16 @@
+// GET: Filtrar usuarios por cédula o nombre
+const getFiltrarUsuarios = async (q = "", page = 1, pageSize = 10) => {
+  return dedupe('perfil:getFiltrarUsuarios', { q, page, pageSize }, async () => {
+    try {
+      let url = `user/filtrar-usuarios/?q=${encodeURIComponent(q)}&page=${page}&page_size=${pageSize}`;
+      const response = await api.get(url);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching filtrar usuarios:', error);
+      throw error;
+    }
+  });
+};
 // Registra un usuario temporal
 export async function registerTemporalUser(payload) {
   try {
@@ -105,11 +118,12 @@ const getCargoRegionesNiveles = async () => {
 };
 
 const Perfil = {
-    getPerfil,
-    getListUsers,
-    getPerfilCapById,
-    getPerfilUserById,
-    getCargoRegionesNiveles,
+  getPerfil,
+  getListUsers,
+  getPerfilCapById,
+  getPerfilUserById,
+  getCargoRegionesNiveles,
+  getFiltrarUsuarios,
 };
 
 export default Perfil

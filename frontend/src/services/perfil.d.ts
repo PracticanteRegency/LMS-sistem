@@ -61,6 +61,7 @@ declare const Perfil: {
   // Firma para obtener progreso de un colaborador en una capacitacion
   getPerfilCapById: (colaboradorId: string | number, capacitacionId: string | number) => Promise<PerfilCapProgress>;
   getPerfilUserById: (id: string | number) => Promise<PerfilResponse>;
+  getFiltrarUsuarios: (query: string, page?: number, pageSize?: number) => Promise<any>;
 };
 
 export default Perfil;
