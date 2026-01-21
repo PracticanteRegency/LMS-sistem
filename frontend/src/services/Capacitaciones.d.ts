@@ -15,6 +15,9 @@ interface CapListService {
   createLeccionFormData(formData: FormData): Promise<any>;
   uploadColaboradoresCSV(file: File): Promise<any>;
   cargarColaboradores(file: File): Promise<any>;
+  updateColaboradores(capacitacionId: string | number, data: any): Promise<any>;
+  getCapacitacionDetalle(id: string | number): Promise<any>;
+  updateCapacitacion(id: string | number, data: any): Promise<any>;
   postCapList(): Promise<any>;
   certificadoDescargar(capacitacionId: string | number): Promise<Blob>;
   postCargarColab(): Promise<any>;
@@ -23,6 +26,8 @@ interface CapListService {
   postCompletarLeccion(capacitacionId: string | number, leccionId: number, token: string): Promise<any>;
   responderLeccion(capacitacionId: string | number, leccionId: number, token: string): Promise<any>;
   enviarRespuestasFormulario(capacitacionId: string | number, leccionId: number, payload: { respuestas: number[] }): Promise<any>;
+  eliminarCapacitacion(capacitacionId: string | number): Promise<any>;
+  toggleCapacitacion(capacitacionId: string | number): Promise<any>;
 }
 
 declare const CapListService: CapListService;

@@ -260,9 +260,10 @@ class ListaUsuarios(APIView):
                 page_size = 10
 
             search = request.GET.get('search', '').strip()
-
+            
             base_qs = (
                 Colaboradores.objects
+                .exclude(estadocolaborador=2)
                 .select_related('cargocolaborador')
                 .annotate(
                     total_capacitaciones=Count(

@@ -1,9 +1,3 @@
-// PUT: Eliminar capacitación (requiere capacitacion_id)
-export async function eliminarCapacitacion(capacitacionId) {
-  // Llama a: PUT /capacitaciones/capacitaciones/ con body { capacitacion_id }
-  const response = await api.put("capacitaciones/capacitaciones/", { capacitacion_id: capacitacionId });
-  return response.data;
-}
 import axios from 'axios';
 import api from "./axios";
 import dedupe from './dedupe';
@@ -130,6 +124,20 @@ const uploadArchivo = async (file, tipo, subtipo) => {
       headers: { "Content-Type": "multipart/form-data" },
     });
 
+    return response.data;
+  });
+};
+
+const toggleCapacitacion = async (capacitacionId) => {
+  return dedupe('cap:toggleCapacitacion', capacitacionId, async () => {
+    const response = await api.put(`capacitaciones/desactivar-capacitaciones/${capacitacionId}/`, { capacitacion_id: capacitacionId });
+    return response.data;
+  });
+};
+
+const eliminarCapacitacion = async (capacitacionId) => {
+  return dedupe('cap:eliminarCapacitacion', capacitacionId, async () => {
+    const response = await api.delete(`capacitaciones/desactivar-capacitaciones/${capacitacionId}/`);
     return response.data;
   });
 };
@@ -288,6 +296,7 @@ const CapListService = {
   enviarRespuestasFormulario,
   certificadoDescargar,
   eliminarCapacitacion,
+  toggleCapacitacion,
 };
 
 export default CapListService;

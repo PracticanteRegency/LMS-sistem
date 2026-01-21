@@ -15,6 +15,7 @@ import PerfilUser from "./usuario/perfilUser";
 import PerfilUserCap from "./pages/PerfilUserCap";
 import CrearCapacitacion from "./pages/CrearCapacitacion";
 import VerCapacitacion from "./pages/VerCapacitacion";
+import EditarColaboradores from "./pages/EditarColaboradores";
 import CrearUsuario from "./pages/CrearUsuario";
 import ReproductorVideo from "./pages/ReproductorVideo";
 import ReproductorImagenes from "./pages/ReproductorImagenes";
@@ -47,6 +48,10 @@ export default function App() {
           <Route path="/capacitaciones/list" element={
             <AdminRoute><Capacitaciones /></AdminRoute>
             } />
+
+          <Route path="/capacitaciones/:id/colaboradores" element={
+            <AdminRoute><EditarColaboradores /></AdminRoute>
+          } />
 
           <Route path="/" element={
             <ProtectedRoute><Home /></ProtectedRoute>

@@ -65,30 +65,17 @@ export default function Dashboard() {
     try {
       setLoading(true);
       setError(null);
-      const data: any = await analiticaService.getProgreso();
-      
-      console.log('Received data:', data);
-      
-      // El backend ahora envía un array de empresas
+      const resp: any = await analiticaService.getProgreso();
+      const data = resp && resp.estructura ? resp.estructura : [];
+
+      console.log('Received estructura:', data);
+
       if (Array.isArray(data) && data.length > 0) {
-        // Filtrar empresas vacías o con nombre "eliminar"
-        const validEmpresas = data.filter((emp: Empresa) => 
-          emp.empresa && 
-          emp.empresa.trim().toLowerCase() !== 'eliminar' &&
-          emp.unidades && 
-          emp.unidades.length > 0
-        );
-        
-        if (validEmpresas.length > 0) {
-          const transformed = transformMultipleEmpresas(validEmpresas);
-          setOrgData(transformed);
-          calculateAnalyticsFromMultiple(validEmpresas);
-        } else {
-          setError("No hay empresas válidas para mostrar");
-        }
+        const transformed = transformFromEstructura(data as Unidad[]);
+        setOrgData(transformed);
+        calculateAnalyticsFromEstructura(data as Unidad[]);
       } else {
-        console.error('Invalid data format:', data);
-        setError("Formato de datos inválido del servidor");
+        setError("No hay datos disponibles");
       }
     } catch (err: any) {
       setError(err.message || "Error al cargar los datos de analítica");
@@ -98,68 +85,55 @@ export default function Dashboard() {
     }
   };
 
-  const transformMultipleEmpresas = (empresas: Empresa[]): OrgItem[] => {
-    return empresas.map((empresa, empIdx) => ({
-      id: "empresa-" + empIdx + "-" + empresa.empresa.trim(),
-      name: empresa.empresa.trim(),
-      type: empresa.tipo,
-      porcentaje: empresa.porcentaje,
-      children: empresa.unidades.map((unidad, uIdx) => ({
-        id: "unidad-" + empIdx + "-" + uIdx + "-" + unidad.unidad,
-        name: unidad.unidad,
-        type: unidad.tipo,
-        porcentaje: unidad.porcentaje,
-        children: unidad.proyectos.map((proyecto, pIdx) => ({
-          id: "proyecto-" + empIdx + "-" + uIdx + "-" + pIdx + "-" + proyecto.proyecto,
-          name: proyecto.proyecto,
-          type: proyecto.tipo,
-          porcentaje: proyecto.porcentaje,
-          children: proyecto.centrosop.map((centro, cIdx) => ({
-            id: "centro-" + empIdx + "-" + uIdx + "-" + pIdx + "-" + cIdx,
-            name: centro.centro_op,
-            type: centro.tipo,
-            porcentaje: centro.porcentaje,
-          })),
+  const transformFromEstructura = (unidades: Unidad[]): OrgItem[] => {
+    return unidades.map((unidad, uIdx) => ({
+      id: "unidad-" + uIdx + "-" + unidad.unidad,
+      name: unidad.unidad,
+      type: unidad.tipo,
+      porcentaje: unidad.porcentaje,
+      children: unidad.proyectos.map((proyecto, pIdx) => ({
+        id: "proyecto-" + uIdx + "-" + pIdx + "-" + proyecto.proyecto,
+        name: proyecto.proyecto,
+        type: proyecto.tipo,
+        porcentaje: proyecto.porcentaje,
+        children: proyecto.centrosop.map((centro, cIdx) => ({
+          id: "centro-" + uIdx + "-" + pIdx + "-" + cIdx + "-" + centro.centro_op,
+          name: centro.centro_op,
+          type: centro.tipo,
+          porcentaje: centro.porcentaje,
         })),
       })),
       isExpanded: true,
     }));
   };
 
-  const calculateAnalyticsFromMultiple = (empresas: Empresa[]) => {
-    let totalUnidades = 0;
+  const calculateAnalyticsFromEstructura = (unidades: Unidad[]) => {
+    let totalUnidades = unidades.length;
     let totalProyectos = 0;
     let totalCentros = 0;
-    let sumaPromedios = 0;
-    const allProyectos: { nombre: string; porcentaje: number; empresa: string }[] = [];
+    const allProyectos: { nombre: string; porcentaje: number }[] = [];
+    let sumaPorcentajesUnidades = 0;
 
-    empresas.forEach((empresa) => {
-      sumaPromedios += empresa.porcentaje;
-      totalUnidades += empresa.unidades.length;
-      
-      empresa.unidades.forEach((unidad) => {
-        unidad.proyectos.forEach((proyecto) => {
-          totalProyectos++;
-          allProyectos.push({ 
-            nombre: proyecto.proyecto, 
-            porcentaje: proyecto.porcentaje,
-            empresa: empresa.empresa.trim()
-          });
-          totalCentros += proyecto.centrosop.length;
-        });
+    unidades.forEach((unidad) => {
+      sumaPorcentajesUnidades += unidad.porcentaje;
+      unidad.proyectos.forEach((proyecto) => {
+        totalProyectos++;
+        totalCentros += proyecto.centrosop.length;
+        allProyectos.push({ nombre: proyecto.proyecto, porcentaje: proyecto.porcentaje });
       });
     });
 
-    const empresaPromedio = empresas.length > 0 ? sumaPromedios / empresas.length : 0;
+    const empresaPromedio = totalUnidades > 0 ? sumaPorcentajesUnidades / totalUnidades : 0;
 
     const topProyectos = allProyectos
       .filter(p => p.porcentaje > 0)
       .sort((a, b) => b.porcentaje - a.porcentaje)
-      .slice(0, 5);
+      .slice(0, 5)
+      .map(p => ({ nombre: p.nombre, porcentaje: p.porcentaje, empresa: "" }));
 
     const analytics: Analytics = {
       empresaPromedio,
-      totalEmpresas: empresas.length,
+      totalEmpresas: 0,
       totalUnidades,
       totalProyectos,
       totalCentros,

@@ -3,175 +3,143 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from decimal import Decimal
 
-from django.db.models import Count, Avg, Q, Prefetch
+from django.db.models import Avg, Q, Count
 from django.db import transaction
-from rest_framework import generics, status
+from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.core.cache import cache
 from django.conf import settings
+from django.utils.timezone import now
+from datetime import datetime
+from calendar import monthrange
 
-from usuarios.permissions import IsSuperAdmin
+from usuarios.models import Colaboradores
+
+from usuarios.permissions import IsSuperAdmin, IsAdminUser
 
 from .models import Epresa, Unidadnegocio, Proyecto, Centroop
-from usuarios.models import Colaboradores
 from .serializers import (
 	EpresaSerializer,
 	UnidadNegocioSerializer,
 	ProyectoSerializer,
-	ProyectoConUnidadSerializer,
 	CentroOpSerializer,
 	CentroOpSimpleSerializer,
 	CargarEstructuraSerializer,
 )
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
+from rest_framework.permissions import IsAuthenticated
+from capacitaciones.models import progresoCapacitaciones
 
 
 # --- Analítica ---
 class ProgresoEmpresarialView(APIView):
-    permission_classes = [IsAuthenticated, IsSuperAdmin]
-    """
-    Retorna la analítica completa:
-    Empresa → Unidad → Proyecto → Centro OP
-
-    Optimización:
-    - Cache de 30 minutos (datos pesados que no cambian frecuentemente)
-    - Prefetch de toda la jerarquía en pocas queries
-    - Annotate para calcular promedios en BD
-    """
-    CACHE_KEY = 'progreso_empresarial_completo'
+    permission_classes = [IsAuthenticated, IsAdminUser]
 
     def get(self, request):
-        # Intentar obtener de cache primero
-        cache_ttl = getattr(settings, 'CACHE_TTL_PROGRESO_EMPRESARIAL', 1800)  # 30 min default
-        cached_data = cache.get(self.CACHE_KEY)
 
-        if cached_data is not None:
-            return Response(cached_data)
+        hoy = now()
+        mes_actual = hoy.month
+        anio_actual = hoy.year
 
-        # Precalcular promedios por centro en una sola query
-        centros_con_promedio = Centroop.objects.filter(
-            estadocentrop=1
-        ).annotate(
-            promedio_progreso=Avg(
-                'colaboradores__progresocapacitaciones__progreso',
-                filter=~Q(colaboradores__progresocapacitaciones__capacitacion__estado=3)
-            )
-        ).select_related('id_proyecto__id_unidad__id_empresa')
+        # Rango del mes actual
+        inicio_mes = datetime(anio_actual, mes_actual, 1)
+        ultimo_dia = monthrange(anio_actual, mes_actual)[1]
+        fin_mes = datetime(anio_actual, mes_actual, ultimo_dia, 23, 59, 59)
+        # Construir mapa agregado por nombre de unidad -> nombre de proyecto -> nombre de centro
+        empresas = Epresa.objects.filter(estadoempresa=1)
 
-        # Crear mapa de centros con sus promedios
-        centros_map = {}
-        for centro in centros_con_promedio:
-            proyecto = centro.id_proyecto
-            if proyecto:
-                unidad = proyecto.id_unidad
-                if unidad:
-                    empresa = unidad.id_empresa
-                    if empresa and empresa.estadoempresa == 1:
-                        key = (empresa.idempresa, unidad.idunidad, proyecto.idproyecto)
-                        if key not in centros_map:
-                            centros_map[key] = {
-                                'empresa': empresa,
-                                'unidad': unidad,
-                                'proyecto': proyecto,
-                                'centros': []
+        units_map = {}
+
+        for empresa in empresas:
+            unidades = Unidadnegocio.objects.filter(id_empresa=empresa)
+
+            for unidad in unidades:
+                unit_key = unidad.nombreunidad.strip().lower()
+                if unit_key not in units_map:
+                    units_map[unit_key] = {
+                        "unidad": unidad.nombreunidad,
+                        "tipo": "unidad",
+                        "proyectos": {}
+                    }
+
+                proyectos_unidad = Proyecto.objects.filter(id_unidad=unidad)
+
+                for proyecto in proyectos_unidad:
+                    proj_key = proyecto.nombreproyecto.strip().lower()
+                    proj_map = units_map[unit_key]["proyectos"]
+                    if proj_key not in proj_map:
+                        proj_map[proj_key] = {
+                            "proyecto": proyecto.nombreproyecto,
+                            "tipo": "proyecto",
+                            "centros": {}
+                        }
+
+                    # Obtener centros del proyecto con promedio anotado
+                    centros = Centroop.objects.filter(id_proyecto=proyecto).annotate(
+                        promedio_progreso=Avg(
+                            'colaboradores__progresocapacitaciones__progreso',
+                            filter=(
+                                Q(colaboradores__progresocapacitaciones__capacitacion__fecha_inicio__lte=fin_mes) &
+                                Q(colaboradores__progresocapacitaciones__capacitacion__fecha_fin__gte=inicio_mes) &
+                                ~Q(colaboradores__progresocapacitaciones__capacitacion__estado__in=[0, 3])
+                            )
+                        )
+                    )
+
+                    for centro in centros:
+                        centro_name = centro.nombrecentrop.strip()
+                        center_key = centro_name.lower()
+                        centers_map = proj_map[proj_key]["centros"]
+                        if center_key not in centers_map:
+                            centers_map[center_key] = {
+                                "centro_op": centro.nombrecentrop,
+                                "valores": []
                             }
-                        centros_map[key]['centros'].append({
-                            'nombre': centro.nombrecentrop.strip(),
-                            'promedio': float(centro.promedio_progreso or 0)
-                        })
 
+                        promedio = centro.promedio_progreso or Decimal('0')
+                        centers_map[center_key]["valores"].append(Decimal(promedio))
 
-        # Construir respuesta jerárquica SOLO con empresas en estado 1
-        empresas_dict = {}
+        # Construir la estructura final (unidades -> proyectos -> centros) con promedios agregados
+        estructura = []
 
-        for key, data in centros_map.items():
-            empresa = data['empresa']
-            if getattr(empresa, 'estadoempresa', None) != 1:
-                continue
-            unidad = data['unidad']
-            proyecto = data['proyecto']
+        for unit in units_map.values():
+            proyectos_list = []
+            unidad_promedios = []
 
-            # Inicializar empresa si no existe
-            if empresa.idempresa not in empresas_dict:
-                empresas_dict[empresa.idempresa] = {
-                    "empresa": empresa.nombre_empresa.strip(),
-                    "tipo": "empresa",
-                    "porcentaje": 0,
-                    "unidades": {},
-                    "_promedios": []
-                }
+            for proj in unit["proyectos"].values():
+                centros_list = []
+                proyecto_centros_prom = []
 
-            empresa_dict = empresas_dict[empresa.idempresa]
+                for centro in proj["centros"].values():
+                    vals = centro.get("valores", [])
+                    centro_avg = (sum(vals) / len(vals)) if vals else Decimal('0')
+                    centros_list.append({
+                        "centro_op": centro["centro_op"],
+                        "porcentaje": float(round(centro_avg, 2)),
+                        "tipo": "centro_op"
+                    })
+                    proyecto_centros_prom.append(centro_avg)
 
-            # Inicializar unidad si no existe
-            if unidad.idunidad not in empresa_dict["unidades"]:
-                empresa_dict["unidades"][unidad.idunidad] = {
-                    "unidad": unidad.nombreunidad.strip(),
-                    "tipo": "unidad",
-                    "porcentaje": 0,
-                    "proyectos": {},
-                    "_promedios": []
-                }
-
-            unidad_dict = empresa_dict["unidades"][unidad.idunidad]
-
-            # Inicializar proyecto si no existe
-            if proyecto.idproyecto not in unidad_dict["proyectos"]:
-                unidad_dict["proyectos"][proyecto.idproyecto] = {
-                    "proyecto": proyecto.nombreproyecto.strip(),
+                proyecto_avg = (sum(proyecto_centros_prom) / len(proyecto_centros_prom)) if proyecto_centros_prom else Decimal('0')
+                proyectos_list.append({
+                    "proyecto": proj["proyecto"],
                     "tipo": "proyecto",
-                    "porcentaje": 0,
-                    "centrosop": []
-                }
-
-            proyecto_dict = unidad_dict["proyectos"][proyecto.idproyecto]
-
-            # Agregar centros
-            centro_promedios = []
-            for centro_data in data['centros']:
-                proyecto_dict["centrosop"].append({
-                    "centro_op": centro_data['nombre'],
-                    "porcentaje": round(centro_data['promedio'], 2),
-                    "tipo": "centro_op"
+                    "porcentaje": float(round(proyecto_avg, 2)),
+                    "centrosop": centros_list
                 })
-                centro_promedios.append(centro_data['promedio'])
+                unidad_promedios.append(proyecto_avg)
 
-            # Calcular promedio del proyecto
-            if centro_promedios:
-                proyecto_promedio = sum(centro_promedios) / len(centro_promedios)
-                proyecto_dict["porcentaje"] = round(proyecto_promedio, 2)
-                unidad_dict["_promedios"].append(proyecto_promedio)
+            unidad_avg = (sum(unidad_promedios) / len(unidad_promedios)) if unidad_promedios else Decimal('0')
+            estructura.append({
+                "unidad": unit["unidad"],
+                "tipo": "unidad",
+                "porcentaje": float(round(unidad_avg, 2)),
+                "proyectos": proyectos_list
+            })
 
-        # Calcular promedios de unidades y empresas
-        for empresa_id, empresa_dict in empresas_dict.items():
-            for unidad_id, unidad_dict in empresa_dict["unidades"].items():
-                if unidad_dict["_promedios"]:
-                    unidad_promedio = sum(unidad_dict["_promedios"]) / len(unidad_dict["_promedios"])
-                    unidad_dict["porcentaje"] = round(unidad_promedio, 2)
-                    empresa_dict["_promedios"].append(unidad_promedio)
-
-            if empresa_dict["_promedios"]:
-                empresa_dict["porcentaje"] = round(
-                    sum(empresa_dict["_promedios"]) / len(empresa_dict["_promedios"]), 2
-                )
-
-        # Convertir dicts a listas y limpiar campos temporales
-        response = []
-        for empresa_dict in empresas_dict.values():
-            empresa_dict["unidades"] = list(empresa_dict["unidades"].values())
-            for unidad_dict in empresa_dict["unidades"]:
-                unidad_dict["proyectos"] = list(unidad_dict["proyectos"].values())
-                del unidad_dict["_promedios"]
-            del empresa_dict["_promedios"]
-            response.append(empresa_dict)
-
-        # Guardar en cache
-        cache.set(self.CACHE_KEY, response, cache_ttl)
-
-        return Response(response)
-
-
+        return Response({"estructura": estructura}, status=status.HTTP_200_OK)
+    
+    
 class ProgresoEmpresarialFiltradoView(APIView):
     permission_classes = [IsAuthenticated, IsSuperAdmin]
     """Resumen filtrado por empresa, unidad o proyecto (query params).

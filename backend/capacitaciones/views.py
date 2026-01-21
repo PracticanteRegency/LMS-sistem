@@ -34,6 +34,7 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import NotAcceptable
 
 import logging
+import threading
 
 # Opcional: pypandoc para conversión DOCX a PDF
 import pypandoc
@@ -58,7 +59,7 @@ from capacitaciones.serializers import (
     CrearCapacitacionSerializer,
     MisCapacitacionesSerializer,
 )
-from .utils import actualizar_progreso_leccion, enviar_correo_capacitacion_creada
+from capacitaciones.utils import actualizar_progreso_leccion, enviar_correo_capacitacion_creada, enviar_correo_cap_activada
 from usuarios.models import Colaboradores
 from usuarios.permissions import IsAdminUser, IsSuperAdmin
 
@@ -270,31 +271,6 @@ class CapacitacionesView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
-    def put(self, request, *args, **kwargs):
-
-        "eliminar capacitacion (soft delete)"
-
-        try:
-            capacitacion_id = request.data.get('capacitacion_id')
-            if not capacitacion_id:
-                return Response({'error': 'capacitacion_id es requerido'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            capacitacion = get_object_or_404(Capacitaciones, pk=capacitacion_id)
-            capacitacion.estado = 3  # estado eliminado
-            capacitacion.save()
-            
-            # Invalidate caches
-            invalidate_capacitacion_cache(capacitacion_id=capacitacion.id)
-            colaboradores_ids = progresoCapacitaciones.objects.filter(capacitacion=capacitacion).values_list('colaborador_id', flat=True)
-            for col_id in colaboradores_ids:
-                invalidate_capacitacion_cache(colaborador_id=col_id)
-            cache.delete('capacitaciones_list_admin')
-            
-            return Response({'mensaje': 'Capacitación eliminada exitosamente'}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
 
 
 class CapacitacionDetailView(APIView):
@@ -1423,3 +1399,81 @@ class MisCapacitacionesListView(APIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DesactivarCapacitacionesView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser, IsSuperAdmin]
+
+    """Desactivar capacitaciones"""
+
+    def put(self, request, *args, **kwargs):
+
+        try:
+            capacitacion_id = request.data.get('capacitacion_id')
+            if not capacitacion_id:
+                return Response({'error': 'capacitacion_id es requerido'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            capacitacion = get_object_or_404(Capacitaciones, pk=capacitacion_id)
+            # Toggle between estado 0 (desactivada) and 1 (activa)
+            if capacitacion.estado == 0:
+                capacitacion.estado = 1
+                mensaje = 'Capacitación activada correctamente'
+            elif capacitacion.estado == 1:
+                capacitacion.estado = 0
+                mensaje = 'Capacitación desactivada correctamente'
+            else:
+                return Response({'error': f'No se puede alternar estado desde el estado {capacitacion.estado}'}, status=status.HTTP_400_BAD_REQUEST)
+            capacitacion.save()
+            # If the capacitacion was activated, trigger the notification task after commit
+            if capacitacion.estado == 1:
+                try:
+                    # schedule sending in a background thread after DB commit
+                    transaction.on_commit(lambda: threading.Thread(target=enviar_correo_cap_activada, args=(capacitacion,)).start())
+                except Exception:
+                    # don't let scheduling/errors break the response
+                    pass
+            # Invalidate caches
+            invalidate_capacitacion_cache(capacitacion_id=capacitacion.id)
+            colaboradores_ids = progresoCapacitaciones.objects.filter(capacitacion=capacitacion).values_list('colaborador_id', flat=True)
+            for col_id in colaboradores_ids:
+                invalidate_capacitacion_cache(colaborador_id=col_id)
+            cache.delete('capacitaciones_list_admin')
+            return Response({'mensaje': mensaje, 'estado': capacitacion.estado}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+    def delete(self, request, *args, **kwargs):
+        try:
+            # Support DELETE with body list or DELETE /desactivar-capacitaciones/<id>/
+            cap_id = kwargs.get('capacitacion_id')
+            if cap_id:
+                ids_capacitaciones = [int(cap_id)]
+            else:
+                ids_capacitaciones = request.data.get('ids_capacitaciones') or request.data.get('capacitacion_ids') or []
+
+            if isinstance(ids_capacitaciones, int):
+                ids_capacitaciones = [ids_capacitaciones]
+
+            if not isinstance(ids_capacitaciones, list) or not all(isinstance(i, int) for i in ids_capacitaciones):
+                return Response(
+                    {'error': 'ids_capacitaciones debe ser una lista de enteros'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            capacitaciones = Capacitaciones.objects.filter(id__in=ids_capacitaciones)
+            actualizadas = capacitaciones.update(estado=3)  # 3 = Eliminada
+
+            # Invalidate caches for affected capacitaciones and colaboradores
+            for cap in capacitaciones:
+                invalidate_capacitacion_cache(capacitacion_id=cap.id)
+            colaboradores_ids = progresoCapacitaciones.objects.filter(capacitacion__id__in=ids_capacitaciones).values_list('colaborador_id', flat=True)
+            for col_id in colaboradores_ids:
+                invalidate_capacitacion_cache(colaborador_id=col_id)
+            cache.delete('capacitaciones_list_admin')
+
+            return Response(
+                {'mensaje': f'Se eliminaron {actualizadas} capacitaciones.'},
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)     

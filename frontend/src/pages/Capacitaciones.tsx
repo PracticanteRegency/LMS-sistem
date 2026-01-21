@@ -165,6 +165,23 @@ export default function Capacitaciones() {
     if (action === "Editar") {
       navigate(`/CrearCapacitacion/${cap.id}`);
     }
+      if (action === "ToggleEstado") {
+      const willActivate = cap.estado === 0;
+      const confirmMsg = willActivate ? "¿Está seguro que desea activar la capacitación?" : "¿Está seguro que desea desactivar la capacitación?";
+      if (!window.confirm(confirmMsg)) return;
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await (CapListService as any).toggleCapacitacion(cap.id);
+        await loadCapacitaciones();
+        alert(res?.mensaje || (willActivate ? 'Capacitación activada.' : 'Capacitación desactivada.'));
+      } catch (err: any) {
+        setError(err?.message || (willActivate ? 'Error al activar la capacitación' : 'Error al desactivar la capacitación'));
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
     if (action === "Eliminar") {
       if (!window.confirm("¿Está seguro que desea eliminar la capacitación? Esta acción no se puede deshacer.")) {
         return;
@@ -321,12 +338,28 @@ export default function Capacitaciones() {
                               >
                                 Editar
                               </button>
+
+                              <button
+                                className={`${styles.btn} ${styles.btnManage}`}
+                                onClick={() => handleAction("EditarColaboradores", cap)}
+                              >
+                                Editar colaboradores
+                              </button>
+
+                                <button
+                                  className={`${styles.btn} ${styles.btnDisable}`}
+                                  onClick={() => handleAction("ToggleEstado", cap)}
+                                >
+                                  {cap.estado === 0 ? 'Activar' : 'Desactivar'}
+                                </button>
+
                               <button
                                 className={`${styles.btn} ${styles.btnDelete}`}
                                 onClick={() => handleAction("Eliminar", cap)}
                               >
                                 Eliminar
                               </button>
+                              
                             </div>
                           )}
                         </div>

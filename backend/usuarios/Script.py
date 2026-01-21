@@ -2,8 +2,12 @@ import os
 import sys
 import django
 import pandas as pd
+import logging
+from pathlib import Path
+from datetime import datetime
 from django.contrib.auth.hashers import make_password
 from django.db import transaction
+import unicodedata
 
 # ========================
 # Configurar Django
@@ -13,7 +17,24 @@ sys.path.append(BASE_DIR)
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "core.settings")
 django.setup()
+# Configurar logging: archivo en la misma carpeta del script
+BASE_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+LOG_FILE = os.path.join(BASE_SCRIPT_DIR, "script_colaboradores.log")
 
+logger = logging.getLogger("usuarios_script")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    fh = logging.FileHandler(LOG_FILE, encoding="utf-8")
+    fh.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+    fh.setFormatter(formatter)
+    sh = logging.StreamHandler()
+    sh.setLevel(logging.INFO)
+    sh.setFormatter(formatter)
+    logger.addHandler(fh)
+    logger.addHandler(sh)
+
+# ahora importar modelos
 from usuarios.models import (
     Colaboradores,
     Usuarios,
@@ -76,16 +97,60 @@ def obtener_email(fila):
     1. corporativo
     2. email_del_contacto
     """
-    corporativo = fila.get("corporativo")
-    contacto = fila.get("email_del_contacto")
 
-    if pd.notna(corporativo) and str(corporativo).strip():
-        return corporativo.strip()
+    corporativo = None
+    for key in ("correo_corporativo", "corporativo", "corporate_email"):
+        val = fila.get(key)
+        if pd.notna(val):
+            val_str = str(val).strip()
+            # Considerar como inválido si es '#N/D', '#N/A', 'N/D', 'N/A', '-', vacío o similar
+            if val_str and val_str.upper() not in {"#N/D", "#N/A", "N/D", "N/A", "-"}:
+                corporativo = val_str
+                break
 
-    if pd.notna(contacto) and str(contacto).strip():
-        return contacto.strip()
+    contacto = None
+    for key in ("email_del_contacto", "email", "email_contacto"):
+        val = fila.get(key)
+        if pd.notna(val) and str(val).strip():
+            contacto = str(val).strip()
+            break
 
+    # Validar formato simple de email
+    def es_email_valido(email):
+        import re
+        return bool(re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email))
+
+    if corporativo and es_email_valido(corporativo):
+        return corporativo
+    if contacto and es_email_valido(contacto):
+        return contacto
+    # Si corporativo está vacío o no es válido, pero contacto existe, usarlo aunque no sea válido
+    if not corporativo and contacto:
+        return contacto
     return None
+
+
+def limpiar_telefono(valor):
+    """Sanitiza el teléfono: mantiene dígitos y un posible + inicial. Devuelve None si inválido."""
+    if pd.isna(valor) or valor is None:
+        return None
+    s = str(valor).strip()
+    if not s:
+        return None
+    import re
+    # conservar + solo si está al inicio
+    s = s.replace(" ", "")
+    cleaned = re.sub(r"[^0-9+]", "", s)
+    if cleaned.startswith("+"):
+        digits = re.sub(r"\D", "", cleaned[1:])
+        if len(digits) < 6:
+            return None
+        return "+" + digits
+    else:
+        digits = re.sub(r"\D", "", cleaned)
+        if len(digits) < 6:
+            return None
+        return digits
 
 
 # ========================
@@ -93,18 +158,24 @@ def obtener_email(fila):
 # ========================
 def cargar_colaboradores_desde_excel():
 
-    excel_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "templates",
-        "Colaboradores.xlsx"
-    )
+    # Preferir MACRO2.xlsx si está disponible en templates (por pedido)
+    base_templates = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
+    preferred = os.path.join(base_templates, "macro3.xlsx")
+    fallback = os.path.join(base_templates, "Colaboradores.xlsx")
+
+    if os.path.exists(preferred):
+        excel_path = preferred
+    else:
+        excel_path = fallback
 
     if not os.path.exists(excel_path):
+        logger.error(f"No se encontró el archivo: {excel_path}")
         print(f"❌ No se encontró el archivo: {excel_path}")
         return
 
     # Leer Excel
     df = pd.read_excel(excel_path)
+    df = df.iloc[:1466]  # Limita la lectura hasta la fila 1466 (0-indexed, incluye 0-1465)
 
     # Normalizar columnas
     df.columns = (
@@ -114,9 +185,9 @@ def cargar_colaboradores_desde_excel():
         .str.replace(" ", "_")
     )
 
-    print("📋 Columnas detectadas:")
-    print(df.columns.tolist())
-    print(f"📊 Filas encontradas: {len(df)}\n")
+    logger.info("Columnas detectadas:")
+    logger.info(df.columns.tolist())
+    logger.info(f"Filas encontradas: {len(df)}")
 
     # FKs fijas
     regional = Regional.objects.get(idregional=1)
@@ -150,19 +221,35 @@ def cargar_colaboradores_desde_excel():
 
             email = obtener_email(fila)
 
+            # Obtener y sanitizar teléfono
+            telefono_val = get_valor(fila, "telefono_del_contacto", "telefono_del_contacto.1", "telefono_del_contacto.2")
+            telefono = limpiar_telefono(telefono_val)
+
             if not email:
-                log_errores.append(f"Fila {fila_num}: Sin email válido")
+                log_errores.append(f"Fila {fila_num}: Sin email válido (ni corporativo ni contacto)")
                 errores += 1
                 continue
 
             usuario = cedula
 
 
-            # Buscar nivel por nombre exacto en columna JERARQUIA
+            # Buscar nivel por nombre similar (ignorando tildes, mayúsculas y permitiendo coincidencia parcial)
             nombre_nivel = get_valor(fila, "jerarquia")
-            nivel = Niveles.objects.filter(nombrenivel__iexact=nombre_nivel).first()
+            def normalizar(texto):
+                if not texto:
+                    return ""
+                return unicodedata.normalize('NFKD', texto).encode('ascii', 'ignore').decode('ascii').strip().lower()
+
+            nombre_nivel_norm = normalizar(nombre_nivel)
+            niveles_db = list(Niveles.objects.all())
+            nivel = None
+            for n in niveles_db:
+                n_norm = normalizar(n.nombrenivel)
+                if nombre_nivel_norm == n_norm or nombre_nivel_norm in n_norm or n_norm in nombre_nivel_norm:
+                    nivel = n
+                    break
             if not nivel:
-                log_errores.append(f"Fila {fila_num}: Nivel '{nombre_nivel}' no encontrado")
+                log_errores.append(f"Fila {fila_num}: Nivel '{nombre_nivel}' no encontrado (normalizado: '{nombre_nivel_norm}')")
                 errores += 1
                 continue
 
@@ -174,31 +261,25 @@ def cargar_colaboradores_desde_excel():
                 errores += 1
                 continue
 
-            # Buscar centro de operación por empresa, unidad, proyecto y centro op
-            empresa_id = get_valor(fila, "empresa_id")
-            nombre_unidad = get_valor(fila, "desc_un")
-            nombre_proyecto = get_valor(fila, "nombre_proyecto")
-            nombre_centro_op = get_valor(fila, "desc_co")
+            # Ahora la columna 'Centro de Operacion' contiene el ID del Centroop
+            # Se espera un número (o string numérico). Si no existe, marcar error.
+            centro_id_val = get_valor(fila, "centro_de_operacion")
+            centro_id = None
+            if centro_id_val is not None:
+                try:
+                    centro_id = int(float(centro_id_val))
+                except Exception:
+                    centro_id = None
 
-            # Buscar la unidad por nombre y empresa
-            from analitica.models import Epresa, Unidadnegocio, Proyecto, Centroop
-            unidad = Unidadnegocio.objects.filter(nombreunidad__iexact=nombre_unidad, id_empresa__idempresa=empresa_id).first()
-            if not unidad:
-                log_errores.append(f"Fila {fila_num}: Unidad '{nombre_unidad}' no encontrada para empresa {empresa_id}")
+            if centro_id is None:
+                log_errores.append(f"Fila {fila_num}: Centro de Operacion vacío o inválido ('{centro_id_val}')")
                 errores += 1
                 continue
 
-            # Buscar el proyecto por nombre y unidad
-            proyecto = Proyecto.objects.filter(nombreproyecto__iexact=nombre_proyecto, id_unidad=unidad.idunidad).first()
-            if not proyecto:
-                log_errores.append(f"Fila {fila_num}: Proyecto '{nombre_proyecto}' no encontrado para unidad {nombre_unidad}")
-                errores += 1
-                continue
-
-            # Buscar el centro de operación por nombre y proyecto
-            centro_op = Centroop.objects.filter(nombrecentrop__iexact=nombre_centro_op, id_proyecto=proyecto.idproyecto).first()
+            from analitica.models import Centroop
+            centro_op = Centroop.objects.filter(idcentrop=centro_id).first()
             if not centro_op:
-                log_errores.append(f"Fila {fila_num}: Centro de operación '{nombre_centro_op}' no encontrado para proyecto {nombre_proyecto}")
+                log_errores.append(f"Fila {fila_num}: Centro de operación con id '{centro_id}' no encontrado")
                 errores += 1
                 continue
 
@@ -208,13 +289,16 @@ def cargar_colaboradores_desde_excel():
                 continue
 
             # Si todo está bien, guardar la fila para procesar después
+            # Truncar email a 50 caracteres para evitar error de longitud
+            email_trunc = email[:50] if email else None
             filas_validas.append({
                 "usuario": usuario,
                 "nombre": nombre,
                 "apellido": apellido,
                 "cargo": cargo,
-                "email": email,
+                "email": email_trunc,
                 "nivel": nivel,
+                "telefono": telefono,
                 "regional": regional,
                 "centro_op": centro_op
             })
@@ -222,27 +306,28 @@ def cargar_colaboradores_desde_excel():
             log_errores.append(f"Fila {fila_num}: {e}")
             errores += 1
 
-    print("\n==============================")
-    print("📋 LOG DE ERRORES")
+    logger.info("\n==============================")
+    logger.info("Comprobando errores antes de insertar datos...")
     if log_errores:
+        logger.error("Se detectaron errores en el archivo de entrada. No se realizará ninguna inserción.")
         for err in log_errores:
-            print(f"❌ {err}")
-        print(f"\nNo se cargaron datos por errores detectados. Corrige los errores y vuelve a intentar.")
-        print("==============================\n")
+            logger.error(err)
+        # Indicar al usuario dónde revisar el log
+        print(f"\n❌ No se cargaron datos por errores detectados. Revisa el log en: {LOG_FILE}\n")
         return
 
-    print("No se detectaron errores. Procediendo a cargar datos...\n")
+    logger.info("No se detectaron errores. Procediendo a cargar datos...")
 
-    for fila in filas_validas:
-        try:
-            with transaction.atomic():
+    try:
+        with transaction.atomic():
+            for fila in filas_validas:
                 colaborador = Colaboradores.objects.create(
                     cccolaborador=fila["usuario"],
                     nombrecolaborador=fila["nombre"],
                     apellidocolaborador=fila["apellido"],
                     cargocolaborador=fila["cargo"],
                     correocolaborador=fila["email"],
-                    telefocolaborador=None,
+                    telefocolaborador=fila.get("telefono"),
                     estadocolaborador=1,
                     nivelcolaborador=fila["nivel"],
                     regionalcolab=fila["regional"],
@@ -255,23 +340,24 @@ def cargar_colaboradores_desde_excel():
                     tipousuario=3,
                     idcolaboradoru=colaborador
                 )
-            print(f"✅ {fila['nombre']} {fila['apellido']} | CC {fila['usuario']}")
-            exitosos += 1
-        except Exception as e:
-            print(f"❌ Error inesperado al guardar {fila['usuario']}: {e}")
-            errores += 1
 
-    print("\n==============================")
-    print("📊 RESUMEN FINAL")
-    print(f"✅ Exitosos: {exitosos}")
-    print(f"❌ Errores: {errores}")
-    print("==============================\n")
+                logger.info(f"✅ {fila['nombre']} {fila['apellido']} | CC {fila['usuario']}")
+                exitosos += 1
+    except Exception as e:
+        logger.exception("Error al guardar lote; ninguna fila fue insertada: %s", e)
+        errores = len(filas_validas)
+
+    logger.info("\n==============================")
+    logger.info("RESUMEN FINAL")
+    logger.info(f"Exitosos: {exitosos}")
+    logger.info(f"Errores: {errores}")
+    logger.info("==============================\n")
 
 
 # ========================
 # EJECUCIÓN
 # ========================
 if __name__ == "__main__":
-    print("🚀 Iniciando carga de colaboradores...")
+    logger.info("🚀 Iniciando carga de colaboradores...")
     cargar_colaboradores_desde_excel()
-    print("✨ Proceso finalizado")
+    logger.info("✨ Proceso finalizado")

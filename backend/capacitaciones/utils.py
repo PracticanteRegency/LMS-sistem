@@ -302,7 +302,7 @@ def enviar_correo_capacitacion_creada(capacitacion, colaboradores_ids=None):
         </ul>
         <p>
             Podrá acceder a la plataforma de formación a través del siguiente enlace:<br>
-            <a href="https://juvenescent-tamelessly-dennis.ngrok-free.dev" target="_blank">Acceder a la plataforma</a>
+            <a href="https://formacion.cloudregencyapps.com/login" target="_blank">Acceder a la plataforma</a>
         </p>
         <p>
             Si olvidó su contraseña, puede restablecerla desde la plataforma.
@@ -328,3 +328,102 @@ def enviar_correo_capacitacion_creada(capacitacion, colaboradores_ids=None):
     email.attach_alternative(html_message, "text/html")
     email.send(fail_silently=False)
 
+def enviar_correo_cap_activada(capacitacion, colaboradores_ids=None):
+    """
+    Envía un correo masivo a los colaboradores cuando una capacitación es activada.
+    - Si `colaboradores_ids` es None: envía a todos los inscritos.
+    - Si se pasa una lista de ids, envía sólo a esos colaboradores.
+    """
+
+    if colaboradores_ids is None:
+        # only include collaborators that are NOT completed
+        correos_qs = progresoCapacitaciones.objects.filter(capacitacion=capacitacion, completada=False)
+        correos = list(
+            correos_qs.values_list("colaborador__correocolaborador", flat=True)
+            .exclude(colaborador__correocolaborador__isnull=True)
+            .exclude(colaborador__correocolaborador__exact="")
+            .distinct()
+        )
+    else:
+        # remove any collaborators from the provided list who already completed the capacitacion
+        try:
+            provided_ids = list(map(int, colaboradores_ids))
+        except Exception:
+            provided_ids = colaboradores_ids or []
+
+        completed_ids = set(
+            progresoCapacitaciones.objects.filter(
+                capacitacion=capacitacion,
+                colaborador_id__in=provided_ids,
+                completada=True
+            ).values_list('colaborador_id', flat=True)
+        )
+
+        notify_ids = [pid for pid in provided_ids if pid not in completed_ids]
+
+        correos = list(
+            Colaboradores.objects.filter(idcolaborador__in=notify_ids)
+            .values_list('correocolaborador', flat=True)
+            .exclude(correocolaborador__isnull=True)
+            .exclude(correocolaborador__exact='')
+            .distinct()
+        )
+
+    if not correos:
+        return
+
+    subject = f"🎓 Nueva Capacitación Activa: {capacitacion.titulo}"
+
+    text_message = (
+        f"Estimado colaborador@,\n\n"
+        f"Reciba un cordial saludo.\n"
+        f"Nos complace informarle que ha sido matriculado en la formación "
+        f"'{capacitacion.titulo}'.\n\n"
+        f"Fecha de inicio: {capacitacion.fecha_inicio.date()}\n"
+        f"Fecha de finalización: {capacitacion.fecha_fin.date()}\n\n"
+        f"Podrá acceder a la plataforma en el siguiente enlace: [enlace a la plataforma]\n\n"
+        f"Agradecemos su disposición e interés en fortalecer sus competencias.\n"
+        f"Atentamente,\n\n"
+        f"Área de Formación Empresarial"
+    )
+
+    html_message = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #333;">
+        <p>Estimado colaborador,</p>
+        <p>Reciba un cordial saludo.</p>
+        <p>
+            Nos complace informarle que ha sido matriculado en la formación
+            <strong>{capacitacion.titulo}</strong>. A continuación, encontrará los detalles:
+        </p>
+        <ul>
+            <li><strong>Fecha de inicio:</strong> {capacitacion.fecha_inicio.date()}</li>
+            <li><strong>Fecha de finalización:</strong> {capacitacion.fecha_fin.date()}</li>
+        </ul>
+        <p>
+            Podrá acceder a la plataforma de formación a través del siguiente enlace:<br>
+            <a href="https://formacion.cloudregencyapps.com/login" target="_blank">Acceder a la plataforma</a>
+        </p>
+        <p>
+            Si olvidó su contraseña, puede restablecerla desde la plataforma.
+        </p>
+        <p>
+            Agradecemos su disposición e interés en fortalecer sus competencias.<br>
+            Le deseamos una experiencia de aprendizaje provechosa.
+        </p>
+        <p><strong>Atentamente,</strong><br>
+        Área de Formación Empresarial</p>
+    </body>
+    </html>
+    """
+
+    email = EmailMultiAlternatives(
+        subject=subject,
+        body=text_message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[],
+        bcc=correos,
+    )
+
+    email.attach_alternative(html_message, "text/html")
+    email.send(fail_silently=False)

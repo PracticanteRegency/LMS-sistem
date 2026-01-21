@@ -91,7 +91,7 @@
 /* Charts Grid */
 .chartsGrid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 20px;
   margin-bottom: 20px;
 }
@@ -101,6 +101,10 @@
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   padding: 20px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0; /* allow children to shrink and avoid overflow */
+  overflow: hidden;
 }
 
 .chartTitle {
@@ -129,6 +133,8 @@
   align-items: center;
   padding: 12px 0;
   border-bottom: 1px solid #eee;
+  gap: 12px;
+  flex-wrap: wrap; /* allow items to wrap on small screens */
 }
 
 .courseItem:last-child {
@@ -140,12 +146,26 @@
   font-weight: 600;
   color: #262626;
   margin: 0 0 4px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap; /* keep single line when space allows */
+  min-width: 0;
 }
 
 .courseInfo {
   font-size: 12px;
   color: #999;
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Allow long words/paths to break when necessary */
+.chartCard, .courseName, .courseInfo {
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .completionBadge {
@@ -167,13 +187,14 @@
   padding: 12px;
   border: 1px solid #e0e0e0;
   overflow-y: auto;
+  overflow-x: auto; /* allow horizontal scroll if the content needs more width */
   max-height: 300px;
 }
 
 .orgRow {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 12px;
   padding: 8px 0;
   border-bottom: 1px solid #eee;
   transition: background-color 0.2s;
@@ -192,7 +213,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -254,18 +275,26 @@ button:disabled,
   font-size: 12px;
   color: #262626;
   font-weight: 500;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 1 1 auto;
+  /* allow the name to wrap so full text is visible */
+  overflow: visible;
+  text-overflow: initial;
+  white-space: normal;
 }
 
 .progressContainer {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 120px;
+  min-width: 80px; /* reduce reserved space so names can take more room */
+  margin-left: auto; /* ensure progress stays at the right */
   flex-shrink: 0;
+}
+
+/* Improve breaking behavior so long names don't force overflow */
+.orgTree, .orgRow, .itemName {
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .progressBar {

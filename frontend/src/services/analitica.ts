@@ -27,7 +27,9 @@ interface Empresa {
 
 // Only declare the service shape we need
 declare const analiticaService: {
-  getProgreso(): Promise<Empresa | Empresa[]>;
+  // backend returns an object with `estructura: Unidad[]`
+  getProgreso(): Promise<any>;
+  getEmpresas?(): Promise<any>;
 };
 
 export default analiticaService;
