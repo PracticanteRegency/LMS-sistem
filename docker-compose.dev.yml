@@ -67,7 +67,7 @@ services:
     container_name: mysql
     restart: always
     environment:
-      MYSQL_ALLOW_EMPTY_PASSWORD: "no"
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
       MYSQL_DATABASE: formularios
       MYSQL_USER: lms_user
       MYSQL_PASSWORD: lms_form@cionGH2026*
