@@ -70,8 +70,8 @@ services:
       MYSQL_ALLOW_EMPTY_PASSWORD: "no"
       MYSQL_DATABASE: formularios
       MYSQL_USER: lms_user
-      MYSQL_PASSWORD: lms_password
-      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_PASSWORD: lms_form@cionGH2026*
+      MYSQL_ROOT_PASSWORD: form@cionGH2026*
     ports:
       - "3307:3306"
     volumes:
