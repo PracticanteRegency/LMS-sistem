@@ -11,4 +11,5 @@ urlpatterns = [
     path('imprimir-reporte/', views.ImprimirReporteCorreosView.as_view(), name='imprimir-reporte'),
     path('registros-por-tipo/', views.ListarRegistrosPorTipoExamenView.as_view(), name='registros-por-tipo'),
     path('actualizar-estado/', views.ActualizarEstadoExamenesMasivoView.as_view(), name='actualizar-estado-examenes-masivo'),
+    path('crear-examen/', views.CrearExamenView.as_view(), name='crear-examen'),
 ]

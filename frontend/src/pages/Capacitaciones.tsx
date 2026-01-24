@@ -165,7 +165,11 @@ export default function Capacitaciones() {
     if (action === "Editar") {
       navigate(`/CrearCapacitacion/${cap.id}`);
     }
-      if (action === "ToggleEstado") {
+    if (action === "EditarColaboradores") {
+      navigate(`/capacitaciones/${cap.id}/colaboradores`);
+      return;
+    }
+    if (action === "ToggleEstado") {
       const willActivate = cap.estado === 0;
       const confirmMsg = willActivate ? "¿Está seguro que desea activar la capacitación?" : "¿Está seguro que desea desactivar la capacitación?";
       if (!window.confirm(confirmMsg)) return;

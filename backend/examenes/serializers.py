@@ -3,6 +3,19 @@ from .models import Examen, ExamenesCargo, CorreoExamenEnviado, RegistroExamenes
 from usuarios.models import Cargo
 
 
+class CrearExamenSerializer(serializers.Serializer):
+    nombre = serializers.CharField(max_length=255)
+    descripcion = serializers.CharField(max_length=1024, required=False, allow_blank=True)
+    empresas_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        allow_empty=False
+    )
+    cargos_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        allow_empty=False
+    )
+
+
 class ExamenSerializer(serializers.ModelSerializer):
     class Meta:
         model = Examen

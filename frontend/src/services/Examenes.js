@@ -85,6 +85,17 @@ const PreviewExamenes = async (cargoId, empresaId) => {
   });
 };
 
+const EmpresaCargo = async () => {
+  const response = await api.get("examenes/crear-examen/");
+  return response.data;
+};
+
+// POST: Crear un nuevo examen
+const crearExamen = async (payload) => {
+  const response = await api.post("examenes/crear-examen/", payload);
+  return response.data;
+};
+
 const ExamenesService = {
   CargoEmpresaConExamenes,
   PreviewExamenes,
@@ -95,6 +106,8 @@ const ExamenesService = {
   GenerarReporteExcel,
   EnviarCorreoMasivo,
   ActualizarEstadoTrabajadores,
+  EmpresaCargo,
+  crearExamen,
 };
 
 export default ExamenesService;

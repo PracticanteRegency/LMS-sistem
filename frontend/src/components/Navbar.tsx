@@ -102,7 +102,7 @@ export default function Navbar({ username: propUsername, onMenuToggle }: NavbarP
       </div>
 
       <div className={styles.branding}>
-        <h1>LMS</h1>
+        <h1>MIConocimiento</h1>
       </div>
 
       <div className={styles.right}>

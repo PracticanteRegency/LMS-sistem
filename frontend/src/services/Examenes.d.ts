@@ -131,6 +131,8 @@ interface ExamenesService {
   GenerarReporteExcel(fechaInicio: string, fechaFin: string, empresas: string): Promise<Blob>;
   EnviarCorreoMasivo(file: File): Promise<any>;
   ActualizarEstadoTrabajadores(payload: { trabajador_ids: number[] }): Promise<any>;
+  EmpresaCargo(): Promise<any>;
+  crearExamen(): Promise<any>;
 }
 
 declare const ExamenesService: ExamenesService;

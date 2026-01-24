@@ -306,3 +306,9 @@ Esto borra TODO lo de Docker (contenedores, imágenes, volúmenes, redes).
 4. Variables de entorno
 
 Este archivo es tu **chuleta oficial del proyecto** 🚀
+
+# vaciar cache (redis)
+
+```bash
+docker compose -f docker-compose.dev.yml exec redis redis-cli FLUSHALL
+```

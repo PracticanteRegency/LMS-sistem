@@ -146,71 +146,7 @@ class CrearCapacitacionView(APIView):
         con un payload { "add": [ids], "remove": [ids] }.
         Si no hay `capacitacion_id`: crear nueva capacitación (comportamiento previo).
         """
-        # Si se proporciona capacitacion_id, manejar add/remove
-        if capacitacion_id:
-            try:
-                # permisos: sólo admin (IsAdminUser ya aplicado)
-                capacitacion = Capacitaciones.objects.get(pk=capacitacion_id)
-            except Capacitaciones.DoesNotExist:
-                return Response({'error': 'Capacitación no encontrada'}, status=status.HTTP_404_NOT_FOUND)
 
-            data = request.data or {}
-            add_ids = set(data.get('add', []) or [])
-            remove_ids = set(data.get('remove', []) or [])
-
-            # validar que no haya intersección problemática
-            if add_ids & remove_ids:
-                return Response({'error': 'IDs en add y remove al mismo tiempo'}, status=status.HTTP_400_BAD_REQUEST)
-
-            # validar existencia de colaboradores a agregar
-            existing_add = set(Colaboradores.objects.filter(idcolaborador__in=add_ids).values_list('idcolaborador', flat=True))
-            missing = add_ids - existing_add
-            if missing:
-                return Response({'error': f'Colaboradores no encontrados: {list(missing)}'}, status=status.HTTP_400_BAD_REQUEST)
-
-            with transaction.atomic():
-                added = []
-                removed = []
-
-                # Agregar nuevos
-                to_add = add_ids - set(progresoCapacitaciones.objects.filter(capacitacion=capacitacion).values_list('colaborador_id', flat=True))
-                bulk = []
-                for cid in to_add:
-                    bulk.append(progresoCapacitaciones(
-                        capacitacion=capacitacion,
-                        colaborador_id=cid,
-                        fecha_registro=timezone.now(),
-                        completada=False,
-                        progreso=0
-                    ))
-                    added.append(cid)
-                if bulk:
-                    progresoCapacitaciones.objects.bulk_create(bulk)
-
-                # Enviar notificación solo a los agregados una vez la transacción se confirme
-                if added:
-                    try:
-                        transaction.on_commit(lambda: enviar_correo_capacitacion_creada(capacitacion, colaboradores_ids=added))
-                    except Exception:
-                        # No queremos que el envio de correos impida la operación
-                        pass
-
-                # Eliminar solicitados
-                to_remove = remove_ids & set(progresoCapacitaciones.objects.filter(capacitacion=capacitacion).values_list('colaborador_id', flat=True))
-                if to_remove:
-                    for cid in to_remove:
-                        progresolecciones.objects.filter(idcolaborador_id=cid, idleccion__idmodulo__idcapacitacion=capacitacion).delete()
-                        from .models import progresoModulo as _progresoModulo
-                        _progresoModulo.objects.filter(colaborador_id=cid, modulo__idcapacitacion=capacitacion).delete()
-                        progresoCapacitaciones.objects.filter(capacitacion=capacitacion, colaborador_id=cid).delete()
-                        removed.append(cid)
-
-                # invalidar caches para colaboradores afectados y para la capacitación
-                invalidate_capacitacion_cache(capacitacion_id=capacitacion.id)
-                for cid in set(added + removed):
-                    invalidate_capacitacion_cache(colaborador_id=cid)
-
-                return Response({'added': added, 'removed': removed}, status=status.HTTP_200_OK)
 
         # si no se proporciona capacitacion_id: comportamiento original (crear)
         try:
@@ -643,8 +579,7 @@ class PrevisualizarColaboradoresView(APIView):
     Optimización:
     - Búsqueda en bulk en lugar de consulta individual por cédula
     - Solo se cargan campos necesarios con only()
-    """
-    
+    """    
     def post(self, request, *args, **kwargs):
         try:
             archivo = request.FILES.get('archivo')
@@ -1477,3 +1412,113 @@ class DesactivarCapacitacionesView(APIView):
             )
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)     
+        
+        
+class EditarColaboradorCapacitacionView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser, IsSuperAdmin]
+    """Editar colaboradores asignados a una capacitación"""
+
+    def get(self, request, capacitacion_id, *args, **kwargs):
+        """
+        Obtener lista de colaboradores asignados a la capacitación con id `capacitacion_id`.
+        Retorna lista de IDs, nombre, apellido y cédula de colaboradores asignados.
+        """
+        try:
+            capacitacion = Capacitaciones.objects.get(pk=capacitacion_id)
+            colaboradores_ids = list(progresoCapacitaciones.objects.filter(capacitacion=capacitacion).values_list('colaborador_id', flat=True))
+            # Obtener datos completos de los colaboradores
+            colaboradores = list(
+                Colaboradores.objects.filter(idcolaborador__in=colaboradores_ids)
+                .values('idcolaborador', 'nombrecolaborador', 'apellidocolaborador', 'cccolaborador')
+            )
+            # Formatear para frontend (compatibilidad)
+            colaboradores_data = [
+                {
+                    'id': c['idcolaborador'],
+                    'nombre': c['nombrecolaborador'],
+                    'apellido': c['apellidocolaborador'],
+                    'cc': c['cccolaborador'],
+                }
+                for c in colaboradores
+            ]
+            return Response({'colaboradores': colaboradores_data}, status=status.HTTP_200_OK)
+        except Capacitaciones.DoesNotExist:
+            return Response({'error': 'Capacitación no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+    
+    def put(self, request, capacitacion_id, *args, **kwargs):
+        """
+        Editar colaboradores asignados a la capacitación con id `capacitacion_id`.
+        Espera un payload JSON con listas de IDs de colaboradores a agregar o remover:
+        {
+            "add": [1, 2, 3],
+            "remove": [4, 5]
+        }
+        Agrega o remueve los colaboradores especificados de la capacitación.
+        Retorna el estado actualizado de la capacitación.
+        
+        Si no se proporciona `capacitacion_id`: crear nueva capacitación (comportamiento previo).
+        """
+        if capacitacion_id:
+            try:
+                # permisos: sólo admin (IsAdminUser ya aplicado)
+                capacitacion = Capacitaciones.objects.get(pk=capacitacion_id)
+            except Capacitaciones.DoesNotExist:
+                return Response({'error': 'Capacitación no encontrada'}, status=status.HTTP_404_NOT_FOUND)
+
+            data = request.data or {}
+            add_ids = set(data.get('add', []) or [])
+            remove_ids = set(data.get('remove', []) or [])
+
+            # validar que no haya intersección problemática
+            if add_ids & remove_ids:
+                return Response({'error': 'IDs en add y remove al mismo tiempo'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # validar existencia de colaboradores a agregar
+            existing_add = set(Colaboradores.objects.filter(idcolaborador__in=add_ids).values_list('idcolaborador', flat=True))
+            missing = add_ids - existing_add
+            if missing:
+                return Response({'error': f'Colaboradores no encontrados: {list(missing)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+            with transaction.atomic():
+                added = []
+                removed = []
+
+                # Agregar nuevos
+                to_add = add_ids - set(progresoCapacitaciones.objects.filter(capacitacion=capacitacion).values_list('colaborador_id', flat=True))
+                bulk = []
+                for cid in to_add:
+                    bulk.append(progresoCapacitaciones(
+                        capacitacion=capacitacion,
+                        colaborador_id=cid,
+                        fecha_registro=timezone.now(),
+                        completada=False,
+                        progreso=0
+                    ))
+                    added.append(cid)
+                if bulk:
+                    progresoCapacitaciones.objects.bulk_create(bulk)
+
+                # Enviar notificación solo a los agregados una vez la transacción se confirme
+                if added:
+                    try:
+                        transaction.on_commit(lambda: enviar_correo_capacitacion_creada(capacitacion, colaboradores_ids=added))
+                    except Exception:
+                        # No queremos que el envio de correos impida la operación
+                        pass
+
+                # Eliminar solicitados
+                to_remove = remove_ids & set(progresoCapacitaciones.objects.filter(capacitacion=capacitacion).values_list('colaborador_id', flat=True))
+                if to_remove:
+                    for cid in to_remove:
+                        progresolecciones.objects.filter(idcolaborador_id=cid, idleccion__idmodulo__idcapacitacion=capacitacion).delete()
+                        from .models import progresoModulo as _progresoModulo
+                        _progresoModulo.objects.filter(colaborador_id=cid, modulo__idcapacitacion=capacitacion).delete()
+                        progresoCapacitaciones.objects.filter(capacitacion=capacitacion, colaborador_id=cid).delete()
+                        removed.append(cid)
+
+                # invalidar caches para colaboradores afectados y para la capacitación
+                invalidate_capacitacion_cache(capacitacion_id=capacitacion.id)
+                for cid in set(added + removed):
+                    invalidate_capacitacion_cache(colaborador_id=cid)
+
+                return Response({'added': added, 'removed': removed}, status=status.HTTP_200_OK)

@@ -16,4 +16,5 @@ urlpatterns = [
     path('mis-capacitaciones/', views.MisCapacitacionesListView.as_view(), name='mis-capacitaciones'),
     path('desactivar-capacitaciones/', views.DesactivarCapacitacionesView.as_view(), name='desactivar-capacitaciones'),
     path('desactivar-capacitaciones/<int:capacitacion_id>/', views.DesactivarCapacitacionesView.as_view(), name='desactivar-capacitacion'),
+    path('editar-colaborador-capacitacion/<int:capacitacion_id>/', views.EditarColaboradorCapacitacionView.as_view(), name='editar-colaborador-capacitacion'),
 ]

@@ -1,0 +1,8 @@
+.previewSection {
+  background: #f0f7ff;
+  border-left: 4px solid #2c5aa0;
+  padding: 16px;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  margin-top: 20px; /* Espacio extra arriba para separar de searchResults */
+}

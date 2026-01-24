@@ -60,10 +60,11 @@
               </li>
             )}
 
-            {isStaff && (
+            {(userType === 3 || userType === 4) && (
               <li className={styles.menuSection}>
                 <span className={styles.sectionTitle}>Examenes</span>
                 <ul className={styles.submenu}>
+                  <li><Link to="/CrearExamenes" className={styles.submenuItem}>Crear Exámenes</Link></li>
                   <li><Link to="/examenes" className={styles.submenuItem}>Enviar Exámenes</Link></li>
                   <li><Link to="/reportes-correos" className={styles.submenuItem}>Reporte de Correos</Link></li>
                 </ul>

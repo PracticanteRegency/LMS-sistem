@@ -21,6 +21,7 @@ from django.db.models import F, Prefetch
 from usuarios.models import Cargo
 from usuarios.permissions import IsUsuarioEspecial, IsSuperAdmin
 from analitica.models import Epresa, Unidadnegocio, Proyecto, Centroop
+from examenes.models import Examen, ExamenesCargo
 
 from django.core.mail import send_mail, EmailMultiAlternatives
 from django.conf import settings
@@ -31,6 +32,7 @@ from .models import ExamenesCargo, CorreoExamenEnviado, RegistroExamenes, Examen
 TIPOS_EXAMEN_VALIDOS = ['INGRESO', 'PERIODICO', 'RETIRO', 'ESPECIAL', 'POST_INCAPACIDAD']
 
 from .serializers import (
+    CrearExamenSerializer,
     EnviarCorreoSerializer,
     EmpresaConCargosSerializer,
     ReporteCorreoSerializer,
@@ -2053,3 +2055,63 @@ class ActualizarEstadoExamenesMasivoView(APIView):
             'no_encontrados': no_encontrados,
             'cambios': cambios
         }, status=status.HTTP_200_OK)
+
+
+# --- ENDPOINT: CrearExamenView ---
+class CrearExamenView(APIView):
+    """
+    Endpoint para crear un examen y asociarlo a empresas y cargos.
+    - GET: Devuelve empresas y cargos disponibles.
+    - POST: Crea el examen y lo asocia a todas las combinaciones de empresas y cargos recibidos.
+    """
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial | IsSuperAdmin]
+
+    def get(self, request):
+        """
+        Devuelve la lista de empresas y cargos para selección en el frontend.
+        """
+        empresas = Epresa.objects.all().values('idempresa', 'nombre_empresa').exclude(estadoempresa = 0)
+        cargos = Cargo.objects.all().values('idcargo', 'nombrecargo')
+        return Response({
+            'empresas': list(empresas),
+            'cargos': list(cargos)  
+        }, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        """
+        Crea un examen y lo asocia a las empresas y cargos seleccionados.
+        Requiere al menos una empresa y un cargo.
+        """
+        serializer = CrearExamenSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        nombre = serializer.validated_data['nombre']
+        empresas_ids = serializer.validated_data.get('empresas_ids', [])
+        cargos_ids = serializer.validated_data.get('cargos_ids', [])
+
+        # Validar que haya al menos una empresa y un cargo
+        if not empresas_ids or not cargos_ids:
+            return Response({
+                'error': 'Debe seleccionar al menos una empresa y un cargo para asociar el examen.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        examen = Examen.objects.create(
+            nombre=nombre,
+        )
+
+        # Asociar examen a todas las combinaciones de empresa y cargo
+        for empresa_id in empresas_ids:
+            for cargo_id in cargos_ids:
+                ExamenesCargo.objects.create(
+                    examen=examen,
+                    empresa_id=empresa_id,
+                    cargo_id=cargo_id
+                )
+
+        return Response({
+            'id_examen': examen.id_examen,
+            'nombre': examen.nombre,
+            'empresas_ids': empresas_ids,
+            'cargos_ids': cargos_ids
+        }, status=status.HTTP_201_CREATED)

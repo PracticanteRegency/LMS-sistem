@@ -1,6 +1,7 @@
 import axios from 'axios';
 import api from "./axios";
 import dedupe from './dedupe';
+import EditarColaboradores from '../pages/EditarColaboradores';
 
 // GET: Obtener las capacitaciones
 const getCapList = async () => {
@@ -268,7 +269,22 @@ const certificadoDescargar = async (capacitacionId) => {
   });
 };
 
+// GET: Obtener solo los IDs de colaboradores asignados a una capacitación
+const getEditarColaboradores = async (capacitacionId) => {
+  return dedupe('cap:getEditarColaboradores', capacitacionId, async () => {
+    const response = await api.get(`capacitaciones/editar-colaborador-capacitacion/${capacitacionId}/`);
+    return response.data;
+  });
+};
 
+// PUT: Editar colaboradores asignados a una capacitación
+const putEditarColaboradores = async (capacitacionId, { add = [], remove = [] }) => {
+  return dedupe('cap:putEditarColaboradores', { capacitacionId, add, remove }, async () => {
+    const body = { add, remove };
+    const response = await api.put(`capacitaciones/editar-colaborador-capacitacion/${capacitacionId}/`, body);
+    return response.data;
+  });
+};
 
 const CapListService = {
   getCapList,
@@ -297,6 +313,8 @@ const CapListService = {
   certificadoDescargar,
   eliminarCapacitacion,
   toggleCapacitacion,
+  getEditarColaboradores,
+  putEditarColaboradores,
 };
 
 export default CapListService;

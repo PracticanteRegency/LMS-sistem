@@ -44,6 +44,17 @@ class capacitacionSerializer(serializers.ModelSerializer):
             return 0
         
         return round((comps / total) * 100, 2)
+    
+
+class RespuestaXSerializer(serializers.ModelSerializer):
+    url_imagen = serializers.CharField(source='urlimagen')
+    
+    class Meta:
+        model = Respuestas
+        fields = ['id', 
+                  'valor',  
+                  'url_imagen',
+                  'escorrecto']
 
 
 class RespuestaSerializer(serializers.ModelSerializer):
@@ -53,11 +64,12 @@ class RespuestaSerializer(serializers.ModelSerializer):
         model = Respuestas
         fields = ['id', 
                   'valor',  
-                  'url_imagen']
+                  'url_imagen'
+                  ]
 
 
 class PreguntaLeccionSerializer(serializers.ModelSerializer):
-    respuestas = RespuestaSerializer(many=True, source='respuestas_set', read_only=True)
+    respuestas = RespuestaXSerializer(many=True, source='respuestas_set', read_only=True)
     tipo_pregunta = serializers.CharField(source='tipopregunta')
     url_multimedia = serializers.CharField(source='urlmultimedia')
 
@@ -113,6 +125,7 @@ class ColaboradorSerializer(serializers.ModelSerializer):
 class CapacitacionDetalleSerializer(serializers.ModelSerializer):
     modulos = ModuloSerializer(many=True, source='modulos_set', read_only=True)
     colaboradores = serializers.SerializerMethodField()
+    imagen = serializers.CharField()
 
     class Meta:
         model = Capacitaciones

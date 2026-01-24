@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+
 import CapListService from "../services/Capacitaciones.js";
-import styles from "./Styles/Capacitaciones.module.css";
+import styles from "./Styles/CrearCapacitacion.module.css";
 
 export default function EditarColaboradores() {
   const { id } = useParams();
@@ -11,18 +12,26 @@ export default function EditarColaboradores() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [colaboradores, setColaboradores] = useState<any[]>([]);
+  const [colaboradoresIds, setColaboradoresIds] = useState<number[]>([]);
   const [newColId, setNewColId] = useState("");
   const [csvPreview, setCsvPreview] = useState<any[] | null>(null);
   const [csvWarnings, setCsvWarnings] = useState<string | null>(null);
+  // Guardar la lista original de IDs para detectar cambios
+  const [originalColaboradoresIds, setOriginalColaboradoresIds] = useState<number[]>([]);
 
+  // Cargar colaboradores asignados con nombre, apellido y cédula y guardar la lista original de IDs al cargar
   const load = async () => {
     if (!capId) return;
     try {
       setLoading(true);
       setError(null);
-      const data: any = await CapListService.getCapacitacionDetalle(capId);
-      // se espera que `colaboradores` venga en la respuesta
-      setColaboradores(Array.isArray(data.colaboradores) ? data.colaboradores : []);
+      // Usar la API GET /editar-colaborador-capacitacion/<id>/
+      const data: any = await CapListService.getEditarColaboradores(capId);
+      // El backend ahora retorna { colaboradores: [{id, nombre, apellido, cc}] }
+      setColaboradores(data.colaboradores || []);
+      const cols = data.colaboradores || [];
+      setColaboradoresIds((cols || []).map((c: any) => c.id).filter((x: any) => typeof x === 'number'));
+      setOriginalColaboradoresIds((cols || []).map((c: any) => c.id).filter((x: any) => typeof x === 'number'));
     } catch (err: any) {
       setError(err?.message || "Error al cargar colaboradores");
     } finally {
@@ -35,20 +44,14 @@ export default function EditarColaboradores() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const quitar = async (colId: number) => {
-    if (!capId) return;
-    if (!window.confirm("Quitar este colaborador de la capacitación?")) return;
-    try {
-      setLoading(true);
-      await CapListService.updateColaboradores(capId, { remove: [colId] });
-      await load();
-    } catch (err: any) {
-      setError(err?.message || "Error al quitar colaborador");
-    } finally {
-      setLoading(false);
-    }
+  // Quitar colaborador solo localmente, no ejecuta PUT
+  const quitar = (colId: number) => {
+    if (!window.confirm("Quitar este colaborador de la lista?")) return;
+    setColaboradores((prev) => prev.filter((c) => c.id !== colId));
+    // No se actualiza la lista de IDs aquí
   };
 
+  // Cargar colaboradores desde CSV solo localmente, no ejecuta PUT
   const handleCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -60,8 +63,6 @@ export default function EditarColaboradores() {
       setCsvWarnings(null);
 
       const response: any = await CapListService.cargarColaboradores(file);
-
-      // estructura esperada similar a CrearCapacitacion
       const encontrados = response.colaboradores_encontrados || response.colaboradores || (Array.isArray(response) ? response : []);
       const no_encontrados = response.colaboradores_no_encontrados || [];
 
@@ -70,57 +71,31 @@ export default function EditarColaboradores() {
         setCsvWarnings(`Advertencia: ${no_encontrados.length} colaboradores no encontrados: ${no_encontrados.join(', ')}`);
       }
 
-      // Calcular add/remove respecto a la lista actual de la capacitación
-      const currentIds = (colaboradores || []).map((c: any) => (c.id_colaborador ?? c.id) as number).filter(Boolean as any);
-      const fileIds = (encontrados || []).map((c: any) => (c.id_colaborador ?? c.id) as number).filter(Boolean as any);
-
-      const add = fileIds.filter((x: number) => !currentIds.includes(x));
-      const remove = currentIds.filter((x: number) => !fileIds.includes(x));
-
-      if ((add && add.length) || (remove && remove.length)) {
-        try {
-          const resUpdate: any = await CapListService.updateColaboradores(capId, { add, remove });
-          // Mostrar resultado: backend puede devolver { added: [...], removed: [...] }
-          const added = resUpdate.added || resUpdate.add || [];
-          const removed = resUpdate.removed || resUpdate.remove || [];
-          let msg = [] as string[];
-          if (added.length) msg.push(`Nuevos agregados: ${added.join(', ')}`);
-          if (removed.length) msg.push(`Eliminados: ${removed.join(', ')}`);
-          if (msg.length) alert(msg.join('\n'));
-        } catch (err: any) {
-          console.error('Error sincronizando desde CSV', err);
-          setError(err?.message || 'Error sincronizando colaboradores');
-        }
-        await load();
-      } else {
-        // No cambios detectados
-        if ((encontrados || []).length) alert('CSV procesado: no se detectaron cambios en la lista de colaboradores');
-      }
+      // Reemplazar la lista local de colaboradores por los encontrados en el CSV
+      setColaboradores(encontrados || []);
+      setColaboradoresIds((encontrados || []).map((c: any) => c.id));
+      // No ejecutar PUT, solo actualizar la vista local
     } catch (err: any) {
       console.error('Error al procesar CSV:', err);
       setError(err?.message || 'Error al procesar el archivo CSV');
     } finally {
       setLoading(false);
-      // limpiar input
       try { (e.target as HTMLInputElement).value = ''; } catch {}
     }
   };
 
-  const agregar = async () => {
+  // (Función agregar eliminada: solo se edita localmente y se guarda con el botón Guardar cambios)
+
+  // Guardar cambios de colaboradores (PUT)
+  const handleGuardar = async () => {
     if (!capId) return;
-    const parsed = parseInt(newColId + "", 10);
-    if (Number.isNaN(parsed)) {
-      setError("Id de colaborador inválido");
-      return;
-    }
     try {
       setLoading(true);
       setError(null);
-      await CapListService.updateColaboradores(capId, { add: [parsed] });
-      setNewColId("");
+      await CapListService.putEditarColaboradores(capId, { add: [], remove: [], colaboradores: colaboradoresIds });
       await load();
     } catch (err: any) {
-      setError(err?.message || "Error al agregar colaborador");
+      setError(err?.message || "Error al guardar cambios");
     } finally {
       setLoading(false);
     }
@@ -128,56 +103,89 @@ export default function EditarColaboradores() {
 
   return (
     <div className={styles.container}>
-      <div className={styles.headerContent}>
-        <button className={styles.pageBtn} onClick={() => navigate(-1)}>← Volver</button>
-        <h2>Editar colaboradores - Capacitación {capId}</h2>
+      <div className={styles.header}>
+        <div className={styles.headerContent}>
+          <div className={styles.headerLeft}>
+            <button className={styles.backButton} onClick={() => navigate(-1)}>
+              ← Volver
+            </button>
+          </div>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <button className={styles.btnGuardar} onClick={handleGuardar} disabled={loading}>
+              {loading ? "Guardando..." : "Guardar cambios"}
+            </button>
+          </div>
+        </div>
       </div>
 
-      {loading && <p>Cargando...</p>}
-      {error && <p className={styles.error}>{error}</p>}
+      <div className={styles.section}>
+        <h2>Configuración Pública</h2>
+        <p className={styles.sectionDescription}>Agregar Colaboradores</p>
 
-      {!loading && (
-        <div>
-          <div style={{ marginBottom: 12 }}>
-            <label style={{ display: 'block', marginBottom: 6 }}>Cargar Excel/CSV para sincronizar colaboradores</label>
-            <input type="file" accept=".csv, .xlsx" onChange={handleCsvUpload} />
-            {csvWarnings && <p className={styles.error}>{csvWarnings}</p>}
-            {csvPreview && csvPreview.length > 0 && (
-              <p>{csvPreview.length} colaboradores encontrados en el archivo.</p>
-            )}
-          </div>
-          <div style={{ marginBottom: 12 }}>
+        <div className={styles.csvSection}>
+          <a
+            href={"data:text/csv;charset=utf-8," + encodeURIComponent("cedula\n")}
+            download="colaboradores.csv"
+            className={styles.csvLink}
+          >
+            CSV Ejemplo
+          </a>
+          <label className={styles.btnSubirCsv}>
+            Subir CSV
             <input
-              placeholder="Id colaborador a agregar"
-              value={newColId}
-              onChange={(e) => setNewColId(e.target.value)}
-              style={{ marginRight: 8 }}
+              type="file"
+              accept=".csv, .xlsx"
+              onChange={handleCsvUpload}
+              style={{ display: "none" }}
             />
-            <button className={styles.btn} onClick={agregar}>Agregar</button>
-          </div>
-
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Nombre</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {colaboradores.map((c) => (
-                <tr key={c.id}>
-                  <td>{c.id}</td>
-                  <td>{c.nombre || c.nombrecolaborador || c.full_name || `${c.nombre} ${c.apellido}`}</td>
-                  <td>
-                    <button className={`${styles.btn} ${styles.btnDelete}`} onClick={() => quitar(c.id)}>Quitar</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          </label>
         </div>
-      )}
+
+        {loading && <p className={styles.loading}>Cargando...</p>}
+        {error && <p className={styles.error}>{error}</p>}
+        {csvWarnings && <p className={styles.error}>{csvWarnings}</p>}
+
+        {colaboradores.length > 0 && (
+          <div className={styles.colaboradoresTable}>
+            <div className={styles.colaboradoresHeader}>
+              <h4>Previsualización de colaboradores cargados ({colaboradores.length})</h4>
+            </div>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Nombre</th>
+                  <th>Apellido</th>
+                  <th>Cédula</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {colaboradores.map((colab, index) => (
+                  <tr key={colab.id}>
+                    <td>{index + 1}</td>
+                    <td><strong>{colab.nombre || "N/A"}</strong></td>
+                    <td>{colab.apellido || "N/A"}</td>
+                    <td>{colab.cc || "N/A"}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className={styles.btnEliminar}
+                        onClick={() => {
+                          if (window.confirm("¿Seguro que deseas eliminar este colaborador?")) quitar(colab.id);
+                        }}
+                        title="Eliminar colaborador"
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -28,6 +28,8 @@ interface CapListService {
   enviarRespuestasFormulario(capacitacionId: string | number, leccionId: number, payload: { respuestas: number[] }): Promise<any>;
   eliminarCapacitacion(capacitacionId: string | number): Promise<any>;
   toggleCapacitacion(capacitacionId: string | number): Promise<any>;
+  getEditarColaboradores(capacitacionId: string | number): Promise<any>;
+  putEditarColaboradores(capacitacionId: string | number, data: any): Promise<any>;
 }
 
 declare const CapListService: CapListService;
