@@ -1505,7 +1505,8 @@ class EditarColaboradorCapacitacionView(APIView):
                     progresoCapacitaciones.objects.bulk_create(bulk)
 
                 # Enviar notificación solo a los agregados una vez la transacción se confirme
-                if added:
+                # Solo enviar si la capacitación está activa (estado = 1)
+                if added and capacitacion.estado == 1:
                     try:
                         transaction.on_commit(lambda: enviar_correo_capacitacion_creada(capacitacion, colaboradores_ids=added))
                     except Exception:
