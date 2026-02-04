@@ -141,7 +141,7 @@ class ProgresoEmpresarialView(APIView):
     
     
 class ProgresoEmpresarialFiltradoView(APIView):
-    permission_classes = [IsAuthenticated, IsSuperAdmin]
+    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdminUser]
     """Resumen filtrado por empresa, unidad o proyecto (query params).
 
     Parámetros soportados: empresa_id, unidad_id, proyecto_id.
@@ -188,7 +188,7 @@ class ProgresoEmpresarialFiltradoView(APIView):
 
 
 class EmpresaCreateView(APIView):
-    permission_classes = [IsAuthenticated, IsSuperAdmin]
+    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdminUser]
 
     def post(self, request):
         serializer = EpresaSerializer(data=request.data)
@@ -202,7 +202,7 @@ class EmpresaCreateView(APIView):
 
 
 class VerEmpresaView(APIView):
-    permission_classes = [IsAuthenticated, IsSuperAdmin]
+    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdminUser]
 
     def get(self, request, empresa_id):
         empresa = Epresa.objects.filter(id_empresa=empresa_id).first()
@@ -232,7 +232,7 @@ class VerEmpresaView(APIView):
 
 
 class ListaEmpresasView(APIView):
-    permission_classes = [IsAuthenticated, IsSuperAdmin]
+    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdminUser]
 
     def get(self, request):
         empresas = Epresa.objects.filter(estadoempresa=1)

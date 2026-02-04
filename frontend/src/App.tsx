@@ -75,7 +75,7 @@ export default function App() {
               <AdminRoute><Usuarios /></AdminRoute>
             }/>
             <Route path="/usuarios/crear" element={
-              <CrearUsuario />
+              <ProtectedRoute><CrearUsuario /></ProtectedRoute>
             }/>
             <Route path="/CrearCapacitacion" element={
               <AdminRoute><CrearCapacitacion /></AdminRoute>
