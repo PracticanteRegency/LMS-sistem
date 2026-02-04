@@ -138,11 +138,13 @@ class IsAuthenticatedUser(BasePermission):
 
 class IsSuperAdmin(BasePermission):
     """
-    Permite acceso solo a super administradores (tipousuario == 4).
+    Permite acceso a administradores (tipousuario == 1) y super administradores (tipousuario == 4).
     """
-    message = "Solo super administradores pueden acceder a este recurso."
+    message = "Solo administradores pueden acceder a este recurso."
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
-        return getattr(request.user, 'tipousuario', None) == 4
+        tipousuario = getattr(request.user, 'tipousuario', None)
+        # Permitir tanto admin (1) como super admin (4)
+        return tipousuario in [1, 4]
