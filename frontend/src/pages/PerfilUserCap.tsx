@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { normalizeDataUrl } from "../utils/media";
 import { useParams, useNavigate } from "react-router-dom";
 import styles from "./Styles/VerCapacitacion.module.css";
 import CapListService from "../services/Capacitaciones";
@@ -138,9 +139,21 @@ export default function PerfilUserCap() {
         </div>
         <div className={styles.imageContainer}>
           {capacitacion.imagen ? (
-            <img src={capacitacion.imagen} alt={capacitacion.titulo} className={styles.headerImage} />
+            <img
+              src={normalizeDataUrl(capacitacion.imagen, 'image')}
+              alt={capacitacion.titulo}
+              className={styles.headerImage}
+              style={{
+                width: '1280px',
+                height: '514px',
+                objectFit: 'cover',
+                objectPosition: 'center',
+                borderRadius: '12px',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.08)'
+              }}
+            />
           ) : (
-            <div className={styles.imagePlaceholder}>Sin imagen</div>
+            <div className={styles.imagePlaceholder} style={{width: '1280px', height: '514px'}}>Sin imagen</div>
           )}
         </div>
 

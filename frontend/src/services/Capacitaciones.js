@@ -286,6 +286,13 @@ const putEditarColaboradores = async (capacitacionId, { add = [], remove = [] })
   });
 };
 
+const GetUsersCapacitacion = async (capacitacionId) => {
+  return dedupe('cap:GetUsersCapacitacion', capacitacionId, async () => {
+    const response = await api.get(`capacitaciones/obtener-colaboradores-capacitacion/${capacitacionId}/`);
+    return response.data;
+  });
+};
+
 const CapListService = {
   getCapList,
   getMisCapacitaciones,
@@ -315,6 +322,7 @@ const CapListService = {
   toggleCapacitacion,
   getEditarColaboradores,
   putEditarColaboradores,
+  GetUsersCapacitacion,
 };
 
 export default CapListService;

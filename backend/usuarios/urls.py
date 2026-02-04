@@ -3,6 +3,7 @@ from usuarios import views
 
 urlpatterns = [
     path("register/", views.Register.as_view(), name="register"),
+    path("register/<int:colaborador_id>/", views.Register.as_view(), name="register"),
     path("registerTemporal/", views.RegisterTemporal.as_view(), name="register_temporal"),
     path("perfil/", views.Perfil.as_view(), name="perfil"),
     # Perfil por colaborador (mantener ambos nombres por compatibilidad)

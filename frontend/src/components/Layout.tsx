@@ -6,10 +6,7 @@ import { getUserRole, getUserId } from "../services/auth";
 
 
 export default function Layout() {
-  const [sidebarOpen, setSidebarOpen] = useState(() => {
-    // Initialize based on screen size
-    return window.innerWidth > 768;
-  });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userType, setUserType] = useState(1); // 1 = usuario, 2 = admin, 3 = staff especial, 4 = superadmin
   const [userId, setUserId] = useState<number | null>(null);
 
@@ -26,11 +23,11 @@ export default function Layout() {
     // Detectar cambios de tamaño de pantalla
     const handleResize = () => {
       const mobile = window.innerWidth <= 768;
-      // Cerrar sidebar automáticamente en móvil
+      // Si el sidebar está abierto y se pasa a móvil, cerrarlo
       if (mobile && sidebarOpen) {
         setSidebarOpen(false);
       }
-    };  
+    };
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);

@@ -446,20 +446,24 @@
   padding: 12px 0;
   border-bottom: 1px solid rgba(255,255,255,0.06);
   margin-bottom: 12px;
-  width: min(100%, 900px);
+  width: 100%;
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .questionHeader {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 8px;
   flex-wrap: wrap;
   gap: 8px;
+  width: 100%;
 }
 
 .questionHeader > div:last-child {
@@ -468,6 +472,8 @@
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-start;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .btnSmall {
@@ -504,10 +510,11 @@
   flex-wrap: wrap;
   width: 100%;
   max-width: 100%;
+  box-sizing: border-box;
 }
 
 .answerRow input {
-  flex: 1 1 220px;
+  flex: 1 1 200px;
   min-width: 0;
   order: 1;
 }
@@ -1390,12 +1397,25 @@ button:disabled,
     margin-bottom: 8px;
     width: 100%;
     max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
-
 
   .questionHeader {
     font-size: 11px;
     gap: 4px;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .questionHeader > strong {
+    min-width: 100%;
+  }
+
+  .questionHeader > div:last-child {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .btnSmall {
@@ -1418,6 +1438,22 @@ button:disabled,
     flex-direction: row;
     align-items: center;
     flex-wrap: wrap;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .answerRow input {
+    flex: 1 1 150px;
+    min-width: 0;
+  }
+
+  .answerRow .selector {
+    flex-shrink: 0;
+  }
+
+  .answerRow .trashBtn,
+  .answerRow label {
+    flex-shrink: 0;
   }
 
   .selector {

@@ -107,14 +107,30 @@ def actualizar_progreso_capacitacion(colaborador_id, capacitacion):
     promedio_capacitacion = round(progreso_total / total_modulos, 2)
     capacitacion_completada = completados == total_modulos
 
-    progresoCapacitaciones.objects.update_or_create(
+    from django.utils import timezone
+    obj, created = progresoCapacitaciones.objects.get_or_create(
         colaborador_id=colaborador_id,
         capacitacion=capacitacion,
         defaults={
             'progreso': promedio_capacitacion,
-            'completada': capacitacion_completada
+            'completada': capacitacion_completada,
+            'fecha_completada': timezone.now() if capacitacion_completada else None
         }
     )
+    # Si ya existe, solo actualizar progreso y completada
+    update_fields = ['progreso', 'completada']
+    if not created:
+        obj.progreso = promedio_capacitacion
+        obj.completada = capacitacion_completada
+        # Si se completa y nunca se había completado antes, poner fecha
+        if capacitacion_completada and not obj.fecha_completada:
+            obj.fecha_completada = timezone.now()
+            update_fields.append('fecha_completada')
+        # Si se descompleta, limpiar la fecha
+        elif not capacitacion_completada and obj.fecha_completada:
+            obj.fecha_completada = None
+            update_fields.append('fecha_completada')
+        obj.save(update_fields=update_fields)
 
     return promedio_capacitacion
 

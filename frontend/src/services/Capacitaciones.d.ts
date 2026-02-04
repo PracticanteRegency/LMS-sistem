@@ -30,6 +30,7 @@ interface CapListService {
   toggleCapacitacion(capacitacionId: string | number): Promise<any>;
   getEditarColaboradores(capacitacionId: string | number): Promise<any>;
   putEditarColaboradores(capacitacionId: string | number, data: any): Promise<any>;
+  GetUsersCapacitacion(capacitacionId: string | number): Promise<any>;
 }
 
 declare const CapListService: CapListService;

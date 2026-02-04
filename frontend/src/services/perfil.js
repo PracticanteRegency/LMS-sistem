@@ -1,3 +1,6 @@
+import api from "./axios";
+import dedupe from './dedupe';
+
 // GET: Filtrar usuarios por cédula o nombre
 const getFiltrarUsuarios = async (q = "", page = 1, pageSize = 10) => {
   return dedupe('perfil:getFiltrarUsuarios', { q, page, pageSize }, async () => {
@@ -22,9 +25,6 @@ export async function registerTemporalUser(payload) {
     throw err;
   }
 }
-import api from "./axios";
-import dedupe from './dedupe';
-
 
 // Obtener el token del localStorage
 const getAuthHeader = () => {
@@ -117,6 +117,57 @@ const getCargoRegionesNiveles = async () => {
   }
 };
 
+const PatchCambiarEstadoUsuario = async (idcolaborador, payload) => {
+  try {
+    const response = await api.patch(`user/perfil/${idcolaborador}/`, payload, {
+      headers: getAuthHeader(),
+    });
+    return response.data;
+  }
+  catch (error) {
+    console.error('Error changing user status:', error);
+    throw error;
+  }
+};
+
+const PutEditarPerfil = async (idcolaborador, payload) => {
+  try {
+    const response = await api.put(`user/register/${idcolaborador}/`, payload, {
+      headers: getAuthHeader(),
+    });
+    return response.data;
+  }
+  catch (error) {
+    console.error('Error editing perfil:', error);
+    throw error;
+  }
+};
+
+const GetEditarPerfil = async (idcolaborador, payload) => {
+  try {
+    const response = await api.get(`user/register/${idcolaborador}/`, payload, {
+      headers: getAuthHeader(),
+    });
+    return response.data;
+  }
+  catch (error) {
+    console.error('Error editing perfil:', error);
+    throw error;
+  }
+};
+
+const BuscarCorreoPorUUID = async (uuid) => {
+  return dedupe('perfil:BuscarCorreoPorUUID', { uuid }, async () => {
+    try {
+      const response = await api.get(`examenes/filtrar-examenes/?uuid=${encodeURIComponent(uuid)}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error buscando correo por UUID:', error);
+      throw error;
+    }
+  });
+};
+
 const Perfil = {
   getPerfil,
   getListUsers,
@@ -124,6 +175,11 @@ const Perfil = {
   getPerfilUserById,
   getCargoRegionesNiveles,
   getFiltrarUsuarios,
+  PatchCambiarEstadoUsuario,
+  registerTemporalUser,
+  PutEditarPerfil,
+  GetEditarPerfil,
+  BuscarCorreoPorUUID,
 };
 
 export default Perfil

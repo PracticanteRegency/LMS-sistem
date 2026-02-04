@@ -101,7 +101,7 @@ class CrearCapacitacionView(APIView):
     
     @transaction.atomic
     def patch(self, request, capacitacion_id, *args, **kwargs):
-        """Editar campos de la capacitación (Admin only)"""
+        """Editar campos de la capacitación (Admin only) - Sin eliminar datos existentes, solo actualizar o agregar"""
         if not getattr(request.user, 'is_staff', False) and not getattr(request.user, 'is_superuser', False):
             return Response({'error': 'No tienes permiso para editar esta capacitación.'}, status=status.HTTP_403_FORBIDDEN)
         try:
@@ -109,7 +109,7 @@ class CrearCapacitacionView(APIView):
         except Capacitaciones.DoesNotExist:
             return Response({'error': 'Capacitación no encontrada'}, status=status.HTTP_404_NOT_FOUND)
 
-        # compute current collaborators to detect removals/additions for cache invalidation
+        # Obtener colaboradores actuales para invalidar cache
         current_collaborators = set(progresoCapacitaciones.objects.filter(capacitacion=capacitacion).values_list('colaborador_id', flat=True))
 
         # Limpieza: si el front envía campos como imagen: '' quitarlos para evitar
@@ -120,16 +120,20 @@ class CrearCapacitacionView(APIView):
         except Exception:
             data = dict(request.data)
 
+        # Eliminar solo cadenas vacías; mantener False/0/None si es necesario
         for k in list(data.keys()):
-            # eliminar sólo cadenas vacías; mantener False/0/None si es necesario
             if isinstance(data.get(k), str) and data.get(k) == '':
                 data.pop(k)
+
+        # NO procesar colaboradores desde el request - se ignoran completamente
+        if 'colaboradores' in data:
+            data.pop('colaboradores')
 
         serializer = CrearCapacitacionSerializer(capacitacion, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
 
-            # invalidate cache for the capacitacion and for affected collaborators
+            # Invalidar cache para la capacitación y colaboradores afectados
             invalidate_capacitacion_cache(capacitacion_id=capacitacion.id)
             new_collaborators = set(progresoCapacitaciones.objects.filter(capacitacion=capacitacion).values_list('colaborador_id', flat=True))
             affected = current_collaborators | new_collaborators
@@ -142,25 +146,26 @@ class CrearCapacitacionView(APIView):
     @transaction.atomic
     def post(self, request, capacitacion_id=None, *args, **kwargs):
         """
-        Si `capacitacion_id` es provisto: manejar agregados/remociones de colaboradores
-        con un payload { "add": [ids], "remove": [ids] }.
-        Si no hay `capacitacion_id`: crear nueva capacitación (comportamiento previo).
+        Crear nueva capacitación.
+        NO se procesan colaboradores en este endpoint - se ignoran completamente.
         """
-
-
-        # si no se proporciona capacitacion_id: comportamiento original (crear)
         try:
-            serializer = CrearCapacitacionSerializer(data=request.data)
+            data = None
+            try:
+                data = request.data.copy()
+            except Exception:
+                data = dict(request.data)
+
+            # Remover colaboradores del request si vienen
+            if 'colaboradores' in data:
+                data.pop('colaboradores')
+
+            serializer = CrearCapacitacionSerializer(data=data)
             if serializer.is_valid():
                 capacitacion = serializer.save()
                 
                 # Invalidar cache de lista de capacitaciones
                 cache.delete('capacitaciones_list_admin')
-                
-                # Invalidar cache de colaboradores inscritos
-                colaboradores_ids = request.data.get('colaboradores', [])
-                for col_id in colaboradores_ids:
-                    invalidate_capacitacion_cache(colaborador_id=col_id)
                 
                 return Response(
                     {'id': capacitacion.id, 'titulo': capacitacion.titulo},
@@ -785,7 +790,7 @@ class DescargarCertificadoView(APIView):
                 cmd = ['soffice', '--headless', '--convert-to', 'pdf', '--outdir', out_dir, docx_path]
                 proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120)
                 logger.warning(f"soffice exit {proc.returncode}")
-                # LibreOffice normalmente crea un PDF con mismo nombre base en out_dir
+                # LibreOffice normalmente crea un PDF con mismo nombre base in out_dir
                 expected = os.path.join(out_dir, os.path.splitext(os.path.basename(docx_path))[0] + '.pdf')
                 if os.path.exists(expected):
                     try:
@@ -1299,7 +1304,8 @@ class MisCapacitacionesListView(APIView):
             
             # Optimización: Annotate + Prefetch con to_attr
             capacitaciones = Capacitaciones.objects.filter(
-                progresocapacitaciones__colaborador=colaborador
+                progresocapacitaciones__colaborador=colaborador,
+                estado=1
             ).annotate(
                 total_lecciones_count=Count('modulos__lecciones', distinct=True)
             ).prefetch_related(
@@ -1323,7 +1329,7 @@ class MisCapacitacionesListView(APIView):
                         )
                     )
                 )
-            ).distinct().exclude(estado__in=[2, 3]).order_by('-fecha_creacion')
+            ).distinct().order_by('-fecha_creacion')
             
             serializer = MisCapacitacionesSerializer(capacitaciones, many=True)
             
@@ -1522,3 +1528,69 @@ class EditarColaboradorCapacitacionView(APIView):
                     invalidate_capacitacion_cache(colaborador_id=cid)
 
                 return Response({'added': added, 'removed': removed}, status=status.HTTP_200_OK)
+            
+            
+class ObtenerColaboradoresCapacitacionView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser | IsSuperAdmin]
+    """
+    Listado paginado de colaboradores de una capacitación con su avance.
+    GET /capacitaciones/<capacitacion_id>/colaboradores-progreso/?limit=20&offset=0
+    """
+    def get(self, request, capacitacion_id, *args, **kwargs):
+        try:
+            limit = int(request.GET.get('limit', 20))
+            offset = int(request.GET.get('offset', 0))
+            if limit > 100:
+                limit = 100
+            if limit < 1:
+                limit = 1
+            if offset < 0:
+                offset = 0
+
+            qs = progresoCapacitaciones.objects.filter(capacitacion_id=capacitacion_id)
+            total = qs.count()
+            progreso_qs = qs.select_related('colaborador').order_by('colaborador__nombrecolaborador')[offset:offset+limit]
+
+            data = list(
+                progreso_qs.values(
+                    'colaborador__idcolaborador',
+                    'colaborador__nombrecolaborador',
+                    'colaborador__apellidocolaborador',
+                    'colaborador__cccolaborador',
+                    'progreso',
+                    'completada',
+                    'fecha_registro',
+                    'fecha_completada',
+                )
+            )
+            results = [
+                {
+                    'id': d['colaborador__idcolaborador'],
+                    'nombre': d['colaborador__apellidocolaborador'],
+                    'apellido': d['colaborador__nombrecolaborador'],
+                    'cedula': d['colaborador__cccolaborador'],
+                    'progreso': float(d['progreso']),
+                    'completada': bool(d['completada']),
+                    'fecha_registro': d['fecha_registro'],
+                    'fecha_completada': d['fecha_completada'],
+                }
+                for d in data
+            ]
+
+            return Response({
+                'count': total,
+                'limit': limit,
+                'offset': offset,
+                'results': results
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+#class ReporteCapacitacionesView(APIView):
+#    permission_classes = [IsAuthenticated, IsAdminUser | IsSuperAdmin]
+#    """
+#    Generar reporte de capacitaciones en formato CSV.
+#    GET /capacitaciones/reporte-capacitaciones/
+#    """
+#    def get(self, request, *args, **kwargs):

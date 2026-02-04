@@ -134,6 +134,8 @@ interface ExamenesService {
   ActualizarEstadoTrabajadores(payload: { trabajador_ids: number[] }): Promise<any>;
   EmpresaCargo(): Promise<any>;
   crearExamen(payload: any): Promise<any>;
+  FiltrarExamenesPorColaborador(colaboradorId?: number | string, page?: number, pageSize?: number): Promise<any>;
+  FiltrarExamenesPorUUID(uuid: string): Promise<any>;
 }
 
 declare const ExamenesService: ExamenesService;

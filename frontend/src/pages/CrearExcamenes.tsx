@@ -20,6 +20,16 @@ const CrearExamenes: React.FC = () => {
   const [mensaje, setMensaje] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [tiposSeleccionados, setTiposSeleccionados] = useState<string[]>([]);
+  const [tipoSearch, setTipoSearch] = useState("");
+
+  const TIPOS_EXAMEN = [
+    { value: "INGRESO", label: "Examen de Ingreso" },
+    { value: "PERIODICO", label: "Examen Periódico" },
+    { value: "RETIRO", label: "Examen de Retiro" },
+    { value: "ESPECIAL", label: "Examen Especial" },
+    { value: "POST_INCAPACIDAD", label: "Examen Post-Incapacidad" },
+  ];
 
   useEffect(() => {
     ExamenesService.EmpresaCargo().then((data: { empresas: Empresa[]; cargos: Cargo[] }) => {
@@ -37,8 +47,8 @@ const CrearExamenes: React.FC = () => {
     e.preventDefault();
     setMensaje("");
     setError("");
-    if (!nombre || empresasSeleccionadas.length === 0 || cargosSeleccionados.length === 0) {
-      setError("Debes ingresar un nombre y seleccionar al menos una empresa y un cargo.");
+    if (!nombre || empresasSeleccionadas.length === 0 || cargosSeleccionados.length === 0 || tiposSeleccionados.length === 0) {
+      setError("Debes ingresar un nombre, seleccionar al menos una empresa, un cargo y al menos un tipo de examen.");
       return;
     }
     setLoading(true);
@@ -47,12 +57,14 @@ const CrearExamenes: React.FC = () => {
         nombre,
         empresas_ids: empresasSeleccionadas.map(e => e.idempresa),
         cargos_ids: cargosSeleccionados.map(c => c.idcargo),
+        tipos: tiposSeleccionados,
       };
       await ExamenesService.crearExamen(payload);
       setMensaje("Examen creado correctamente.");
       setNombre("");
       setEmpresasSeleccionadas([]);
       setCargosSeleccionados([]);
+      setTiposSeleccionados([]);
     } catch (err: any) {
       setError(err?.response?.data?.error || "Error al crear el examen.");
     } finally {
@@ -68,6 +80,56 @@ const CrearExamenes: React.FC = () => {
           <div className="mb-3">
             <label className={styles.label}>Nombre del examen</label>
             <input type="text" className={styles.input + ' form-control'} value={nombre} onChange={e => setNombre(e.target.value)} required maxLength={100} />
+          </div>
+          <div className={styles.searchPanel}>
+            <div className={styles.searchHeader}>
+              <h3>Seleccionar Tipos de Examen</h3>
+              <p className={styles.smallNote}>Busca y agrega tipos de examen.</p>
+            </div>
+            <input
+              type="text"
+              placeholder="Buscar tipo de examen"
+              value={tipoSearch}
+              onChange={e => setTipoSearch(e.target.value)}
+              className={styles.searchInput}
+            />
+            <div className={styles.searchResults}>
+              {TIPOS_EXAMEN.filter(tipo => tipo.label.toLowerCase().includes(tipoSearch.toLowerCase()) && !tiposSeleccionados.includes(tipo.value)).map(tipo => (
+                <button
+                  key={tipo.value}
+                  type="button"
+                  className={styles.addButton}
+                  onClick={() => setTiposSeleccionados([...tiposSeleccionados, tipo.value])}
+                >
+                  ➕ {tipo.label}
+                </button>
+              ))}
+              {TIPOS_EXAMEN.filter(tipo => tipo.label.toLowerCase().includes(tipoSearch.toLowerCase()) && !tiposSeleccionados.includes(tipo.value)).length === 0 && (
+                <p className={styles.smallNote}>No hay resultados o ya fueron agregados.</p>
+              )}
+            </div>
+            {tiposSeleccionados.length > 0 && (
+              <div className={styles.previewSection}>
+                <h4>Tipos seleccionados</h4>
+                <ul className={styles.examenList}>
+                  {tiposSeleccionados.map(tipoValue => {
+                    const tipo = TIPOS_EXAMEN.find(t => t.value === tipoValue);
+                    return (
+                      <li key={tipoValue}>
+                        ✓ {tipo ? tipo.label : tipoValue}
+                        <button
+                          type="button"
+                          className={styles.removeButton}
+                          onClick={() => setTiposSeleccionados(tiposSeleccionados.filter(t => t !== tipoValue))}
+                        >
+                          Quitar
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
           </div>
           <div className={styles.searchPanel}>
             <div className={styles.searchHeader}>

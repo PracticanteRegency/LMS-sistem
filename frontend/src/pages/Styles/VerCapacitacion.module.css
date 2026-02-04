@@ -1,3 +1,46 @@
+.imageContainer {
+  width: 100%;
+  aspect-ratio: 1280 / 514;
+  max-width: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  border-radius: 4px;
+  position: relative;
+  min-height: 120px;
+}
+.imageContainer img {
+  width: 100%;
+  height: 100%;
+  max-width: 1280px;
+  max-height: 514px;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  background: #fff;
+}
+
+@media (max-width: 900px) {
+  .imageContainer {
+    min-height: 80px;
+  }
+  .imageContainer img {
+    max-width: 100vw;
+    max-height: 220px;
+  }
+}
+@media (max-width: 600px) {
+  .imageContainer {
+    min-height: 60px;
+    border-radius: 2px;
+  }
+  .imageContainer img {
+    max-width: 100vw;
+    max-height: 120px;
+  }
+}
 .container {
   max-width: flex;
   margin: 0 auto;
@@ -31,20 +74,57 @@
 
 .imageContainer {
   width: 100%;
-  height: 240px; /* increased to show images larger */
-  background-color: #d32f2f;
+  aspect-ratio: 1280 / 514;
+  max-width: 100%;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 16px;
   border-radius: 4px;
+  position: relative;
 }
 
-.headerImage {
+.imageContainer img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
+  max-width: 1280px;
+  max-height: 514px;
+  display: block;
+}
+
+.headerImage {
+  width: 1280px;
+  height: 512px;
+  max-width: 100%;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.headerImage {
+  width: 1280px;
+  height: 514px;
+  object-fit: cover;
+  object-position: center;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+  display: block;
+  background: #f6f6f6;
+}
+
+.imagePlaceholder {
+  width: 1280px;
+  height: 514px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eaeaea;
+  color: #888;
+  border-radius: 12px;
+  font-size: 1.2rem;
 }
 
 .imagePlaceholder {
@@ -556,27 +636,27 @@
   }
 
   .imageContainer {
-    height: 100px;
-    margin-bottom: 8px;
+    width: 100%;
+    aspect-ratio: 1280 / 514;
+    max-width: 100%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+    border-radius: 4px;
+    position: relative;
   }
-
-  .headerTitle {
-    font-size: 13px;
+  .imageContainer img {
+    width: 100%;
+    height: 100%;
+    max-width: 1280px;
+    max-height: 514px;
+    object-fit: contain;
+    object-position: center;
+    display: block;
+    background: #fff;
   }
-
-  .descriptionTitle {
-    font-size: 12px;
-  }
-
-  .description {
-    font-size: 12px;
-  }
-
-  .modulosList {
-    padding: 8px;
-    gap: 8px;
-  }
-
   .moduloHeader {
     padding: 8px;
   }

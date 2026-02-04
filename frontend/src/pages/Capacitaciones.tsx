@@ -142,10 +142,14 @@ export default function Capacitaciones() {
         if (el) {
           const rect = el.getBoundingClientRect();
           const menuWidth = 180;
-          let left = rect.right - menuWidth + 8;
+          const menuHeight = 160; // Ajusta según el alto real del menú
+          // Centrar verticalmente el menú respecto al botón y mostrar a la izquierda
+          let left = rect.left - menuWidth - 8;
           if (left < 8) left = 8;
-          if (left + menuWidth > window.innerWidth - 8) left = window.innerWidth - menuWidth - 8;
-          const top = rect.bottom + 8;
+          // Centrado vertical respecto al botón
+          let top = rect.top + rect.height / 2 - menuHeight / 2;
+          if (top < 8) top = 8;
+          if (top + menuHeight > window.innerHeight - 8) top = window.innerHeight - menuHeight - 8;
           setMenuCoords({ [id]: { top, left } });
         }
       } catch (e) {
@@ -160,7 +164,7 @@ export default function Capacitaciones() {
     toggleActionMenu(cap.id);
 
     if (action === "Ver") {
-      navigate(`/capacitaciones/${cap.id}`);
+      navigate(`/capacitaciones/${cap.id}/users-cap`);
     }
     if (action === "Editar") {
       navigate(`/CrearCapacitacion/${cap.id}`);

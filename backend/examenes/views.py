@@ -224,7 +224,7 @@ class EnviarCorreoView(APIView):
 
         # Forzar destinatarios fijos para este endpoint
         correos_destino_fixed = (
-            "practicante.desarrollogh@regency.com.co,"
+            "coordinador.seleccion@regency.com.co,"
             "operativo@servicompetentes.com,"
             "administrativo@servicompetentes.com"
         )
@@ -645,7 +645,9 @@ class ImprimirReporteCorreosView(APIView):
 
             # Iniciar queryset base - ahora usamos RegistroExamenes
             # OPTIMIZADO: Prefetch de exámenes enviados para evitar N+1 en el loop
-            queryset = RegistroExamenes.objects.select_related(
+            queryset = RegistroExamenes.objects.filter(
+                estado_trabajador=1
+            ).select_related(
                 'correo_lote', 'empresa', 'cargo', 'centro',
                 'centro__id_proyecto', 'centro__id_proyecto__id_unidad'
             ).prefetch_related(
@@ -2089,6 +2091,7 @@ class CrearExamenView(APIView):
         nombre = serializer.validated_data['nombre']
         empresas_ids = serializer.validated_data.get('empresas_ids', [])
         cargos_ids = serializer.validated_data.get('cargos_ids', [])
+        tipos = serializer.validated_data.get('tipos', ['INGRESO'])
 
         # Validar que haya al menos una empresa y un cargo
         if not empresas_ids or not cargos_ids:
@@ -2100,18 +2103,196 @@ class CrearExamenView(APIView):
             nombre=nombre,
         )
 
-        # Asociar examen a todas las combinaciones de empresa y cargo
+        # Asociar examen a todas las combinaciones de empresa, cargo y tipo
         for empresa_id in empresas_ids:
             for cargo_id in cargos_ids:
-                ExamenesCargo.objects.create(
-                    examen=examen,
-                    empresa_id=empresa_id,
-                    cargo_id=cargo_id
-                )
+                for tipo in tipos:
+                    ExamenesCargo.objects.create(
+                        examen=examen,
+                        empresa_id=empresa_id,
+                        cargo_id=cargo_id,
+                        tipo=tipo
+                    )
 
         return Response({
             'id_examen': examen.id_examen,
             'nombre': examen.nombre,
             'empresas_ids': empresas_ids,
-            'cargos_ids': cargos_ids
+            'cargos_ids': cargos_ids,
+            'tipos': tipos
         }, status=status.HTTP_201_CREATED)
+
+
+class FiltrarExamenesView(APIView):
+    """
+    Endpoint para filtrar correos enviados por colaboradores.
+    
+    GET sin parámetro: Devuelve lista de colaboradores que han enviado correos de exámenes.
+    GET con parámetro enviado_por_id: Devuelve correos enviados por ese colaborador,
+                                       con formato paginado como ReporteCorreosEnviadosView.
+    """
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial | IsSuperAdmin]
+
+    def get(self, request):
+        enviado_por_id = request.query_params.get('enviado_por_id', None)
+        uuid_correo = request.query_params.get('uuid', None)
+
+        if uuid_correo:
+            # Filtrar por UUID del correo
+            return self._get_correo_por_uuid(request, uuid_correo)
+        elif not enviado_por_id:
+            # Devolver lista de colaboradores que han enviado correos
+            return self._get_colaboradores_que_enviaron(request)
+        else:
+            # Devolver correos enviados por un colaborador específico (formato paginado)
+            return self._get_correos_por_colaborador(request, enviado_por_id)
+
+    def _get_colaboradores_que_enviaron(self, request):
+        """
+        Devuelve lista de colaboradores que han enviado correos de exámenes.
+        """
+        cache_key = "filtrar_examenes_colaboradores"
+        
+        # Intentar obtener del cache
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached, status=status.HTTP_200_OK, headers={'X-Cache': 'HIT'})
+
+        try:
+            # Obtener colaboradores únicos que han enviado correos
+            colaboradores_ids = CorreoExamenEnviado.objects.exclude(
+                enviado_por_id=None
+            ).values_list('enviado_por_id', flat=True).distinct()
+
+            # Importar el modelo de colaboradores
+            from usuarios.models import Colaboradores
+            colaboradores = Colaboradores.objects.filter(
+                idcolaborador__in=colaboradores_ids
+            ).values('idcolaborador', 'nombrecolaborador').order_by('nombrecolaborador')
+
+            colaboradores_list = [
+                {"id": c["idcolaborador"], "nombre": c["nombrecolaborador"]}
+                for c in colaboradores
+            ]
+
+            response_data = {
+                "total": len(colaboradores_list),
+                "colaboradores": colaboradores_list
+            }
+
+            # Guardar en cache (5 minutos)
+            cache.set(cache_key, response_data, timeout=300)
+
+            return Response(response_data, status=status.HTTP_200_OK, headers={'X-Cache': 'MISS'})
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error obteniendo colaboradores: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def _get_correos_por_colaborador(self, request, enviado_por_id):
+        """
+        Devuelve correos enviados por un colaborador específico con formato paginado
+        igual a ReporteCorreosEnviadosView.
+        """
+        # Cache con parámetros de paginación
+        page = request.query_params.get('page', '1')
+        page_size = request.query_params.get('page_size', '25')
+        cache_key = f"filtrar_examenes_colaborador={enviado_por_id}_page={page}_size={page_size}"
+
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached, status=status.HTTP_200_OK, headers={'X-Cache': 'HIT'})
+
+        # Validar que el colaborador existe
+        try:
+            from usuarios.models import Colaboradores
+            colaborador = Colaboradores.objects.get(idcolaborador=enviado_por_id)
+        except Exception:
+            return Response(
+                {"error": f"Colaborador con id {enviado_por_id} no encontrado"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Obtener correos del colaborador con relaciones optimizadas
+        correos_queryset = CorreoExamenEnviado.objects.filter(
+            enviado_por_id=enviado_por_id
+        ).select_related('enviado_por').order_by('-fecha_envio')
+
+        # Aplicar paginación
+        paginator = PageNumberPagination()
+        paginator.page_size = 25
+        paginator.page_size_query_param = 'page_size'
+        paginator.max_page_size = 100
+        
+        paginated_correos = paginator.paginate_queryset(correos_queryset, request, view=self)
+
+        if paginated_correos is not None:
+            # Serializar página actual
+            serializer = ReporteCorreoSerializer(paginated_correos, many=True)
+            # Respuesta estándar de DRF con paginación
+            paginated_response = paginator.get_paginated_response(serializer.data)
+            # Agregar metadata del colaborador
+            paginated_response.data.update({
+                "enviado_por_id": enviado_por_id,
+                "nombre_colaborador": colaborador.nombrecolaborador,
+                "total_correos": correos_queryset.count()
+            })
+            paginated_response['X-Cache'] = 'MISS'
+            cache.set(cache_key, paginated_response.data, timeout=300)
+            return paginated_response
+
+        # Fallback sin paginación (poco probable)
+        serializer = ReporteCorreoSerializer(correos_queryset, many=True)
+        data = {
+            "count": len(serializer.data),
+            "next": None,
+            "previous": None,
+            "results": serializer.data,
+            "enviado_por_id": enviado_por_id,
+            "nombre_colaborador": colaborador.nombrecolaborador,
+            "total_correos": correos_queryset.count()
+        }
+        cache.set(cache_key, data, timeout=300)
+        return Response(data, status=status.HTTP_200_OK, headers={'X-Cache': 'MISS'})
+
+    def _get_correo_por_uuid(self, request, uuid_correo):
+        """
+        Devuelve un correo específico filtrado por su UUID.
+        """
+        cache_key = f"filtrar_examenes_uuid={uuid_correo}"
+
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return Response(cached, status=status.HTTP_200_OK, headers={'X-Cache': 'HIT'})
+
+        try:
+            # Buscar el correo por UUID
+            correo = CorreoExamenEnviado.objects.select_related('enviado_por').get(
+                uuid_correo=uuid_correo
+            )
+
+            # Serializar el correo
+            serializer = ReporteCorreoSerializer(correo)
+            response_data = {
+                "found": True,
+                "correo": serializer.data,
+                "uuid": uuid_correo
+            }
+
+            # Guardar en cache (5 minutos)
+            cache.set(cache_key, response_data, timeout=300)
+
+            return Response(response_data, status=status.HTTP_200_OK, headers={'X-Cache': 'MISS'})
+
+        except CorreoExamenEnviado.DoesNotExist:
+            return Response(
+                {"found": False, "error": f"Correo con UUID {uuid_correo} no encontrado"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"error": f"Error buscando correo: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

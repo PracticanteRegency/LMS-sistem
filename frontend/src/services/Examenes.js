@@ -96,6 +96,58 @@ const crearExamen = async (payload) => {
   return response.data;
 };
 
+const FiltrarExamenesPorColaborador = async (colaboradorId, page = 1, pageSize = 10) => {
+  // Detectar si es un UUID (formato: 8-4-4-4-12 caracteres hexadecimales)
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const isUUID = colaboradorId && uuidPattern.test(colaboradorId.toString());
+  
+  console.log('FiltrarExamenesPorColaborador - colaboradorId:', colaboradorId, 'isUUID:', isUUID);
+  
+  const cacheKey = isUUID 
+    ? `examenes:FiltrarExamenesPorColaborador:uuid=${colaboradorId}`
+    : `examenes:FiltrarExamenesPorColaborador:id=${colaboradorId}:page=${page}:size=${pageSize}`;
+  
+  return dedupe(cacheKey, { colaboradorId, page, pageSize, isUUID }, async () => {
+    try {
+      let url = 'examenes/filtrar-examenes/';
+      
+      if (isUUID) {
+        // Si es UUID, buscar por uuid
+        url += `?uuid=${encodeURIComponent(colaboradorId)}`;
+        console.log('Buscando por UUID - URL:', url);
+      } else if (colaboradorId) {
+        // Si es ID numérico, filtrar por colaborador
+        url += `?enviado_por_id=${colaboradorId}&page=${page}&page_size=${pageSize}`;
+        console.log('Buscando por ID colaborador - URL:', url);
+      } else {
+        console.log('Obteniendo lista de colaboradores - URL:', url);
+      }
+      
+      const response = await api.get(url);
+      console.log('Respuesta del backend:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching filtrar examenes por colaborador:', error);
+      throw error;
+    }
+  });
+};
+
+const FiltrarExamenesPorUUID = async (uuid) => {
+  return dedupe(`examenes:FiltrarExamenesPorUUID:${uuid}`, uuid, async () => {
+    try {
+      const url = `examenes/filtrar-examenes/?uuid=${encodeURIComponent(uuid)}`;
+      console.log('Buscando por UUID - URL:', url);
+      const response = await api.get(url);
+      console.log('Respuesta del backend:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching filtrar examenes por UUID:', error);
+      throw error;
+    }
+  });
+};
+
 const ExamenesService = {
   CargoEmpresaConExamenes,
   PreviewExamenes,
@@ -108,6 +160,8 @@ const ExamenesService = {
   ActualizarEstadoTrabajadores,
   EmpresaCargo,
   crearExamen,
+  FiltrarExamenesPorColaborador,
+  FiltrarExamenesPorUUID,
 };
 
 export default ExamenesService;

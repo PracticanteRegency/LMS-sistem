@@ -252,7 +252,12 @@ class CrearCapacitacionSerializer(serializers.ModelSerializer):
 
             # Reemplazar módulos y lecciones si se envía 'modulos'
             if modulos_data is not None:
-                # Borrar módulos existentes y su cascade de lecciones/preguntas
+                # PRIMERO: Eliminar todos los registros de progreso relacionados con módulos de esta capacitación
+                modulos_ids = Modulos.objects.filter(idcapacitacion=instance).values_list('id', flat=True)
+                if modulos_ids:
+                    progresoModulo.objects.filter(modulo__in=modulos_ids).delete()
+                
+                # LUEGO: Borrar módulos existentes y su cascade de lecciones/preguntas
                 Modulos.objects.filter(idcapacitacion=instance).delete()
                 for modulo_data in modulos_data:
                     lecciones_data = modulo_data.get('lecciones', [])

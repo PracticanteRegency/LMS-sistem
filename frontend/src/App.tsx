@@ -25,6 +25,8 @@ import ResponderLeccion from "./pages/responderLeccion";
 import NoAutorizado from "./pages/NoAutorizado";
 import ProtectedRoute from "./ProtectedRoute.tsx";
 import CrearExamenes from "./pages/CrearExcamenes";
+import EditarUsuario from "./pages/EditarUsuario";
+import UsersCap from "./pages/UsersCap.tsx";
 
 export default function App() {
   const user = getUser();
@@ -55,6 +57,12 @@ export default function App() {
               <AdminRoute><Capacitaciones /></AdminRoute>
               } />
 
+
+            {/* Ruta para ver usuarios de una capacitación, solo para roles 1 y 4 */}
+            <Route path="/capacitaciones/:id/users-cap" element={
+              <AdminRoute><UsersCap /></AdminRoute>
+            } />
+
             <Route path="/capacitaciones/:id/colaboradores" element={
               <AdminRoute><EditarColaboradores /></AdminRoute>
             } />
@@ -75,6 +83,7 @@ export default function App() {
             <Route path="/CrearCapacitacion/:id" element={
               <AdminRoute><CrearCapacitacion /></AdminRoute>
             }/>
+            <Route path="/user/editar/:id" element={<EditarUsuario />} />
 
           </Route>
 

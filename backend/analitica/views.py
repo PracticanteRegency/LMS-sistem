@@ -447,8 +447,11 @@ class ListaCentrosOperativosView(APIView):
     
     
 class CargarEstructuraView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
     def post(self, request):
         serializer = CargarEstructuraSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.save()
         return Response(data, status=status.HTTP_201_CREATED)
+

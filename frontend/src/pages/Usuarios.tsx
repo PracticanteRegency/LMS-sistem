@@ -122,7 +122,6 @@ export default function Usuarios() {
   const toggleActionMenu = (id: number) => {
     setOpenMenus((prev) => {
       if (prev[id]) {
-        // close and remove coords
         setMenuCoords((mc) => {
           const copy = { ...mc };
           delete copy[id];
@@ -131,22 +130,24 @@ export default function Usuarios() {
         return {};
       }
 
-      // compute viewport coords for fixed menu
       try {
         const el = menuRefs.current[id];
         if (el) {
           const rect = el.getBoundingClientRect();
           const menuWidth = 180;
-          let left = rect.right - menuWidth + 8;
+          const menuHeight = 160; // Ajusta según el alto real del menú
+          // Centrar verticalmente el menú respecto al botón y mostrar a la izquierda
+          let left = rect.left - menuWidth - 8;
           if (left < 8) left = 8;
-          if (left + menuWidth > window.innerWidth - 8) left = window.innerWidth - menuWidth - 8;
-          const top = rect.bottom + 8;
+          // Centrado vertical respecto al botón
+          let top = rect.top + rect.height / 2 - menuHeight / 2;
+          if (top < 8) top = 8;
+          if (top + menuHeight > window.innerHeight - 8) top = window.innerHeight - menuHeight - 8;
           setMenuCoords({ [id]: { top, left } });
         }
       } catch (e) {
         // ignore
       }
-
       return { [id]: true };
     });
   };
@@ -220,8 +221,8 @@ export default function Usuarios() {
                   <th>Apellido</th>
                   <th>Correo</th>
                   <th>Cargo</th>
-                  <th>Total Cap.</th>
-                  <th>Completadas</th>
+                  <th>Capacitaciones Totales</th>
+                  <th>Capacitaciones Completadas</th>
                   <th>Estado</th>
                   <th>Acciones</th>
                 </tr>
@@ -265,7 +266,10 @@ export default function Usuarios() {
                             >
                               Ver
                             </button>
-                            <button className={`${styles.btn} ${styles.btnEdit}`}>
+                            <button
+                              className={`${styles.btn} ${styles.btnEdit}`}
+                              onClick={() => navigate(`/user/editar/${u.id_colaborador}`)}
+                            >
                               Editar
                             </button>
                             <button className={`${styles.btn} ${styles.btnDelete}`}>

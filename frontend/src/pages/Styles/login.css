@@ -4,7 +4,10 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
+  min-height: 10dvh;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow: hidden;
   padding: 16px;
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
@@ -236,6 +239,10 @@
 @media (max-width: 768px) {
   .login-page {
     padding: 12px;
+    min-height: 10dvh;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
   }
 
   .login_content {

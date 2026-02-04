@@ -14,6 +14,19 @@ class CrearExamenSerializer(serializers.Serializer):
         child=serializers.IntegerField(),
         allow_empty=False
     )
+    tipos = serializers.ListField(
+        child=serializers.ChoiceField(
+            choices=[
+                ("INGRESO", "Examen de Ingreso"),
+                ("PERIODICO", "Examen Periódico"),
+                ("RETIRO", "Examen de Retiro"),
+                ("ESPECIAL", "Examen Especial"),
+                ("POST_INCAPACIDAD", "Examen Post-Incapacidad")
+            ]
+        ),
+        allow_empty=False,
+        default=["INGRESO"]
+    )
 
 
 class ExamenSerializer(serializers.ModelSerializer):

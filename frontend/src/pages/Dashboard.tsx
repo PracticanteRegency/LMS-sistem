@@ -254,17 +254,6 @@ export default function Dashboard() {
         <div className={styles.kpiCard}>
           <div className={styles.kpiContent}>
             <div>
-              <p className={styles.kpiLabel}>Total Empresas</p>
-              <p className={styles.kpiValue}>{analytics?.totalEmpresas || 0}</p>
-              <p className={styles.kpiTrend}>Empresas registradas</p>
-            </div>
-            <span className={styles.kpiIcon}>🏢</span>
-          </div>
-        </div>
-
-        <div className={styles.kpiCard}>
-          <div className={styles.kpiContent}>
-            <div>
               <p className={styles.kpiLabel}>Total Unidades</p>
               <p className={styles.kpiValue}>{analytics?.totalUnidades || 0}</p>
               <p className={styles.kpiTrend}>Unidades organizativas</p>

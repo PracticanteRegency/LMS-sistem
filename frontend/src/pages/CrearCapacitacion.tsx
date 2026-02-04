@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import styles from "./Styles/CrearCapacitacion.module.css";
 import { useNavigate } from "react-router-dom";
 import CapListService from "../services/Capacitaciones";
+import { normalizeDataUrl } from "../utils/media";
 
 const STORAGE_KEY = "crearCapacitacion_formData";
 const STORAGE_KEY_MODULOS = "crearCapacitacion_modulos";
@@ -85,15 +86,35 @@ export default function CrearCapacitacion() {
           ...prev,
           titulo: data.titulo || prev.titulo,
           descripcion: data.descripcion || prev.descripcion,
-          imagen: data.imagen || "",
+          imagen: normalizeDataUrl(data.imagen) || "",
           fecha_inicio: data.fecha_inicio ? (data.fecha_inicio.split("T")[0]) : prev.fecha_inicio,
           fecha_fin: data.fecha_fin ? (data.fecha_fin.split("T")[0]) : prev.fecha_fin,
           tipo: data.tipo || prev.tipo,
           imagenFile: null,
-          imagenPreview: data.imagen || "",
+          imagenPreview: normalizeDataUrl(data.imagen) || "",
         }));
 
-        setModulos(data.modulos || []);
+        // Normalizar URLs de imágenes en módulos, lecciones y respuestas, y mapear escorrecto a es_correcto
+        const modulosNorm = (data.modulos || []).map((mod: Modulo) => ({
+          ...mod,
+          lecciones: (mod.lecciones || []).map((lec: Leccion) => ({
+            ...lec,
+            url: normalizeDataUrl(lec.url),
+            preview: lec.preview ? normalizeDataUrl(lec.preview) : undefined,
+            preguntas: (lec.preguntas || []).map((preg: Pregunta) => ({
+              ...preg,
+              url_multimedia: normalizeDataUrl(preg.url_multimedia),
+              preview: preg.preview ? normalizeDataUrl(preg.preview) : undefined,
+              respuestas: (preg.respuestas || []).map((resp: any) => ({
+                valor: resp.valor || "",
+                url_imagen: normalizeDataUrl(resp.url_imagen),
+                preview: resp.preview ? normalizeDataUrl(resp.preview) : undefined,
+                es_correcto: typeof resp.escorrecto !== 'undefined' ? (resp.escorrecto === 1 ? 1 : 0) : (typeof resp.es_correcto !== 'undefined' ? (resp.es_correcto === 1 ? 1 : 0) : 0),
+              })),
+            })),
+          })),
+        }));
+        setModulos(modulosNorm);
         const cols = data.colaboradores || [];
         setColaboradores(cols);
         setColaboradoresFiltrados(cols);
@@ -677,7 +698,8 @@ const handleRespuestaChange = async (
                 return;
               }
             }
-            if (!colaboradores || colaboradores.length === 0) {
+            // Solo validar colaboradores si es creación, no edición
+            if (!id && (!colaboradores || colaboradores.length === 0)) {
               setError("Debe cargar al menos un colaborador para esta capacitación");
               setLoading(false);
               return;
@@ -764,41 +786,20 @@ const handleRespuestaChange = async (
           fecha_inicio: formData.fecha_inicio + "T08:00:00Z",
           fecha_fin: formData.fecha_fin + "T18:00:00Z",
           modulos: normalizedModulos,
-          colaboradores: colaboradores.map((c) => c.id_colaborador || c.id),
-        };
+        } as any;
+
+        // Solo incluir colaboradores si es creación (no edición)
+        if (!id) {
+          payload.colaboradores = colaboradores.map((c) => c.id_colaborador || c.id);
+        }
 
         console.log("Enviando capacitación:", payload);
         if (id) {
-          // Editar existente
-          // Primero sincronizar colaboradores con add/remove si hubo cambios
-          try {
-            const currentIds = (colaboradores || [])
-              .map((c: any) => (c.id_colaborador ?? c.id) as number | undefined)
-              .filter((x): x is number => typeof x === 'number');
-            const orig = originalColaboradoresIds || [];
-            const add = currentIds.filter((x) => !orig.includes(x));
-            const remove = orig.filter((x) => !currentIds.includes(x));
-
-            if ((add && add.length) || (remove && remove.length)) {
-              // Llamada POST add/remove
-              const resUpdate: any = await (CapListService as any).updateColaboradores(id, { add, remove });
-              console.log('updateColaboradores result:', resUpdate);
-              // actualizar estado local de referencia
-              setOriginalColaboradoresIds(currentIds);
-            }
-          } catch (err: any) {
-            console.error('Error actualizando colaboradores:', err);
-            setError(err.message || 'Error actualizando colaboradores');
-            setLoading(false);
-            return;
-          }
-
-          // Ahora aplicar PATCH con el resto de campos (colaboradores ya sincronizados)
-          const payloadForPatch = { ...payload } as any;
-          delete payloadForPatch.colaboradores;
-          const response = await (CapListService as any).patchCapacitacion(id, payloadForPatch);
+          // Editar existente - solo enviar datos de la capacitación, sin colaboradores
+          const response = await (CapListService as any).patchCapacitacion(id, payload);
           console.log("Capacitación actualizada exitosamente:", response);
         } else {
+          // Crear nueva
           const response = await CapListService.crearCapacitacionCompleta(payload);
           console.log("Capacitación creada exitosamente:", response);
         }
@@ -987,7 +988,7 @@ const handleRespuestaChange = async (
               ) : (
                 <div className={styles.previewWrapper}>
                   <img
-                    src={(formData as any).imagenPreview || formData.imagen}
+                    src={normalizeDataUrl((formData as any).imagenPreview || formData.imagen)}
                     alt="vista previa"
                     className={styles.previewThumb}
                   />
@@ -1034,16 +1035,18 @@ const handleRespuestaChange = async (
                   {expandedModulos[moduloIndex] ? "▼" : ">"}
                 </span>
                 <h3>{modulo.nombre_modulo}</h3>
-                  <button
-                    type="button"
-                    className={styles.trashBtn}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      eliminarModulo(moduloIndex);
-                    }}
-                  >
-                    🗑 Eliminar módulo
-                  </button>
+                  {!id || !(modulo as any).id ? (
+                    <button
+                      type="button"
+                      className={styles.trashBtn}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        eliminarModulo(moduloIndex);
+                      }}
+                    >
+                      🗑 Eliminar módulo
+                    </button>
+                  ) : null}
                 <button
                   type="button"
                   className={styles.btnAgregarLeccion}
@@ -1085,13 +1088,15 @@ const handleRespuestaChange = async (
                             </button>
                           )}
 
-                          <button
-                            type="button"
-                            className={styles.trashBtn}
-                            onClick={() => eliminarLeccion(moduloIndex, leccionIndex)}
-                          >
-                            🗑 Eliminar lección
-                          </button>
+                          {!id || !(leccion as any).id ? (
+                            <button
+                              type="button"
+                              className={styles.trashBtn}
+                              onClick={() => eliminarLeccion(moduloIndex, leccionIndex)}
+                            >
+                              🗑 Eliminar lección
+                            </button>
+                          ) : null}
                         </div>
                       </div>
                       {expandedLecciones[`${moduloIndex}-${leccionIndex}`] && (
@@ -1185,17 +1190,16 @@ const handleRespuestaChange = async (
                                     )
                                     }
                                 />
-                                </label>
-
-                                {/* Previsualización para imagen */}
-                                {leccion.preview && leccion.tipo_leccion === "imagen" && (
+                              </label>
+                              {/* Previsualización para imagen (si hay url o preview) */}
+                              {(leccion.preview || leccion.url) && (
                                 <img
-                                  src={leccion.preview}
+                                  src={normalizeDataUrl(leccion.preview || leccion.url)}
                                   alt="Vista previa"
                                   className={styles.previewThumb}
                                   style={{ marginTop: 8 }}
                                 />
-                                )}
+                              )}
                             </div>
                           )}
 
@@ -1217,25 +1221,26 @@ const handleRespuestaChange = async (
                                     )
                                     }
                                 />
-                                </label>
-
-                                {/* Indicador cuando es PDF */}
-                                {leccion.file && leccion.tipo_leccion === "pdf" && (
-                                  <div style={{ marginTop: 8 }}>
+                              </label>
+                              {/* Indicador cuando es PDF */}
+                              {(leccion.file || leccion.url) && (
+                                <div style={{ marginTop: 8 }}>
+                                  {leccion.file && (
                                     <p className="text-sm text-gray-500">
                                       PDF cargado: <strong>{leccion.file.name}</strong>
                                       {leccion.url && <span> ✓ (URL guardada)</span>}
                                     </p>
-                                    {/* Previsualización temporal del PDF */}
-                                    {leccion.preview && (
-                                      <iframe
-                                        src={leccion.preview}
-                                        title={leccion.titulo_leccion || 'Vista previa PDF'}
-                                        style={{ width: '100%', height: 240, border: '1px solid #ddd', borderRadius: 6 }}
-                                      />
-                                    )}
-                                  </div>
-                                )}
+                                  )}
+                                  {/* Previsualización PDF (si hay url o preview) */}
+                                  {(leccion.preview || leccion.url) && (
+                                    <iframe
+                                      src={normalizeDataUrl(leccion.preview || leccion.url, 'pdf')}
+                                      title={leccion.titulo_leccion || 'Vista previa PDF'}
+                                      style={{ width: '100%', height: 240, border: '1px solid #ddd', borderRadius: 6 }}
+                                    />
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -1263,13 +1268,15 @@ const handleRespuestaChange = async (
                                         >
                                           + Agregar respuesta
                                         </button>
-                                        <button
-                                          type="button"
-                                          className={styles.trashBtn}
-                                          onClick={() => eliminarPregunta(moduloIndex, leccionIndex, preguntaIndex)}
-                                        >
-                                          🗑
-                                        </button>
+                                        {!id || !(q as any).id ? (
+                                          <button
+                                            type="button"
+                                            className={styles.trashBtn}
+                                            onClick={() => eliminarPregunta(moduloIndex, leccionIndex, preguntaIndex)}
+                                          >
+                                            🗑
+                                          </button>
+                                        ) : null}
                                       </div>
                                     </div>
 
@@ -1298,14 +1305,23 @@ const handleRespuestaChange = async (
                                           }
                                         />
                                       </label>
-                                      {/* Previsualización para imagen de pregunta */}
+                                      {/* Previsualización para imagen o PDF de pregunta */}
                                       {(q.url_multimedia || q.preview) && (
                                         <div style={{ marginTop: 8 }}>
-                                          <img
-                                            src={q.preview || q.url_multimedia}
-                                            alt={`Preview pregunta ${preguntaIndex + 1}`}
-                                            className={styles.previewThumbSmall}
-                                          />
+                                          {q.url_multimedia && q.url_multimedia.toLowerCase().endsWith('.pdf') ? (
+                                            <iframe
+                                              src={normalizeDataUrl(q.preview || q.url_multimedia, 'pdf')}
+                                              title={`Preview pregunta ${preguntaIndex + 1}`}
+                                              className={styles.previewThumbSmall}
+                                              style={{ height: 120 }}
+                                            />
+                                          ) : (
+                                            <img
+                                              src={normalizeDataUrl(q.preview || q.url_multimedia)}
+                                              alt={`Preview pregunta ${preguntaIndex + 1}`}
+                                              className={styles.previewThumbSmall}
+                                            />
+                                          )}
                                         </div>
                                       )}
                                     </div>
@@ -1378,30 +1394,33 @@ const handleRespuestaChange = async (
                                                 {/* El nombre del archivo ya no se muestra por UI */}
 
                                                 {/* Vista previa de la imagen */}
-                                                {r.preview && (
-                                                <img
-                                                  src={r.preview}
-                                                  alt="Vista previa"
-                                                  className={styles.previewTiny}
-                                                  style={{ marginLeft: 8 }}
-                                                />
+                                                {/* Vista previa de la imagen de la respuesta */}
+                                                {(r.preview || r.url_imagen) && (
+                                                  <img
+                                                    src={normalizeDataUrl(r.preview || r.url_imagen)}
+                                                    alt="Vista previa"
+                                                    className={styles.previewTiny}
+                                                    style={{ marginLeft: 8 }}
+                                                  />
                                                 )}
 
                                                 {/* Eliminar respuesta */}
-                                                <button
-                                                type="button"
-                                                className={styles.trashBtn}
-                                                onClick={() =>
-                                                    eliminarRespuesta(
-                                                    moduloIndex,
-                                                    leccionIndex,
-                                                    preguntaIndex,
-                                                    respIndex
-                                                    )
-                                                }
-                                                >
-                                                🗑
-                                                </button>
+                                                {!id ? (
+                                                  <button
+                                                  type="button"
+                                                  className={styles.trashBtn}
+                                                  onClick={() =>
+                                                      eliminarRespuesta(
+                                                      moduloIndex,
+                                                      leccionIndex,
+                                                      preguntaIndex,
+                                                      respIndex
+                                                      )
+                                                  }
+                                                  >
+                                                  🗑
+                                                  </button>
+                                                ) : null}
 
                                             </div>
                                             );
@@ -1444,10 +1463,11 @@ const handleRespuestaChange = async (
           ))}
         </div>
 
-        {/* Sección 3: Configuración Pública */}
-        <div className={styles.section}>
-          <h2>Configuración Pública</h2>
-          <p className={styles.sectionDescription}>Agregar Colaboradores</p>
+        {/* Sección 3: Configuración Pública - Solo si es crear, no editar */}
+        {!id && (
+          <div className={styles.section}>
+            <h2>Configuración Pública</h2>
+            <p className={styles.sectionDescription}>Agregar Colaboradores</p>
 
           <div className={styles.csvSection}>
             <a
@@ -1523,6 +1543,7 @@ const handleRespuestaChange = async (
             </div>
           )}
         </div>
+        )}
         {error && <p className={styles.error}>{error}</p>}
         </form>
       </div>

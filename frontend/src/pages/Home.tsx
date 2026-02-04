@@ -45,7 +45,7 @@ export default function Home() {
 
   return (
     <div className={styles.container}>
-      <h1>Capacitaciones</h1>
+      <h1 className={styles.mainTitle}>Capacitaciones</h1>
       <div className={styles.grid}>
         {caps.map((cap: any) => {
           const id = cap.id || cap.id_capacitacion || cap.pk;

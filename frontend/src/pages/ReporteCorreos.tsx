@@ -27,10 +27,14 @@ interface Empresa {
   nombre: string;
 }
 
+interface Colaborador {
+  id: number;
+  nombre: string;
+}
+
 export default function ReporteCorreos() {
   const navigate = useNavigate();
   const [reportes, setReportes] = useState<ReporteCorreoItem[]>([]);
-  const [reportesOriginal, setReportesOriginal] = useState<ReporteCorreoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -50,6 +54,12 @@ export default function ReporteCorreos() {
   const [loadingEmpresas, setLoadingEmpresas] = useState(false);
   const [generatingExcel, setGeneratingExcel] = useState(false);
   const [excelError, setExcelError] = useState<string | null>(null);
+  
+  // Estados para filtro por colaborador
+  const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
+  const [loadingColaboradores, setLoadingColaboradores] = useState(false);
+  const [colaboradorSeleccionado, setColaboradorSeleccionado] = useState<number | null>(null);
+  const [filtroActivo, setFiltroActivo] = useState(false);
 
   // Load reportes on mount
   const loadReportes = useCallback(async (page: number) => {
@@ -64,12 +74,10 @@ export default function ReporteCorreos() {
       if (Array.isArray(data)) {
         // Backend devuelve array directo
         setReportes(data);
-        setReportesOriginal(data);
         setTotalCount(data.length);
       } else {
         // Backend devuelve objeto paginado {count, next, previous, results}
         setReportes(data.results || []);
-        setReportesOriginal(data.results || []);
         setTotalCount(data.count || 0);
       }
       setCurrentPage(page);
@@ -79,26 +87,47 @@ export default function ReporteCorreos() {
     } finally {
       setLoading(false);
     }
+  }, [itemsPerPage]);
+
+  // Cargar colaboradores
+  const loadColaboradores = useCallback(async () => {
+    try {
+      setLoadingColaboradores(true);
+      const data = await ExamenesService.FiltrarExamenesPorColaborador();
+      // El backend devuelve: { total, colaboradores: [...] }
+      setColaboradores(data.colaboradores || []);
+    } catch (err: any) {
+      console.error("Error cargando colaboradores:", err);
+    } finally {
+      setLoadingColaboradores(false);
+    }
   }, []);
 
   useEffect(() => {
     loadReportes(1);
-  }, [loadReportes]);
+    loadColaboradores();
+  }, [loadReportes, loadColaboradores]);
 
-  // Filtrar por correos_destino o uuid (sobre la página cargada)
-  useEffect(() => {
+  // Ejecutar búsqueda manualmente
+  const handleEjecutarBusqueda = async () => {
     if (searchTerm.trim() === "") {
-      setReportes(reportesOriginal);
-    } else {
-      const filtered = reportesOriginal.filter((reporte) => {
-        const searchLower = searchTerm.toLowerCase();
-        const correos = reporte.correos_destino?.toLowerCase() || "";
-        const uuid = reporte.uuid_correo?.toLowerCase() || "";
-        return correos.includes(searchLower) || uuid.includes(searchLower);
-      });
-      setReportes(filtered);
+      // Si no hay término de búsqueda, cargar reportes normales
+      loadReportes(1);
+      return;
     }
-  }, [searchTerm, reportesOriginal]);
+    
+    // Siempre buscar en el backend con el UUID escrito
+    const searchValue = searchTerm.trim();
+    console.log("Buscando UUID en backend:", searchValue);
+    await handleBuscarPorUUID(searchValue);
+  };
+
+  // Manejar Enter en el input de búsqueda
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleEjecutarBusqueda();
+    }
+  };
 
   const paginatedReportes = reportes; // ya vienen paginados desde backend
   const totalPages = Math.max(1, Math.ceil(totalCount / itemsPerPage));
@@ -216,6 +245,83 @@ export default function ReporteCorreos() {
     }
   };
 
+  // Aplicar filtro de colaborador
+  const handleFiltrarPorColaborador = async () => {
+    if (colaboradorSeleccionado === null) {
+      setError("Selecciona un colaborador");
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setError(null);
+      // El backend devuelve: { count, next, previous, results, enviado_por_id, nombre_colaborador, total_correos }
+      const data = await ExamenesService.FiltrarExamenesPorColaborador(colaboradorSeleccionado, 1, itemsPerPage);
+      setReportes(data.results || []);
+      setTotalCount(data.count || 0);
+      setCurrentPage(1);
+      setFiltroActivo(true);
+    } catch (err: any) {
+      setError(err.message || "Error aplicando filtro");
+      console.error("Error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Limpiar filtro
+  const handleLimpiarFiltro = () => {
+    setColaboradorSeleccionado(null);
+    setFiltroActivo(false);
+    loadReportes(1);
+  };
+
+  // Buscar por UUID
+  const handleBuscarPorUUID = async (uuid: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log("Buscando correo por UUID:", uuid);
+      
+      // Llamar al servicio directamente con el UUID
+      // El servicio enviará: GET /examenes/filtrar-examenes/?uuid=<uuid>
+      const data = await ExamenesService.FiltrarExamenesPorUUID(uuid);
+      
+      console.log("Respuesta del backend:", data);
+      
+      if (data.found && data.correo) {
+        // Mostrar el correo encontrado
+        setReportes([data.correo]);
+        setTotalCount(1);
+        setError(null);
+      } else if (data.correo) {
+        // Si solo viene correo sin "found"
+        setReportes([data.correo]);
+        setTotalCount(1);
+        setError(null);
+      } else {
+        setReportes([]);
+        setTotalCount(0);
+        setError(`No se encontró correo con UUID: ${uuid}`);
+      }
+    } catch (err: any) {
+      setReportes([]);
+      setTotalCount(0);
+      
+      console.error("Error en búsqueda por UUID:", err);
+      
+      // Manejar error 404 específico
+      if (err?.response?.status === 404) {
+        setError(`No se encontró correo con UUID: ${uuid}`);
+      } else {
+        setError(`Error buscando UUID: ${err.message || "Error desconocido"}`);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Toggle empresa seleccionada
   const toggleEmpresa = (empresaId: number) => {
     setEmpresasSeleccionadas(prev => 
@@ -248,17 +354,73 @@ export default function ReporteCorreos() {
           placeholder="🔍 Buscar por correo destino o UUID..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyPress={handleKeyPress}
           className={styles.searchInput}
         />
+        <button
+          className={styles.searchButton}
+          onClick={handleEjecutarBusqueda}
+          title="Buscar"
+        >
+          🔍 Buscar
+        </button>
         {searchTerm && (
           <button
             className={styles.clearButton}
-            onClick={() => setSearchTerm("")}
+            onClick={() => {
+              setSearchTerm("");
+              loadReportes(1);
+            }}
             title="Limpiar búsqueda"
           >
             ✕
           </button>
         )}
+      </div>
+
+      {/* Filtro por Colaborador */}
+      <div className={styles.filterContainer}>
+        <div className={styles.filterContent}>
+          <div className={styles.filterGroup}>
+            <label htmlFor="colaborador">Filtrar por Colaborador:</label>
+            {loadingColaboradores ? (
+              <p className={styles.loadingText}>Cargando colaboradores...</p>
+            ) : (
+              <>
+                <select
+                  id="colaborador"
+                  value={colaboradorSeleccionado !== null ? String(colaboradorSeleccionado) : ""}
+                  onChange={(e) => setColaboradorSeleccionado(e.target.value !== "" ? Number(e.target.value) : null)}
+                  className={styles.filterSelect}
+                >
+                  <option value="">-- Selecciona un colaborador --</option>
+                  {colaboradores.map((colab) => (
+                    <option key={colab.id} value={colab.id}>
+                      {colab.nombre}
+                    </option>
+                  ))}
+                </select>
+                <div className={styles.filterButtons}>
+                  <button
+                    className={styles.filterButton}
+                    onClick={handleFiltrarPorColaborador}
+                    disabled={colaboradorSeleccionado === null}
+                  >
+                    🔎 Aplicar Filtro
+                  </button>
+                  {filtroActivo && (
+                    <button
+                      className={styles.clearFilterButton}
+                      onClick={handleLimpiarFiltro}
+                    >
+                      ✕ Limpiar Filtro
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {loading && !reportes.length ? (

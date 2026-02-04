@@ -7,29 +7,33 @@
     userId?: number;
   }
   
+
   export default function Sidebar({ userType = 1, isOpen = true, userId }: SidebarProps) {
     const isSuperAdmin = userType === 4;
     const isAdmin = userType === 2 || isSuperAdmin;
-    const isStaff = userType === 3 || isSuperAdmin;
     // allow specific user IDs to see Usuarios menu
-    const allowedUserIdsForUsuarios = new Set([1,3,4]);
+    const allowedUserIdsForUsuarios = new Set([1, 3, 4]);
     const canSeeUsuarios = isAdmin || (typeof userId === 'number' && allowedUserIdsForUsuarios.has(userId));
 
     return (
-      <aside className={`${styles.sidebar} ${isOpen ? styles.open : styles.closed}`}>
-        <div className={styles.logo}>
+      <aside className={`${styles.sidebar} ${isOpen ? styles.open : styles.closed}`}
+        style={{ display: 'flex', flexDirection: 'column', height: '100dvh', minHeight: '100vh' }}>
+        <div className={styles.logo} style={{ flexShrink: 0 }}>
           <Link to="/perfil" className={styles.logoLink}>
             <div className="logo-placeholder">
-              <img 
-                src="/img/REGENCYL.png" 
-                alt="Logo" 
+              <img
+                src="/img/REGENCYL.png"
+                alt="Logo"
                 className="logo-img"
               />
             </div>
           </Link>
         </div>
 
-        <nav className={styles.menu}>
+        <nav
+          className={styles.menu}
+          style={{ flex: '1 1 auto', overflowY: 'auto', minHeight: 0, paddingBottom: 32 }}
+        >
           <ul>
             {isAdmin ? (
               <>

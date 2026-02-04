@@ -6,7 +6,7 @@ from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from usuarios.permissions import IsSuperAdmin, IsUsuarioEspecial
+from usuarios.permissions import IsSuperAdmin, IsAdminUser, IsUsuarioEspecial
 from usuarios.models import Colaboradores, Usuarios, Cargo, Niveles, Regional
 from capacitaciones.models import Capacitaciones, progresoCapacitaciones, Modulos, Lecciones, progresolecciones
 from capacitaciones.serializers import CapacitacionProgresoSerializer
@@ -89,6 +89,7 @@ class Perfil(APIView):
                 "completada": bool(prog.completada),
                 "progreso": float(prog.progreso) if prog.progreso is not None else 0.0,
                 "lecciones_completadas": prog.lecciones_completadas,
+                "estado_capacitacion": prog.capacitacion.estado,
                 "total_lecciones": prog.total_lecciones,
                 "fecha_completacion": prog.fecha_completada.isoformat() if getattr(prog, 'fecha_completada', None) else None
             }
@@ -122,11 +123,47 @@ class Perfil(APIView):
         }
 
         return Response(data)
+    
+    def patch(self, request, id=None):
+        """
+        Alterna el estado del colaborador (0 <-> 1). Requiere id de colaborador.
+        """
+        if id is None:
+            return Response({"error": "Se requiere el id del colaborador"}, status=400)
+
+        colaborador = Colaboradores.objects.filter(idcolaborador=id).first()
+        if not colaborador:
+            return Response({"error": "Colaborador no encontrado"}, status=404)
+
+        # Alternar estado: si es 1 pasa a 0, si es 0 pasa a 1
+        if hasattr(colaborador, 'estadocolaborador'):
+            nuevo_estado = 0 if colaborador.estadocolaborador == 1 else 1
+            colaborador.estadocolaborador = nuevo_estado
+            colaborador.save()
+
+            # Cambiar también el estado del usuario relacionado si existe
+            usuario = Usuarios.objects.filter(idcolaboradoru=colaborador).first()
+            if usuario:
+                if nuevo_estado == 0:
+                    usuario.estadousuario = 0
+                    usuario.save()
+                # Si quieres reactivar el usuario cuando el colaborador se activa, descomenta:
+                # elif nuevo_estado == 1:
+                #     usuario.estadousuario = 1
+                #     usuario.save()
+
+            return Response({
+                "id_colaborador": colaborador.idcolaborador,
+                "nuevo_estado_colaborador": colaborador.estadocolaborador,
+                "nuevo_estado_usuario": usuario.estadousuario if usuario else None
+            })
+        else:
+            return Response({"error": "El colaborador no tiene campo 'estadocolaborador'"}, status=400)
 
 
 
 class Register(APIView):
-    permission_classes = [IsAuthenticated, IsSuperAdmin, IsUsuarioEspecial]
+    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdminUser]
 
     def post(self, request, *args, **kwargs):
 
@@ -180,9 +217,77 @@ class Register(APIView):
             }, status=201)
         except Exception as e:
             return JsonResponse({'error': str(e)}, status=500)
+        
+
+    def get(self, request, colaborador_id):
+        colaborador = (
+            Colaboradores.objects
+            .select_related(
+                'cargocolaborador',
+                'nivelcolaborador',
+                'regionalcolab',
+                'centroop__id_proyecto__id_unidad__id_empresa'
+            )
+            .filter(idcolaborador=colaborador_id)
+            .first()
+        )
+        if not colaborador:
+            return Response({"error": "Colaborador no encontrado"}, status=404)
+
+        cargo = colaborador.cargocolaborador
+        nivel = colaborador.nivelcolaborador
+        region = colaborador.regionalcolab
+        centroop = colaborador.centroop
+        proyecto = centroop.id_proyecto if centroop else None
+        unidad = proyecto.id_unidad if proyecto else None
+        empresa = unidad.id_empresa if unidad else None
+
+        data = {
+            "idcolaborador": colaborador.idcolaborador,
+            "nombre": colaborador.nombrecolaborador,
+            "apellido": colaborador.apellidocolaborador,
+            "correo": colaborador.correocolaborador,
+            "telefono": colaborador.telefocolaborador,
+            "cargo": cargo.idcargo if cargo else None,
+            "nivel": nivel.idnivel if nivel else None,
+            "region": region.idregional if region else None,
+            "centroop_id": centroop.idcentrop if centroop else None,
+            "centroop": centroop.nombrecentrop if centroop else None,
+        }
+        return Response(data)
+    
+    def put(self, request, colaborador_id):
+        colaborador = Colaboradores.objects.filter(idcolaborador=colaborador_id).first()
+        if not colaborador:
+            return Response({"error": "Colaborador no encontrado"}, status=404)
+
+        data = request.data
+        # Mapear campos del frontend a los del modelo
+        mapeo = {
+            'nombre': 'nombrecolaborador',
+            'apellido': 'apellidocolaborador',
+            'correo': 'correocolaborador',
+            'telefono': 'telefocolaborador',
+            'cargo': 'cargocolaborador_id',
+            'nivel': 'nivelcolaborador_id',
+            'region': 'regionalcolab_id',
+            'centroop_id': 'centroop_id',
+        }
+        for campo_front, campo_modelo in mapeo.items():
+            if campo_front in data:
+                setattr(colaborador, campo_modelo, data[campo_front])
+
+        # Si el frontend envía estadocolaborador, también actualizarlo
+        if 'estadocolaborador' in data:
+            colaborador.estadocolaborador = data['estadocolaborador']
+
+        colaborador.save()
+        serializer = ColaboradorListadoSerializer(colaborador)
+        return Response(serializer.data)
+    
 
 class RegisterTemporal(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdminUser, IsUsuarioEspecial]
 
     def post(self, request, *args, **kwargs):
         payload = request.data if hasattr(request, 'data') else None
@@ -248,7 +353,7 @@ class RegisterTemporal(APIView):
             return JsonResponse({'error': str(e)}, status=500)
 
 class ListaUsuarios(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdminUser]
 
     def get(self, request, *args, **kwargs):
         try:
@@ -376,7 +481,7 @@ class FiltrarUsuariosView(APIView):
     """
     Vista para filtrar usuarios por nombre o CC.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdminUser]
 
     def get(self, request):
         query = request.GET.get('q', '').strip()

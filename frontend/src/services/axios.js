@@ -1,6 +1,6 @@
 import axios from "axios";
 
-export const API_URL = "/api/";
+export const API_URL = "http://localhost:8000/";
 
 // Crear instancia principal
 const api = axios.create({
@@ -39,7 +39,7 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       console.warn("Token expirado o inválido, cerrando sesión...");
       localStorage.removeItem("user");
-      window.location.href = "/login";
+      // No recargar la página automáticamente, dejar que el frontend maneje el error
     }
 
     return Promise.reject(error);

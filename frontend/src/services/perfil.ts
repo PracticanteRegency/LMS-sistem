@@ -62,6 +62,15 @@ declare const Perfil: {
   getPerfilCapById: (colaboradorId: string | number, capacitacionId: string | number) => Promise<PerfilCapProgress>;
   getPerfilUserById: (id: string | number) => Promise<PerfilResponse>;
   getFiltrarUsuarios: (query: string, page?: number, pageSize?: number) => Promise<any>;
+  GetEditarPerfil: (id: string | number, data: any) => Promise<any>;
+  PatchCambiarEstadoUsuario: (id: string | number, estado: number) => Promise<any>;
+  registerTemporalUser: (data: any) => Promise<any>;
+  PutEditarPerfil: (id: string | number, data: any) => Promise<any>;
+  getCargoRegionesNiveles: () => Promise<{
+    cargos: Array<{ id: number; nombre: string }>;
+    niveles: Array<{ id: number; nombre: string }>;
+    regionales: Array<{ id: number; nombre: string }>;
+  }>;
 };
 
 export default Perfil;

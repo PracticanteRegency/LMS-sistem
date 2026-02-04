@@ -1,3 +1,38 @@
+.buttonCompletada {
+  width: 100%;
+  padding: 12px 16px;
+  background: #43a047;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  opacity: 1;
+}
+
+.buttonFinalizada {
+  width: 100%;
+  padding: 12px 16px;
+  background: #c62828;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  opacity: 1;
+}
 .container {
   padding: 20px;
   background: #f5f5f5;

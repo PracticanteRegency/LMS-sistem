@@ -1,5 +1,5 @@
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
-
+from rest_framework_simplejwt.exceptions import AuthenticationFailed
 
 class TokenLMSSerializer(TokenObtainPairSerializer):
     """
@@ -8,7 +8,12 @@ class TokenLMSSerializer(TokenObtainPairSerializer):
     """
 
     def validate(self, attrs):
-        data = super().validate(attrs)
-        data["is_admin"] = int(getattr(self.user, "tipousuario", 0) or 0)
-
+        try:
+            data = super().validate(attrs)
+        except Exception as e:
+            raise AuthenticationFailed('El usuario no está activo o no tiene permiso para ingresar.')
+        user = self.user
+        if not hasattr(user, 'estadousuario') or getattr(user, 'estadousuario', None) != 1:
+            raise AuthenticationFailed('El usuario no está activo o no tiene permiso para ingresar.')
+        data["is_admin"] = int(getattr(user, "tipousuario", 0) or 0)
         return data

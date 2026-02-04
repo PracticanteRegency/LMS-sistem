@@ -13,9 +13,8 @@ export default function EditarColaboradores() {
   const [error, setError] = useState<string | null>(null);
   const [colaboradores, setColaboradores] = useState<any[]>([]);
   const [colaboradoresIds, setColaboradoresIds] = useState<number[]>([]);
-  const [newColId, setNewColId] = useState("");
-  const [csvPreview, setCsvPreview] = useState<any[] | null>(null);
   const [csvWarnings, setCsvWarnings] = useState<string | null>(null);
+  // const [csvPreview, setCsvPreview] = useState<any[] | null>(null);
   // Guardar la lista original de IDs para detectar cambios
   const [originalColaboradoresIds, setOriginalColaboradoresIds] = useState<number[]>([]);
 
@@ -45,10 +44,20 @@ export default function EditarColaboradores() {
   }, [id]);
 
   // Quitar colaborador solo localmente, no ejecuta PUT
-  const quitar = (colId: number) => {
-    if (!window.confirm("Quitar este colaborador de la lista?")) return;
+  const quitar = async (colId: number) => {
+    if (!window.confirm("¿Seguro que deseas eliminar este colaborador?")) return;
     setColaboradores((prev) => prev.filter((c) => c.id !== colId));
-    // No se actualiza la lista de IDs aquí
+    setColaboradoresIds((prev) => prev.filter((id) => id !== colId));
+    try {
+      setLoading(true);
+      setError(null);
+      await CapListService.putEditarColaboradores(capId, { add: [], remove: [colId] });
+      await load();
+    } catch (err: any) {
+      setError(err?.message || "Error al eliminar colaborador");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Cargar colaboradores desde CSV solo localmente, no ejecuta PUT
@@ -59,14 +68,14 @@ export default function EditarColaboradores() {
     try {
       setLoading(true);
       setError(null);
-      setCsvPreview(null);
+      // setCsvPreview(null);
       setCsvWarnings(null);
 
       const response: any = await CapListService.cargarColaboradores(file);
       const encontrados = response.colaboradores_encontrados || response.colaboradores || (Array.isArray(response) ? response : []);
       const no_encontrados = response.colaboradores_no_encontrados || [];
 
-      setCsvPreview(encontrados || []);
+      // setCsvPreview(encontrados || []);
       if (no_encontrados && no_encontrados.length) {
         setCsvWarnings(`Advertencia: ${no_encontrados.length} colaboradores no encontrados: ${no_encontrados.join(', ')}`);
       }
@@ -92,7 +101,13 @@ export default function EditarColaboradores() {
     try {
       setLoading(true);
       setError(null);
-      await CapListService.putEditarColaboradores(capId, { add: [], remove: [], colaboradores: colaboradoresIds });
+      // Calcular IDs a agregar y quitar
+      const nuevos = colaboradoresIds.filter(id => !originalColaboradoresIds.includes(id));
+      const removidos = originalColaboradoresIds.filter(id => !colaboradoresIds.includes(id));
+      // Solo enviar add/remove si hay cambios
+      if (nuevos.length > 0 || removidos.length > 0) {
+        await CapListService.putEditarColaboradores(capId, { add: nuevos, remove: removidos });
+      }
       await load();
     } catch (err: any) {
       setError(err?.message || "Error al guardar cambios");

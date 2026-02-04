@@ -272,7 +272,7 @@ export default function ReproductorVideo() {
         ) : (
           <div className={styles.warningBox}>
             <p className={styles.warningText}>
-              ⏱️ {isYouTubeUrl ? 'Marque como completado cuando termine de ver' : 'Debe ver el video completo antes de poder finalizar'}
+              ⏱️ {isYouTubeUrl ? 'Marque como completado cuando termine de verlo' : 'Debe ver el video completo antes de poder finalizar'}
             </p>
             {isYouTubeUrl && (
               <button

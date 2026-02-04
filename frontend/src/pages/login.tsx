@@ -18,8 +18,17 @@ const LoginPage: React.FC = () => {
     try {
       const data = await authService.login({ usuario, password });
 
-      const token = data?.access;
+      // Validar primero si la respuesta del backend contiene 'detail' (error)
+      if (data && data.detail) {
+        setErrorMsg(data.detail);
+        return;
+      }
+      if (!data || !data.access) {
+        setErrorMsg("Usuario o contraseña incorrectos");
+        return;
+      }
 
+      const token = data.access;
       const userData = {
         usuario,
         token,
@@ -27,11 +36,15 @@ const LoginPage: React.FC = () => {
       };
 
       localStorage.setItem("user", JSON.stringify(userData));
-
+      // Solo navegar al home si el login fue exitoso
       navigate("/");
     } catch (err: any) {
+      let msg = "Usuario o contraseña incorrectos";
+      if (err?.response?.data?.detail) {
+        msg = err.response.data.detail;
+      }
+      setErrorMsg(msg);
       console.error("Error login:", err);
-      setErrorMsg("Usuario o contraseña incorrectos");
     } finally {
       setLoading(false);
     }

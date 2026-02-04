@@ -11,6 +11,7 @@ interface Capacitacion {
   completada: boolean;
   progreso: number;
   fecha_completacion?: string;
+  estado_capacitacion?: number;
   total_lecciones?: number;
   lecciones_completadas?: number;
 }
@@ -185,12 +186,23 @@ export default function Perfil() {
                   {cap.lecciones_completadas || 0} de {cap.total_lecciones || 0} lecciones completadas
                 </p>
 
-                <button 
-                  className={styles.buttonContinuar}
-                  onClick={() => navigate(`/capacitaciones/${cap.id_capacitacion}`)}
-                >
-                  ▶ continuar
-                </button>
+                {/* Botón según estado y completada */}
+                {cap.completada ? (
+                  <button className={styles.buttonCompletada} disabled>
+                    Capacitación completada
+                  </button>
+                ) : cap.estado_capacitacion !== 1 ? (
+                  <button className={styles.buttonFinalizada} disabled>
+                    Capacitación desactivada
+                  </button>
+                ) : (
+                  <button 
+                    className={styles.buttonContinuar}
+                    onClick={() => navigate(`/capacitaciones/${cap.id_capacitacion}`)}
+                  >
+                    ▶ Continuar
+                  </button>
+                )}
               </div>
             ))}
           </div>
