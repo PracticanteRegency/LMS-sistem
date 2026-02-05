@@ -1534,23 +1534,45 @@ class EditarColaboradorCapacitacionView(APIView):
 class ObtenerColaboradoresCapacitacionView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser | IsSuperAdmin]
     """
-    Listado paginado de colaboradores de una capacitación con su avance.
-    GET /capacitaciones/<capacitacion_id>/colaboradores-progreso/?limit=20&offset=0
+    Listado de colaboradores de una capacitación con su avance.
+    
+    Comportamiento:
+    - GET /capacitaciones/<capacitacion_id>/colaboradores/ → Devuelve TODOS los colaboradores
+    - GET /capacitaciones/<capacitacion_id>/colaboradores/?limit=20&offset=0 → Paginado (20 por página)
+    - GET /capacitaciones/<capacitacion_id>/colaboradores/?limit=50&offset=50 → Paginado (50 por página)
+    
+    Parámetros opcionales:
+    - limit: Número de registros por página (máx 500). Si no se especifica, devuelve todos.
+    - offset: Número de registros a saltar (default: 0)
     """
     def get(self, request, capacitacion_id, *args, **kwargs):
         try:
-            limit = int(request.GET.get('limit', 20))
-            offset = int(request.GET.get('offset', 0))
-            if limit > 100:
-                limit = 100
-            if limit < 1:
-                limit = 1
-            if offset < 0:
-                offset = 0
-
+            # Detectar si se solicita paginación
+            limit_param = request.GET.get('limit', None)
+            offset_param = request.GET.get('offset', None)
+            
             qs = progresoCapacitaciones.objects.filter(capacitacion_id=capacitacion_id)
             total = qs.count()
-            progreso_qs = qs.select_related('colaborador').order_by('colaborador__nombrecolaborador')[offset:offset+limit]
+            
+            # Si no se especifica limit, devolver TODOS
+            if limit_param is None:
+                progreso_qs = qs.select_related('colaborador').order_by('colaborador__nombrecolaborador')
+                limit = total
+                offset = 0
+            else:
+                # Si se especifica limit, aplicar paginación
+                limit = int(limit_param)
+                offset = int(offset_param) if offset_param else 0
+                
+                # Validaciones
+                if limit > 500:
+                    limit = 500
+                if limit < 1:
+                    limit = 1
+                if offset < 0:
+                    offset = 0
+                
+                progreso_qs = qs.select_related('colaborador').order_by('colaborador__nombrecolaborador')[offset:offset+limit]
 
             data = list(
                 progreso_qs.values(
