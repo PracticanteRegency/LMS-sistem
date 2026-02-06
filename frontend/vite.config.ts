@@ -23,7 +23,7 @@ export default defineConfig({
     hmr: {
       protocol: process.env.HMR_PROTOCOL || 'wss',
       host: process.env.HMR_HOST || 'formacion.cloudregencyapps.com',
-      port: process.env.HMR_PORT ? parseInt(process.env.HMR_PORT, 10) : undefined,
+      port: process.env.HMR_PORT ? parseInt(process.env.HMR_PORT, 10) : 443,
     },
   },
 })

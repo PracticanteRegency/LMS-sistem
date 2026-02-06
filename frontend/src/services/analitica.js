@@ -30,10 +30,216 @@ const getEmpresas = async () => {
   });
 };
 
+// GET: obtener unidades
+const getUnidades = async () => {
+  return dedupe('analitica:unidades', null, async () => {
+    try {
+      const response = await api.get('analitica/lista-unidades-negocio/');
+      console.log('Unidades Response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching unidades:', error);
+      throw error;
+    }
+  });
+};
+
+// GET: obtener proyectos
+const getProyectos = async () => {
+  return dedupe('analitica:proyectos', null, async () => {
+    try {
+      const response = await api.get('analitica/proyectos/');
+      console.log('Proyectos Response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching proyectos:', error);
+      throw error;
+    }
+  });
+};
+
+// GET: obtener centros operativos
+const getCentros = async () => {
+  return dedupe('analitica:centros', null, async () => {
+    try {
+      const response = await api.get('analitica/lista-centros-operativos/');
+      console.log('Centros Response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching centros:', error);
+      throw error;
+    }
+  });
+};
+
+// POST: crear empresa
+const createEmpresa = async (payload) => {
+  const response = await api.post('analitica/empresa/', payload);
+  return response.data;
+};
+
+// PUT: actualizar empresa
+const updateEmpresa = async (id, payload) => {
+  const response = await api.put(`analitica/ver-empresa/${id}/`, payload);
+  return response.data;
+};
+
+// POST: crear unidad
+const createUnidad = async (payload) => {
+  const response = await api.post('analitica/crear-unidad-negocio/', payload);
+  return response.data;
+};
+
+// PUT: actualizar unidad
+const updateUnidad = async (id, payload) => {
+  const response = await api.put(`analitica/ver-unidad-negocio/${id}/`, payload);
+  return response.data;
+};
+
+// POST: crear proyecto
+const createProyecto = async (payload) => {
+  const response = await api.post('analitica/crear-proyecto/', payload);
+  return response.data;
+};
+
+// PUT: actualizar proyecto
+const updateProyecto = async (id, payload) => {
+  const response = await api.put(`analitica/ver-proyecto/${id}/`, payload);
+  return response.data;
+};
+
+// POST: crear centro operativo
+const createCentro = async (payload) => {
+  const response = await api.post('analitica/crear-centro-operativo/', payload);
+  return response.data;
+};
+
+// PUT: actualizar centro operativo
+const updateCentro = async (id, payload) => {
+  const response = await api.put(`analitica/ver-centro-operativo/${id}/`, payload);
+  return response.data;
+};
+
+// GET: obtener cargos
+const getCargos = async () => {
+  return dedupe('analitica:cargos', null, async () => {
+    try {
+      const response = await api.get('user/Cargo/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching cargos:', error);
+      throw error;
+    }
+  });
+};
+
+// POST: crear cargo
+const createCargo = async (payload) => {
+  const response = await api.post('user/Cargo/', payload);
+  return response.data;
+};
+
+// PUT: actualizar cargo
+const updateCargo = async (id, payload) => {
+  const response = await api.put('user/Cargo/', { ...payload, idcargo: id });
+  return response.data;
+};
+
+// DELETE: desactivar cargo
+const deleteCargo = async (id) => {
+  const response = await api.delete('user/Cargo/', { data: { idcargo: id } });
+  return response.data;
+};
+
+// GET: obtener niveles
+const getNiveles = async () => {
+  return dedupe('analitica:niveles', null, async () => {
+    try {
+      const response = await api.get('user/Nivel/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching niveles:', error);
+      throw error;
+    }
+  });
+};
+
+// POST: crear nivel
+const createNivel = async (payload) => {
+  const response = await api.post('user/Nivel/', payload);
+  return response.data;
+};
+
+// PUT: actualizar nivel
+const updateNivel = async (id, payload) => {
+  const response = await api.put('user/Nivel/', { ...payload, idnivel: id });
+  return response.data;
+};
+
+// DELETE: desactivar nivel
+const deleteNivel = async (id) => {
+  const response = await api.delete('user/Nivel/', { data: { idnivel: id } });
+  return response.data;
+};
+
+// GET: obtener regionales
+const getRegionales = async () => {
+  return dedupe('analitica:regionales', null, async () => {
+    try {
+      const response = await api.get('user/Region/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching regionales:', error);
+      throw error;
+    }
+  });
+};
+
+// POST: crear regional
+const createRegional = async (payload) => {
+  const response = await api.post('user/Region/', payload);
+  return response.data;
+};
+
+// PUT: actualizar regional
+const updateRegional = async (id, payload) => {
+  const response = await api.put('user/Region/', { ...payload, idregional: id });
+  return response.data;
+};
+
+// DELETE: desactivar regional
+const deleteRegional = async (id) => {
+  const response = await api.delete('user/Region/', { data: { idregional: id } });
+  return response.data;
+};
+
 
 const analiticaService = {
   getProgreso,
   getEmpresas,
+  getUnidades,
+  getProyectos,
+  getCentros,
+  createEmpresa,
+  updateEmpresa,
+  createUnidad,
+  updateUnidad,
+  createProyecto,
+  updateProyecto,
+  createCentro,
+  updateCentro,
+  getCargos,
+  createCargo,
+  updateCargo,
+  deleteCargo,
+  getNiveles,
+  createNivel,
+  updateNivel,
+  deleteNivel,
+  getRegionales,
+  createRegional,
+  updateRegional,
+  deleteRegional,
 };
 
 export default analiticaService;

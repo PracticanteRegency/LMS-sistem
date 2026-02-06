@@ -35,6 +35,9 @@ from rest_framework.exceptions import NotAcceptable
 
 import logging
 import threading
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from datetime import datetime
 
 # Opcional: pypandoc para conversión DOCX a PDF
 import pypandoc
@@ -60,6 +63,7 @@ from capacitaciones.serializers import (
     MisCapacitacionesSerializer,
 )
 from capacitaciones.utils import actualizar_progreso_leccion, enviar_correo_capacitacion_creada, enviar_correo_cap_activada
+from capacitaciones.batch_email import enviar_correo_capacitacion_creada_batch
 from usuarios.models import Colaboradores
 from usuarios.permissions import IsAdminUser, IsSuperAdmin
 
@@ -1506,9 +1510,10 @@ class EditarColaboradorCapacitacionView(APIView):
 
                 # Enviar notificación solo a los agregados una vez la transacción se confirme
                 # Solo enviar si la capacitación está activa (estado = 1)
+                # NOTA: Usar batching para soportar 1500+ colaboradores
                 if added and capacitacion.estado == 1:
                     try:
-                        transaction.on_commit(lambda: enviar_correo_capacitacion_creada(capacitacion, colaboradores_ids=added))
+                        transaction.on_commit(lambda: enviar_correo_capacitacion_creada_batch(capacitacion, colaboradores_ids=added))
                     except Exception:
                         # No queremos que el envio de correos impida la operación
                         pass
@@ -1610,10 +1615,349 @@ class ObtenerColaboradoresCapacitacionView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-#class ReporteCapacitacionesView(APIView):
-#    permission_classes = [IsAuthenticated, IsAdminUser | IsSuperAdmin]
-#    """
-#    Generar reporte de capacitaciones en formato CSV.
-#    GET /capacitaciones/reporte-capacitaciones/
-#    """
-#    def get(self, request, *args, **kwargs):
+class ReporteCapacitacionesView(APIView):
+    permission_classes = [IsAuthenticated, IsAdminUser | IsSuperAdmin]
+    """
+    Generar reporte de capacitaciones en formato exel.
+    
+    Casos de uso:
+    1. Con ID de capacitación:
+       GET /capacitaciones/reporte-capacitaciones/?capacitacion_id=1
+       - Genera reporte del avance de colaboradores en esa capacitación
+       - Incluye: nombre, apellido, cédula, % completación, fecha registro, fecha completación
+       - Información de la capacitación: título, tipo, fecha de creación
+    
+    2. Sin ID (con rango de fechas):
+       GET /capacitaciones/reporte-capacitaciones/?fecha_inicio=2025-01-01&fecha_fin=2025-12-31
+       - Genera reporte de TODAS las capacitaciones en el rango de fechas
+       - Excluye capacitaciones con estado 3 (eliminadas)
+       - No cuenta colaboradores desactivados (estadocolaborador != 1)
+    """
+    
+    def get(self, request, *args, **kwargs):
+        try:
+            capacitacion_id = request.GET.get('capacitacion_id')
+            fecha_inicio = request.GET.get('fecha_inicio')
+            fecha_fin = request.GET.get('fecha_fin')
+            
+            if capacitacion_id:
+                # CASO 1: Reporte de una capacitación específica
+                return self._generar_reporte_capacitacion(capacitacion_id)
+            elif fecha_inicio and fecha_fin:
+                # CASO 2: Reporte de rango de fechas
+                return self._generar_reporte_rango_fechas(fecha_inicio, fecha_fin)
+            else:
+                return Response(
+                    {'error': 'Debe proporcionar capacitacion_id o (fecha_inicio y fecha_fin)'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except Exception as e:
+            return Response(
+                {'error': f'Error al generar reporte: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def _generar_reporte_capacitacion(self, capacitacion_id):
+        """
+        Genera reporte de una capacitación específica con todos sus colaboradores.
+        """
+        try:
+            # Obtener capacitación
+            capacitacion = get_object_or_404(Capacitaciones, id=capacitacion_id)
+            
+            # Obtener colaboradores inscritos (solo activos)
+            progreso_qs = progresoCapacitaciones.objects.filter(
+                capacitacion=capacitacion
+            ).select_related('colaborador').order_by('colaborador__nombrecolaborador')
+            
+            # Crear workbook
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Reporte Capacitación"
+            
+            # Estilos
+            header_fill = PatternFill(start_color="1F4788", end_color="1F4788", fill_type="solid")
+            header_font = Font(bold=True, color="FFFFFF", size=11)
+            border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+            center_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            
+            # Información de la capacitación (encabezado)
+            ws['A1'] = "REPORTE DE CAPACITACIÓN"
+            ws['A1'].font = Font(bold=True, size=14)
+            ws.merge_cells('A1:H1')
+            
+            ws['A2'] = f"Título: {capacitacion.titulo}"
+            ws['A3'] = f"Tipo: {capacitacion.tipo}"
+            ws['A4'] = f"Fecha de Creación: {capacitacion.fecha_creacion.strftime('%d/%m/%Y %H:%M') if capacitacion.fecha_creacion else 'N/A'}"
+            
+            # Headers de tabla
+            headers = [
+                "Nombre",
+                "Apellido",
+                "Cédula",
+                "% Completación",
+                "Fecha Registro",
+                "Fecha Completación",
+                "Estado"
+            ]
+            
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=7, column=col)
+                cell.value = header
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = center_alignment
+                cell.border = border
+            
+            # Datos de colaboradores
+            row = 8
+            for progreso in progreso_qs:
+                colaborador = progreso.colaborador
+                
+                # Solo incluir colaboradores activos
+                if colaborador.estadocolaborador != 1:
+                    continue
+                
+                ws.cell(row=row, column=1).value = colaborador.nombrecolaborador
+                ws.cell(row=row, column=2).value = colaborador.apellidocolaborador
+                ws.cell(row=row, column=3).value = colaborador.cccolaborador
+                ws.cell(row=row, column=4).value = float(progreso.progreso)
+                ws.cell(row=row, column=5).value = progreso.fecha_registro.strftime('%d/%m/%Y %H:%M') if progreso.fecha_registro else 'N/A'
+                ws.cell(row=row, column=6).value = progreso.fecha_completada.strftime('%d/%m/%Y %H:%M') if progreso.fecha_completada else 'N/A'
+                
+                # Determinar estado: Completada, No Completado (si pasó fecha fin) o En Progreso
+                if progreso.completada == 1:
+                    estado = "Completada"
+                elif capacitacion.fecha_fin and timezone.now() > capacitacion.fecha_fin:
+                    estado = "No Completado"
+                else:
+                    estado = "En Progreso"
+                ws.cell(row=row, column=7).value = estado
+                
+                # Formato
+                for col in range(1, 8):
+                    cell = ws.cell(row=row, column=col)
+                    cell.border = border
+                    if col == 4:  # Porcentaje
+                        cell.alignment = center_alignment
+                        cell.number_format = '0.00"%"'
+                    elif col in [5, 6]:  # Fechas
+                        cell.alignment = center_alignment
+                    elif col == 7:  # Estado
+                        cell.alignment = center_alignment
+                
+                row += 1
+            
+            # Ajustar anchos de columna
+            ws.column_dimensions['A'].width = 18
+            ws.column_dimensions['B'].width = 18
+            ws.column_dimensions['C'].width = 18
+            ws.column_dimensions['D'].width = 16
+            ws.column_dimensions['E'].width = 20
+            ws.column_dimensions['F'].width = 20
+            ws.column_dimensions['G'].width = 16
+            
+            # Guardar a bytes
+            from io import BytesIO
+            output = BytesIO()
+            wb.save(output)
+            output.seek(0)
+            
+            # Crear respuesta
+            response = FileResponse(
+                output,
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = f'attachment; filename="reporte_capacitacion_{capacitacion_id}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.xlsx"'
+            
+            return response
+            
+        except Capacitaciones.DoesNotExist:
+            return Response(
+                {'error': 'Capacitación no encontrada'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'error': f'Error al generar reporte de capacitación: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def _generar_reporte_rango_fechas(self, fecha_inicio_str, fecha_fin_str):
+        """
+        Genera reporte de todas las capacitaciones en un rango de fechas.
+        Excluye capacitaciones con estado 3 (eliminadas).
+        No cuenta colaboradores desactivados.
+        """
+        try:
+            # Parsear fechas
+            try:
+                fecha_inicio = datetime.strptime(fecha_inicio_str, '%Y-%m-%d')
+                fecha_fin = datetime.strptime(fecha_fin_str, '%Y-%m-%d')
+            except ValueError:
+                return Response(
+                    {'error': 'Formato de fecha inválido. Use YYYY-MM-DD'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Obtener capacitaciones en rango (excluyendo estado 3)
+            capacitaciones = Capacitaciones.objects.filter(
+                fecha_creacion__gte=fecha_inicio,
+                fecha_creacion__lte=fecha_fin
+            ).exclude(estado=3).order_by('fecha_creacion')
+            
+            # Crear workbook
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Reporte General"
+            
+            # Estilos
+            header_fill = PatternFill(start_color="1F4788", end_color="1F4788", fill_type="solid")
+            header_font = Font(bold=True, color="FFFFFF", size=11)
+            subheader_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+            subheader_font = Font(bold=True, color="FFFFFF", size=10)
+            border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+            center_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            
+            # Título
+            ws['A1'] = "REPORTE GENERAL DE CAPACITACIONES"
+            ws['A1'].font = Font(bold=True, size=14)
+            ws.merge_cells('A1:H1')
+            
+            ws['A2'] = f"Período: {fecha_inicio.strftime('%d/%m/%Y')} al {fecha_fin.strftime('%d/%m/%Y')}"
+            ws.merge_cells('A2:H2')
+            
+            # Headers principales
+            headers = [
+                "Capacitación",
+                "Tipo",
+                "Fecha Creación",
+                "total colaboradores",
+                "total completados",
+                "% Completación General",
+                "Nombre Colaborador",
+                "Apellido Colaborador",
+                "Cédula",
+                "% Completación",
+                "Estado Avance"
+            ]
+            
+            row = 4
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=row, column=col)
+                cell.value = header
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = center_alignment
+                cell.border = border
+            
+            # Datos
+            row = 5
+            for capacitacion in capacitaciones:
+                # Obtener colaboradores inscritos en esta capacitación (solo activos)
+                progreso_qs = progresoCapacitaciones.objects.filter(
+                    capacitacion=capacitacion
+                ).select_related('colaborador').order_by('colaborador__nombrecolaborador')
+                
+                if progreso_qs.exists():
+                    # Calcular totales una sola vez por capacitación
+                    total_colaboradores = progreso_qs.count()
+                    total_completados = progreso_qs.filter(completada=1).count()
+                    porcentaje_general = (total_completados / total_colaboradores * 100) if total_colaboradores > 0 else 0
+                    
+                    for i, progreso in enumerate(progreso_qs):
+                        colaborador = progreso.colaborador
+                        
+                        # Saltar colaboradores desactivados
+                        if colaborador.estadocolaborador != 1:
+                            continue
+                        
+                        # Mostrar info de capacitación en TODAS las filas
+                        ws.cell(row=row, column=1).value = capacitacion.titulo
+                        ws.cell(row=row, column=2).value = capacitacion.tipo
+                        ws.cell(row=row, column=3).value = capacitacion.fecha_creacion.strftime('%d/%m/%Y') if capacitacion.fecha_creacion else 'N/A'
+                        ws.cell(row=row, column=4).value = total_colaboradores
+                        ws.cell(row=row, column=5).value = total_completados
+                        ws.cell(row=row, column=6).value = porcentaje_general
+                        
+                        # Datos del colaborador
+                        ws.cell(row=row, column=7).value = colaborador.nombrecolaborador
+                        ws.cell(row=row, column=8).value = colaborador.apellidocolaborador
+                        ws.cell(row=row, column=9).value = colaborador.cccolaborador
+                        ws.cell(row=row, column=10).value = float(progreso.progreso)
+                        
+                        # Determinar estado: Completada, No Completado (si pasó fecha fin) o En Progreso
+                        if progreso.completada == 1:
+                            estado = "Completada"
+                        elif capacitacion.estado == 0:
+                            estado = "No Completado"
+                        else:
+                            estado = "En Progreso"
+                        ws.cell(row=row, column=11).value = estado
+                        
+                        # Aplicar bordes y formato
+                        for col in range(1, 12):
+                            cell = ws.cell(row=row, column=col)
+                            cell.border = border
+                            if col in [6, 10]:  # Porcentajes
+                                cell.alignment = center_alignment
+                                cell.number_format = '0.00"%"'
+                            elif col == 11:  # Estado
+                                cell.alignment = center_alignment
+                            else:
+                                cell.alignment = Alignment(vertical='center')
+                        
+                        row += 1
+                else:
+                    # Capacitación sin colaboradores inscritos
+                    ws.cell(row=row, column=1).value = capacitacion.titulo
+                    ws.cell(row=row, column=2).value = capacitacion.tipo
+                    ws.cell(row=row, column=3).value = capacitacion.fecha_creacion.strftime('%d/%m/%Y') if capacitacion.fecha_creacion else 'N/A'
+                    ws.cell(row=row, column=4).value = "Sin colaboradores"
+                    
+                    for col in range(1, 12):
+                        cell = ws.cell(row=row, column=col)
+                        cell.border = border
+                    
+                    row += 1
+            
+            # Ajustar anchos de columna
+            ws.column_dimensions['A'].width = 25
+            ws.column_dimensions['B'].width = 15
+            ws.column_dimensions['C'].width = 16
+            ws.column_dimensions['D'].width = 18
+            ws.column_dimensions['E'].width = 18
+            ws.column_dimensions['F'].width = 18
+            ws.column_dimensions['G'].width = 16
+            ws.column_dimensions['H'].width = 16
+            
+            # Guardar a bytes
+            from io import BytesIO
+            output = BytesIO()
+            wb.save(output)
+            output.seek(0)
+            
+            # Crear respuesta
+            response = FileResponse(
+                output,
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = f'attachment; filename="reporte_capacitaciones_{fecha_inicio.strftime("%Y%m%d")}_{fecha_fin.strftime("%Y%m%d")}.xlsx"'
+            
+            return response
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Error al generar reporte de rango de fechas: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

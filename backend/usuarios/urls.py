@@ -12,5 +12,10 @@ urlpatterns = [
     path("perfil/<int:colaborador_id>/capacitacion/<int:capacitacion_id>/",views.PerfilCapacitacionView.as_view()),
     path("cargo-Nivel-Regional/", views.CargoNivelRegionalView.as_view(), name="cargo-nivel-regional"),
     path("filtrar-usuarios/", views.FiltrarUsuariosView.as_view(), name="filtrar-usuarios"),
+    path("cambiar-estado-usuario/<int:colaborador_id>/", views.CambiarEstadoUsuarioView.as_view(), name="cambiar-estado-usuario"),
+    path("actualizar-rol-usuario/<int:colaborador_id>/", views.ActualizarRolUsuarioView.as_view(), name="actualizar-rol-usuario"),
+    path("Cargo/", views.DatosCargoView.as_view(), name="datos-cargo"),
+    path("Nivel/", views.DatosNivelView.as_view(), name="datos-nivel"),
+    path("Region/", views.DatosRegionView.as_view(), name="datos-region"),
 ]
 

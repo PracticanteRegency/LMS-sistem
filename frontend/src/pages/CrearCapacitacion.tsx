@@ -70,8 +70,6 @@ export default function CrearCapacitacion() {
     imagenFile: null as File | null,
     imagenPreview: "" as string | null,
   });
-  const [originalColaboradoresIds, setOriginalColaboradoresIds] = useState<number[]>([]);
-
   // Cargar datos guardados al montar
   useEffect(() => {
     // Si venimos con un id, cargamos la capacitación para editar
@@ -118,12 +116,6 @@ export default function CrearCapacitacion() {
         const cols = data.colaboradores || [];
         setColaboradores(cols);
         setColaboradoresFiltrados(cols);
-        try {
-          const ids = (cols || [])
-            .map((c: any) => (c.id_colaborador ?? c.id) as number | undefined)
-            .filter((x: number | undefined): x is number => typeof x === 'number');
-          setOriginalColaboradoresIds(ids);
-        } catch (e) {}
       } catch (e) {
         console.error('Error cargando capacitación para editar', e);
       } finally {

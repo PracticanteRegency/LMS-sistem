@@ -81,6 +81,7 @@
   transition: all 0.3s ease;
   background: white;
   box-sizing: border-box;
+  color: black;
 }
 
 .searchInput:focus {

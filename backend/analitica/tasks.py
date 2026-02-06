@@ -152,7 +152,7 @@ def calcular_progreso_empresarial_mensual(mes=None, anio=None):
                     for centro in centros:
                         # Usar agregación a nivel de base de datos con filtro por fecha
                         promedio_result = Colaboradores.objects.filter(
-                            centroOP=centro,
+                            centroop=centro,
                             progresocapacitaciones__capacitacion__fecha_inicio__lte=fin_mes,
                             progresocapacitaciones__capacitacion__fecha_fin__gte=inicio_mes
                         ).aggregate(

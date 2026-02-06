@@ -16,7 +16,7 @@ from calendar import monthrange
 
 from usuarios.models import Colaboradores
 
-from usuarios.permissions import IsSuperAdmin, IsAdminUser
+from usuarios.permissions import IsSuperAdmin, IsAdminUser, IsUsuarioEspecial
 
 from .models import Epresa, Unidadnegocio, Proyecto, Centroop
 from .serializers import (
@@ -188,7 +188,7 @@ class ProgresoEmpresarialFiltradoView(APIView):
 
 
 class EmpresaCreateView(APIView):
-    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
 
     def post(self, request):
         serializer = EpresaSerializer(data=request.data)
@@ -202,16 +202,16 @@ class EmpresaCreateView(APIView):
 
 
 class VerEmpresaView(APIView):
-    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
 
-    def get(self, request, empresa_id):
-        empresa = Epresa.objects.filter(id_empresa=empresa_id).first()
+    def get(self, request, pk):
+        empresa = Epresa.objects.filter(idempresa=pk).first()
         if not empresa:
             return Response({"error": "Empresa no encontrada"}, status=status.HTTP_404_NOT_FOUND)
         return Response({"empresa": EpresaSerializer(empresa).data})
 
-    def put(self, request, empresa_id):
-        empresa = Epresa.objects.filter(id_empresa=empresa_id).first()
+    def put(self, request, pk):
+        empresa = Epresa.objects.filter(idempresa=pk).first()
         if not empresa:
             return Response({"error": "Empresa no encontrada"}, status=status.HTTP_404_NOT_FOUND)
         serializer = EpresaSerializer(empresa, data=request.data, partial=True)
@@ -220,19 +220,19 @@ class VerEmpresaView(APIView):
             return Response({"message": "Empresa actualizada", "empresa": serializer.data})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def patch(self, request, empresa_id):
-        empresa = Epresa.objects.filter(id_empresa=empresa_id).first()
+    def patch(self, request, pk):
+        empresa = Epresa.objects.filter(idempresa=pk).first()
         if not empresa:
             return Response({"error": "Empresa no encontrada"}, status=status.HTTP_404_NOT_FOUND)
 
-        empresa.estado_empresa = 0 if empresa.estado_empresa == 1 else 1
-        empresa.save(update_fields=["estado_empresa"])
+        empresa.estadoempresa = 0 if empresa.estadoempresa == 1 else 1
+        empresa.save(update_fields=["estadoempresa"])
 
         return Response({"message": f"Estado actualizado correctamente"})
 
 
 class ListaEmpresasView(APIView):
-    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
 
     def get(self, request):
         empresas = Epresa.objects.filter(estadoempresa=1)
@@ -245,7 +245,7 @@ class ListaEmpresasView(APIView):
 # UNIDAD DE NEGOCIO
 # ============================
 class UnidadNegocioCreateView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
 
     def post(self, request):
         serializer = UnidadNegocioSerializer(data=request.data)
@@ -259,16 +259,16 @@ class UnidadNegocioCreateView(APIView):
 
 
 class VerUnidadNegocioView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
 
-    def get(self, request, unidad_id):
-        unidad = Unidadnegocio.objects.filter(id_unidad=unidad_id).first()
+    def get(self, request, pk):
+        unidad = Unidadnegocio.objects.filter(idunidad=pk).first()
         if not unidad:
             return Response({"error": "Unidad no encontrada"}, status=status.HTTP_404_NOT_FOUND)
         return Response({"unidad_negocio": UnidadNegocioSerializer(unidad).data})
 
-    def put(self, request, unidad_id):
-        unidad = Unidadnegocio.objects.filter(id_unidad=unidad_id).first()
+    def put(self, request, pk):
+        unidad = Unidadnegocio.objects.filter(idunidad=pk).first()
         if not unidad:
             return Response({"error": "Unidad no encontrada"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -278,22 +278,22 @@ class VerUnidadNegocioView(APIView):
             return Response({"message": "Unidad actualizada", "unidad_negocio": serializer.data})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def patch(self, request, unidad_id):
-        unidad = Unidadnegocio.objects.filter(id_unidad=unidad_id).first()
+    def patch(self, request, pk):
+        unidad = Unidadnegocio.objects.filter(idunidad=pk).first()
         if not unidad:
             return Response({"error": "Unidad no encontrada"}, status=status.HTTP_404_NOT_FOUND)
 
-        unidad.estado_unidad = 0 if unidad.estado_unidad == 1 else 1
-        unidad.save(update_fields=["estado_unidad"])
+        unidad.estadounidad = 0 if unidad.estadounidad == 1 else 1
+        unidad.save(update_fields=["estadounidad"])
 
         return Response({"message": f"Estado actualizado correctamente"})
 
 
 class ListaUnidadesNegocioView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
 
     def get(self, request):
-        unidades = Unidadnegocio.objects.select_related('empresa').all()
+        unidades = Unidadnegocio.objects.select_related('id_empresa').all()
         serializer = UnidadNegocioSerializer(unidades, many=True)
         return Response({"unidades_negocio": serializer.data})
 
@@ -303,88 +303,70 @@ class ListaUnidadesNegocioView(APIView):
 # PROYECTOS
 # ============================
 class ProyectoCreateView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
 
     def post(self, request):
-        proyecto_data = {
-            "nombre_proyecto": request.data.get("nombre_proyecto"),
-            "estado_proyecto": request.data.get("estado_proyecto", 1)
-        }
         unidad_id = request.data.get("id_unidad")
 
         if not unidad_id:
             return Response({"error": "Debe especificar la unidad"}, status=status.HTTP_400_BAD_REQUEST)
 
-        proyecto_serializer = ProyectoSerializer(data=proyecto_data)
-        if not proyecto_serializer.is_valid():
-            return Response(proyecto_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        unidad = Unidadnegocio.objects.filter(idunidad=unidad_id).first()
+        if not unidad:
+            return Response({"error": "Unidad no encontrada"}, status=status.HTTP_404_NOT_FOUND)
 
-        proyecto = proyecto_serializer.save()
-
-        relacion_serializer = ProyectoSerializer(
-            data={"id_proyecto": proyecto.id_proyecto, "id_unidad": unidad_id}
-        )
-        if relacion_serializer.is_valid():
-            relacion_serializer.save()
-
-        return Response(
-            {"message": "Proyecto creado", "proyecto": ProyectoSerializer(proyecto).data},
-            status=status.HTTP_201_CREATED
-        )
+        proyecto_data = request.data.copy()
+        proyecto_data['id_unidad'] = unidad_id
+        
+        serializer = ProyectoSerializer(data=proyecto_data)
+        if serializer.is_valid():
+            proyecto = serializer.save()
+            return Response(
+                {"message": "Proyecto creado", "proyecto": ProyectoSerializer(proyecto).data},
+                status=status.HTTP_201_CREATED
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class VerProyectoView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
 
-    def get(self, request, proyecto_id):
-        proyecto = Proyecto.objects.filter(id_proyecto=proyecto_id).first()
+    def get(self, request, pk):
+        proyecto = Proyecto.objects.filter(idproyecto=pk).first()
         if not proyecto:
             return Response({"error": "Proyecto no encontrado"}, status=status.HTTP_404_NOT_FOUND)
 
         return Response({"proyecto": ProyectoSerializer(proyecto).data})
 
-    def put(self, request, proyecto_id):
-        proyecto = Proyecto.objects.filter(id_proyecto=proyecto_id).first()
+    def put(self, request, pk):
+        proyecto = Proyecto.objects.filter(idproyecto=pk).first()
         if not proyecto:
             return Response({"error": "Proyecto no encontrado"}, status=status.HTTP_404_NOT_FOUND)
 
         serializer = ProyectoSerializer(proyecto, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Proyecto actualizado", "proyecto": serializer.data})
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        nuevas_unidades = request.data.get("unidades", [])
-        if nuevas_unidades:
-            proyecto.objects.filter(proyecto=proyecto).delete()
-            for unidad_id in nuevas_unidades:
-                unidad = Unidadnegocio.objects.filter(id_unidad=unidad_id).first()
-                if unidad:
-                    proyecto.objects.create(proyecto=proyecto, unidad=unidad)
-
-        return Response({"message": "Proyecto actualizado", "proyecto": ProyectoSerializer(proyecto).data})
-
-    def patch(self, request, proyecto_id):
-        proyecto = Proyecto.objects.filter(id_proyecto=proyecto_id).first()
+    def patch(self, request, pk):
+        proyecto = Proyecto.objects.filter(idproyecto=pk).first()
         if not proyecto:
             return Response({"error": "Proyecto no encontrado"}, status=status.HTTP_404_NOT_FOUND)
 
-        proyecto.estado_proyecto = 0 if proyecto.estado_proyecto == 1 else 1
-        proyecto.save(update_fields=["estado_proyecto"])
+        proyecto.estadoproyecto = 0 if proyecto.estadoproyecto == 1 else 1
+        proyecto.save(update_fields=["estadoproyecto"])
 
         return Response({"message": "Estado actualizado"})
 
 
 class ListaProyectosView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
 
     def get(self, request):
-        proyectos = Proyecto.objects.filter(estado_proyecto=1)
+        proyectos = Proyecto.objects.filter(estadoproyecto=1)
         serializer = ProyectoSerializer(proyectos, many=True)
-
-        filtrados = [p for p in serializer.data if p["unidades"]]
-
-        return Response({"proyectos": filtrados})
+        return Response({"proyectos": serializer.data})
 
 
 
@@ -392,7 +374,7 @@ class ListaProyectosView(APIView):
 # CENTRO OPERATIVO
 # ============================
 class CentroOperativoCreateView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
 
     def post(self, request):
         with transaction.atomic():
@@ -407,16 +389,16 @@ class CentroOperativoCreateView(APIView):
 
 
 class VerCentroOperativoView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
 
-    def get(self, request, centroop_id):
-        centro = Centroop.objects.filter(id_centrop=centroop_id).first()
+    def get(self, request, pk):
+        centro = Centroop.objects.filter(idcentrop=pk).first()
         if not centro:
             return Response({"error": "Centro no encontrado"}, status=status.HTTP_404_NOT_FOUND)
         return Response({"centro_operativo": CentroOpSerializer(centro).data})
 
-    def put(self, request, centroop_id):
-        centro = Centroop.objects.filter(id_centrop=centroop_id).first()
+    def put(self, request, pk):
+        centro = Centroop.objects.filter(idcentrop=pk).first()
         if not centro:
             return Response({"error": "Centro no encontrado"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -426,28 +408,28 @@ class VerCentroOperativoView(APIView):
             return Response({"message": "Centro actualizado", "centro_operativo": serializer.data})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    def patch(self, request, centroop_id):
-        centro = Centroop.objects.filter(id_centrop=centroop_id).first()
+    def patch(self, request, pk):
+        centro = Centroop.objects.filter(idcentrop=pk).first()
         if not centro:
             return Response({"error": "Centro no encontrado"}, status=status.HTTP_404_NOT_FOUND)
 
-        centro.estado_centrop = 0 if centro.estado_centrop == 1 else 1
-        centro.save(update_fields=["estado_centrop"])
+        centro.estadocentrop = 0 if centro.estadocentrop == 1 else 1
+        centro.save(update_fields=["estadocentrop"])
 
         return Response({"message": "Estado actualizado"})
 
 
 class ListaCentrosOperativosView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
 
     def get(self, request):
-        centros = Centroop.objects.filter(estado_centrop=1).select_related("id_proyecto")
+        centros = Centroop.objects.filter(estadocentrop=1).select_related("id_proyecto")
         serializer = CentroOpSimpleSerializer(centros, many=True)
         return Response({"centros_operativos": serializer.data})
     
     
 class CargarEstructuraView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
 
     def post(self, request):
         serializer = CargarEstructuraSerializer(data=request.data)

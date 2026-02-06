@@ -1,76 +1,74 @@
-// Interfaces del perfil y capacitaciones
-export interface Capacitacion {
-  id_capacitacion: number;
-  nombre_capacitacion: string;
-  completada: boolean;
-  progreso: number;
+interface PerfilResponse {
+  idcolaborador?: number;
+  nombrecolaborador?: string;
+  apellidocolaborador?: string;
+  correo_colaborador?: string;
+  tipousuario?: number;
+  tipo_usuario?: number;
+  capacitaciones?: any[];
 }
 
-export interface PerfilResponse {
-  id_colaborador: number;
-  nombre_colaborador: string;
-  apellido_colaborador: string;
-  correo_colaborador: string;
-  telefo_colaborador: string;
-  nombre_centroOP: string;
-  nombre_empresa: string;
-  nombre_nivel: string;
-  nombre_regional: string;
-  nombre_cargo: string;
-  nombre_proyecto: string;
-  nombre_unidad: string;
-  capacitaciones_totales: number;
-  capacitaciones_completadas: number;
-  capacitaciones: Capacitacion[];
-}
-
-export interface PerfilService {
-  id_colaborador: number;
-  cc_colaborador: number;
-  nombre_colaborador: string;
-  apellido_colaborador: string;
-  correo_colaborador: string;
-  nombre_cargo: string;
-  capacitaciones_totales: number;
-  capacitaciones_completadas: number;
-  estado_colaborador: number;
-}
-
-export interface LeccionProgress {
-  titulo_leccion?: string;
-  tipo_leccion?: string;
-  url?: string;
-  duracion?: string;
-  descripcion?: string;
-  completada?: boolean;
-}
-
-export interface ModuloProgress {
-  nombre_modulo?: string;
-  lecciones?: LeccionProgress[];
-}
-
-export interface PerfilCapProgress {
-  modulos?: ModuloProgress[];
-}
-
-// Esta firma representa el servicio PERO NO LO IMPLEMENTA
-declare const Perfil: {
-  getPerfil: () => Promise<PerfilResponse>;
-  getListUsers: (page?: number, pageSize?: number) => Promise<any>;
-  // Firma para obtener progreso de un colaborador en una capacitacion
-  getPerfilCapById: (colaboradorId: string | number, capacitacionId: string | number) => Promise<PerfilCapProgress>;
-  getPerfilUserById: (id: string | number) => Promise<PerfilResponse>;
-  getFiltrarUsuarios: (query: string, page?: number, pageSize?: number) => Promise<any>;
-  GetEditarPerfil: (id: string | number, data: any) => Promise<any>;
-  PatchCambiarEstadoUsuario: (id: string | number, estado: number) => Promise<any>;
-  registerTemporalUser: (data: any) => Promise<any>;
-  PutEditarPerfil: (id: string | number, data: any) => Promise<any>;
-  getCargoRegionesNiveles: () => Promise<{
-    cargos: Array<{ id: number; nombre: string }>;
-    niveles: Array<{ id: number; nombre: string }>;
-    regionales: Array<{ id: number; nombre: string }>;
+interface ListUsuariosResponse {
+  count?: number;
+  results?: Array<{
+    id_colaborador: number;
+    cc_colaborador: string;
+    nombre_colaborador: string;
+    apellido_colaborador: string;
+    correo_colaborador: string;
+    nombrecargo: string;
+    capacitaciones_totales: number;
+    capacitaciones_completadas: number;
+    estado_colaborador: number;
   }>;
+}
+
+interface CargoNivelRegionalResponse {
+  cargos: Array<{
+    idcargo?: number;
+    id?: number;
+    nombrecargo?: string;
+    nombre?: string;
+  }>;
+  niveles: Array<{
+    idnivel?: number;
+    id?: number;
+    nombrenivel?: string;
+    nombre?: string;
+  }>;
+  regionales: Array<{
+    idregional?: number;
+    id?: number;
+    nombreregional?: string;
+    nombre?: string;
+  }>;
+}
+
+interface CambiarEstadoPayload {
+  estado?: number;
+  estadocolaborador?: number;
+}
+
+interface ActualizarRolPayload {
+  tipo_usuario?: number;
+  tipousuario?: number;
+  rol?: number;
+}
+
+declare const Perfil: {
+  getPerfil(): Promise<PerfilResponse>;
+  getListUsers(page?: number, pageSize?: number, search?: string): Promise<ListUsuariosResponse>;
+  getPerfilCapById(idcolaborador: number, capacitacion_id: number): Promise<any>;
+  getPerfilUserById(idcolaborador: number): Promise<any>;
+  getCargoRegionesNiveles(): Promise<CargoNivelRegionalResponse>;
+  getFiltrarUsuarios(q?: string, page?: number, pageSize?: number): Promise<any>;
+  PatchCambiarEstadoUsuario(idcolaborador: number, payload: CambiarEstadoPayload): Promise<any>;
+  registerTemporalUser(payload: any): Promise<any>;
+  PutEditarPerfil(idcolaborador: number, payload: any): Promise<any>;
+  GetEditarPerfil(idcolaborador: number, payload: any): Promise<any>;
+  BuscarCorreoPorUUID(uuid: string): Promise<any>;
+  cambiarEstadoUsuario(idcolaborador: number, payload: CambiarEstadoPayload): Promise<any>;
+  actualizarRolUsuario(idcolaborador: number, payload: ActualizarRolPayload): Promise<any>;
 };
 
 export default Perfil;

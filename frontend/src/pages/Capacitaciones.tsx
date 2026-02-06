@@ -36,6 +36,10 @@ export default function Capacitaciones() {
   const menuRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
   const [menuCoords, setMenuCoords] = useState<{ [key: number]: { top: number; left: number } }>({});
   const navigate = useNavigate();
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportFechaInicio, setReportFechaInicio] = useState("");
+  const [reportFechaFin, setReportFechaFin] = useState("");
+  const [downloadingReport, setDownloadingReport] = useState(false);
 
   useEffect(() => {
     loadCapacitaciones();
@@ -209,6 +213,43 @@ export default function Capacitaciones() {
     }
   };
 
+  const handleDescargarReporteRangoFechas = async () => {
+    if (!reportFechaInicio || !reportFechaFin) {
+      alert("Por favor, selecciona ambas fechas");
+      return;
+    }
+
+    if (new Date(reportFechaInicio) > new Date(reportFechaFin)) {
+      alert("La fecha de inicio no puede ser mayor que la fecha de fin");
+      return;
+    }
+
+    try {
+      setDownloadingReport(true);
+      const blob = await CapListService.descargarReporteRangoFechas(reportFechaInicio, reportFechaFin);
+      
+      // Crear URL para descargar el archivo
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `reporte_capacitaciones_${reportFechaInicio}_${reportFechaFin}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+      
+      // Cerrar modal
+      setShowReportModal(false);
+      setReportFechaInicio("");
+      setReportFechaFin("");
+    } catch (err: any) {
+      alert("Error al descargar el reporte: " + (err.message || "Error desconocido"));
+      console.error("Error descargando reporte:", err);
+    } finally {
+      setDownloadingReport(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className={styles.container}>
@@ -234,12 +275,21 @@ export default function Capacitaciones() {
             <h1>Capacitaciones</h1>
             <p className={styles.subtitle}>Gestión de capacitaciones y entrenamientos</p>
           </div>
-          <button
-            className={styles.btnCreate}
-            onClick={() => navigate("/CrearCapacitacion")}
-          >
-            + Crear Capacitación
-          </button>
+          <div className={styles.headerButtons}>
+            <button
+              className={styles.btnReport}
+              onClick={() => setShowReportModal(true)}
+              disabled={downloadingReport}
+            >
+              {downloadingReport ? "⏳ Descargando..." : "📊 Generar Reporte"}
+            </button>
+            <button
+              className={styles.btnCreate}
+              onClick={() => navigate("/CrearCapacitacion")}
+            >
+              + Crear Capacitación
+            </button>
+          </div>
         </div>
       </div>
 
@@ -402,6 +452,58 @@ export default function Capacitaciones() {
           </div>
         )}
       </div>
+
+      {/* Modal para generar reporte por rango de fechas */}
+      {showReportModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowReportModal(false)}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2>Generar Reporte por Rango de Fechas</h2>
+              <button
+                className={styles.closeBtn}
+                onClick={() => setShowReportModal(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className={styles.modalBody}>
+              <div className={styles.formGroup}>
+                <label>Fecha de Inicio:</label>
+                <input
+                  type="date"
+                  className={styles.dateInput}
+                  value={reportFechaInicio}
+                  onChange={(e) => setReportFechaInicio(e.target.value)}
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Fecha de Fin:</label>
+                <input
+                  type="date"
+                  className={styles.dateInput}
+                  value={reportFechaFin}
+                  onChange={(e) => setReportFechaFin(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className={styles.modalFooter}>
+              <button
+                className={styles.btnCancel}
+                onClick={() => setShowReportModal(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                className={styles.btnConfirm}
+                onClick={handleDescargarReporteRangoFechas}
+                disabled={downloadingReport}
+              >
+                {downloadingReport ? "Descargando..." : "Descargar Reporte"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

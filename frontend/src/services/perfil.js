@@ -168,6 +168,30 @@ const BuscarCorreoPorUUID = async (uuid) => {
   });
 };
 
+const cambiarEstadoUsuario = async (idcolaborador, payload) => {
+  try {
+    const response = await api.patch(`user/cambiar-estado-usuario/${idcolaborador}/`, payload, {
+      headers: getAuthHeader(),
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error changing user status:', error);
+    throw error;
+  }
+};
+
+const actualizarRolUsuario = async (idcolaborador, payload) => {
+  try {
+    const response = await api.patch(`user/actualizar-rol-usuario/${idcolaborador}/`, payload, {
+      headers: getAuthHeader(),
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    throw error;
+  }
+};
+
 const Perfil = {
   getPerfil,
   getListUsers,
@@ -180,6 +204,8 @@ const Perfil = {
   PutEditarPerfil,
   GetEditarPerfil,
   BuscarCorreoPorUUID,
+  cambiarEstadoUsuario,
+  actualizarRolUsuario,
 };
 
 export default Perfil

@@ -17,27 +17,27 @@ def debug_task(self):
 app.conf.beat_schedule = {
     'enviar-correo-capacitaciones-activas-cada-dia': {
         'task': 'notificaciones.tasks.enviar_correo_capacitaciones_activas',
-        'schedule': crontab(hour=8, minute=0),  
+        'schedule': crontab(hour=8, minute=0),  # Cada día a las 08:00
     },
     'notificar-capacitaciones-7-dias': {
-        'task': 'notificaciones.tasks. ',
-        'schedule': crontab(hour=7, minute=0),
+        'task': 'notificaciones.tasks.notificar_capacitacion_por_vencer_7_dias',
+        'schedule': crontab(hour=7, minute=0),  # Cada día a las 07:00
     },
     'notificar-capacitaciones-1-dia': {
         'task': 'notificaciones.tasks.notificar_capacitacion_por_vencer_1_dia',
-        'schedule': crontab(hour=7, minute=30),
+        'schedule': crontab(hour=7, minute=30),  # Cada día a las 07:30
     },
     'activar-capacitaciones-cada-dia': {
         'task': 'notificaciones.tasks.activar_capacitaciones',
-        'schedule': crontab(hour=12, minute=0),
+        'schedule': crontab(hour=12, minute=0),  # Cada día a las 12:00
     },
     'desactivar-capacitaciones-cada-dia': {
         'task': 'notificaciones.tasks.desactivar_capacitaciones',
-        'schedule': crontab(hour=23, minute=59),
+        'schedule': crontab(hour=23, minute=59),  # Cada día a las 23:59
     },
-        'notificar-jefes-proyectos-capacitaciones-no-completadas': {
-        'task': 'notificaciones.tasks.notificar_jefes_proyectos_capacitaciones_no_completadas',
-        'schedule': crontab(hour=9, minute=0, day_of_week='monday'),
+    'notificar-jefes-sin-progreso': {
+        'task': 'notificaciones.tasks.notificar_jefes_por_colaboradores_sin_progreso',
+        'schedule': crontab(hour=9, minute=0, day_of_week='monday'),  # Lunes a las 09:00
     },
     'calcular-progreso-empresarial-diario': {
         'task': 'analitica.tasks.calcular_progreso_empresarial_diario',

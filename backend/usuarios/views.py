@@ -368,7 +368,7 @@ class ListaUsuarios(APIView):
 
             base_qs = (
                 Colaboradores.objects
-                .exclude(estadocolaborador=2)
+                .filter(estadocolaborador=1)
                 .select_related('cargocolaborador')
                 .annotate(
                     total_capacitaciones=Count(
@@ -463,9 +463,9 @@ class CargoNivelRegionalView(APIView):
 
     def get(self, request):
 
-        cargos = Cargo.objects.filter(estadocargo=1)
-        niveles = Niveles.objects.filter(estadonivel=1)
-        regionales = Regional.objects.filter(estadoregional=1)
+        cargos = Cargo.objects.filter(estadocargo=1).order_by('nombrecargo')
+        niveles = Niveles.objects.filter(estadonivel=1).order_by('nombrenivel')
+        regionales = Regional.objects.filter(estadoregional=1).order_by('nombreregional')
 
         cargos_data = cargosSerializer(cargos, many=True).data
         niveles_data = nivelesSerializer(niveles, many=True).data
@@ -492,7 +492,26 @@ class FiltrarUsuariosView(APIView):
         if page_size < 1 or page_size > 100:
             page_size = 10
 
-        base_qs = Colaboradores.objects.exclude(estadocolaborador=2)
+        base_qs = (
+            Colaboradores.objects
+            .exclude(estadocolaborador=3)
+            .annotate(
+                total_capacitaciones=Count(
+                    'progresocapacitaciones',
+                    filter=Q(progresocapacitaciones__capacitacion__estado__in=[0, 1]),
+                    distinct=True
+                ),
+                completadas=Count(
+                    'progresocapacitaciones',
+                    filter=Q(
+                        progresocapacitaciones__capacitacion__estado__in=[0, 1],
+                        progresocapacitaciones__completada=1
+                    ),
+                    distinct=True
+                ),
+            )
+            .order_by('idcolaborador')
+        )
         if query:
             base_qs = base_qs.filter(
                 Q(nombrecolaborador__icontains=query) |
@@ -513,3 +532,605 @@ class FiltrarUsuariosView(APIView):
             'results': results,
         }
         return Response(response)
+
+
+class CambiarEstadoUsuarioView(APIView):
+    """
+    Vista para activar o desactivar un usuario.
+    Solo SuperAdmin puede realizar esta acción.
+    """
+    permission_classes = [IsAuthenticated, IsSuperAdmin]
+
+    def patch(self, request, colaborador_id):
+        """
+        PATCH /usuarios/cambiar-estado-usuario/<colaborador_id>/
+        Body: { "estado": 1 o 0 }
+        
+        - estado = 1: activar usuario
+        - estado = 0: desactivar usuario
+        """
+        try:
+            nuevo_estado = request.data.get('estado')
+            
+            if nuevo_estado is None:
+                return Response(
+                    {"error": "El campo 'estado' es requerido (0 o 1)"},
+                    status=400
+                )
+            
+            if nuevo_estado not in [0, 1]:
+                return Response(
+                    {"error": "El estado debe ser 0 (inactivo) o 1 (activo)"},
+                    status=400
+                )
+            
+            # Obtener el usuario por su colaborador
+            usuario = Usuarios.objects.filter(
+                idcolaboradoru__idcolaborador=colaborador_id
+            ).first()
+            
+            if not usuario:
+                return Response(
+                    {"error": "Usuario no encontrado"},
+                    status=404
+                )
+            
+            usuario.estadousuario = nuevo_estado
+            usuario.save()
+            
+            # Sincronizar estado en el modelo Colaboradores
+            colaborador = getattr(usuario, 'idcolaboradoru', None)
+            nuevo_estado_colaborador = None
+            if colaborador:
+                try:
+                    colaborador.estadocolaborador = nuevo_estado
+                    colaborador.save()
+                    nuevo_estado_colaborador = colaborador.estadocolaborador
+                except Exception:
+                    nuevo_estado_colaborador = None
+            
+            return Response({
+                "mensaje": "Estado del usuario actualizado correctamente",
+                "usuario_id": usuario.id,
+                "colaborador_id": usuario.idcolaboradoru.idcolaborador if getattr(usuario, 'idcolaboradoru', None) else None,
+                "nuevo_estado_usuario": usuario.estadousuario,
+                "nuevo_estado_colaborador": nuevo_estado_colaborador
+            }, status=200)
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error al actualizar estado: {str(e)}"},
+                status=500
+            )
+
+
+class ActualizarRolUsuarioView(APIView):
+    """
+    Vista para cambiar el rol de un usuario.
+    Solo SuperAdmin puede realizar esta acción.
+    """
+    permission_classes = [IsAuthenticated, IsSuperAdmin]
+
+    def patch(self, request, colaborador_id):
+        """
+        PATCH /usuarios/actualizar-rol-usuario/<colaborador_id>/
+        Body: { "tipousuario": 0, 1, 2, 3 o 4 }
+        
+        Tipos de usuario:
+        - 0: Usuario Normal/Colaborador
+        - 1: Administrador
+        - 2: Lectura Admin
+        - 3: Usuario Especial
+        - 4: Super Admin
+        """
+        try:
+            nuevo_rol = request.data.get('tipousuario')
+            
+            if nuevo_rol is None:
+                return Response(
+                    {"error": "El campo 'tipousuario' es requerido"},
+                    status=400
+                )
+            
+            if nuevo_rol not in [0, 1, 2, 3, 4]:
+                return Response(
+                    {"error": "El tipousuario debe ser 0, 1, 2, 3 o 4"},
+                    status=400
+                )
+            
+            # Obtener el usuario por su colaborador
+            usuario = Usuarios.objects.filter(
+                idcolaboradoru__idcolaborador=colaborador_id
+            ).first()
+            
+            if not usuario:
+                return Response(
+                    {"error": "Usuario no encontrado"},
+                    status=404
+                )
+            
+            rol_anterior = usuario.tipousuario
+            usuario.tipousuario = nuevo_rol
+            usuario.save()
+            
+            return Response({
+                "mensaje": "Rol del usuario actualizado correctamente",
+                "usuario_id": usuario.id,
+                "colaborador_id": usuario.idcolaboradoru.idcolaborador,
+                "rol_anterior": rol_anterior,
+                "nuevo_rol": usuario.tipousuario
+            }, status=200)
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error al actualizar rol: {str(e)}"},
+                status=500
+            )
+
+
+class DatosCargoView(APIView):
+    """
+    CRUD para gestionar Cargos.
+    Solo SuperAdmin e IsUsuarioEspecial pueden manipular.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def check_permission(self, request):
+        """Verifica si el usuario tiene permisos para manipular cargos"""
+        tipo_usuario = getattr(request.user, 'tipousuario', None)
+        # SuperAdmin (4) o Usuario Especial (3)
+        return tipo_usuario in [3, 4]
+
+    def get(self, request):
+        """GET /usuarios/Cargo/ - Obtener todos los cargos activos"""
+        try:
+            cargos = Cargo.objects.filter(estadocargo=1).order_by('idcargo')
+            serializer = cargosSerializer(cargos, many=True)
+            return Response({
+                "count": cargos.count(),
+                "results": serializer.data
+            }, status=200)
+        except Exception as e:
+            return Response(
+                {"error": f"Error al obtener cargos: {str(e)}"},
+                status=500
+            )
+
+    def post(self, request):
+        """POST /usuarios/Cargo/ - Crear un nuevo cargo"""
+        if not self.check_permission(request):
+            return Response(
+                {"error": "Solo SuperAdmin e IsUsuarioEspecial pueden crear cargos"},
+                status=403
+            )
+        
+        try:
+            nombre_cargo = request.data.get('nombrecargo')
+            
+            if not nombre_cargo:
+                return Response(
+                    {"error": "El campo 'nombrecargo' es requerido"},
+                    status=400
+                )
+            
+            # Verificar si el cargo ya existe
+            if Cargo.objects.filter(nombrecargo=nombre_cargo).exists():
+                return Response(
+                    {"error": "El cargo ya existe"},
+                    status=400
+                )
+            
+            cargo = Cargo.objects.create(
+                nombrecargo=nombre_cargo,
+                estadocargo=1
+            )
+            
+            serializer = cargosSerializer(cargo)
+            return Response({
+                "mensaje": "Cargo creado correctamente",
+                "data": serializer.data
+            }, status=201)
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error al crear cargo: {str(e)}"},
+                status=500
+            )
+
+    def put(self, request):
+        """PUT /usuarios/Cargo/ - Actualizar un cargo"""
+        if not self.check_permission(request):
+            return Response(
+                {"error": "Solo SuperAdmin e IsUsuarioEspecial pueden actualizar cargos"},
+                status=403
+            )
+        
+        try:
+            cargo_id = request.data.get('idcargo')
+            nombre_cargo = request.data.get('nombrecargo')
+            
+            if not cargo_id:
+                return Response(
+                    {"error": "El campo 'idcargo' es requerido"},
+                    status=400
+                )
+            
+            if not nombre_cargo:
+                return Response(
+                    {"error": "El campo 'nombrecargo' es requerido"},
+                    status=400
+                )
+            
+            cargo = Cargo.objects.filter(idcargo=cargo_id).first()
+            
+            if not cargo:
+                return Response(
+                    {"error": "Cargo no encontrado"},
+                    status=404
+                )
+            
+            cargo.nombrecargo = nombre_cargo
+            cargo.save()
+            
+            serializer = cargosSerializer(cargo)
+            return Response({
+                "mensaje": "Cargo actualizado correctamente",
+                "data": serializer.data
+            }, status=200)
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error al actualizar cargo: {str(e)}"},
+                status=500
+            )
+
+    def delete(self, request):
+        """DELETE /usuarios/Cargo/ - Eliminar (desactivar) un cargo"""
+        if not self.check_permission(request):
+            return Response(
+                {"error": "Solo SuperAdmin e IsUsuarioEspecial pueden eliminar cargos"},
+                status=403
+            )
+        
+        try:
+            cargo_id = request.data.get('idcargo')
+            
+            if not cargo_id:
+                return Response(
+                    {"error": "El campo 'idcargo' es requerido"},
+                    status=400
+                )
+            
+            cargo = Cargo.objects.filter(idcargo=cargo_id).first()
+            
+            if not cargo:
+                return Response(
+                    {"error": "Cargo no encontrado"},
+                    status=404
+                )
+            
+            cargo.estadocargo = 0
+            cargo.save()
+            
+            return Response({
+                "mensaje": "Cargo desactivado correctamente",
+                "cargo_id": cargo.idcargo
+            }, status=200)
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error al eliminar cargo: {str(e)}"},
+                status=500
+            )
+
+
+class DatosNivelView(APIView):
+    """
+    CRUD para gestionar Niveles.
+    Solo SuperAdmin e IsUsuarioEspecial pueden manipular.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def check_permission(self, request):
+        """Verifica si el usuario tiene permisos para manipular niveles"""
+        tipo_usuario = getattr(request.user, 'tipousuario', None)
+        # SuperAdmin (4) o Usuario Especial (3)
+        return tipo_usuario in [3, 4]
+
+    def get(self, request):
+        """GET /usuarios/Nivel/ - Obtener todos los niveles activos"""
+        try:
+            niveles = Niveles.objects.filter(estadonivel=1).order_by('idnivel')
+            serializer = nivelesSerializer(niveles, many=True)
+            return Response({
+                "count": niveles.count(),
+                "results": serializer.data
+            }, status=200)
+        except Exception as e:
+            return Response(
+                {"error": f"Error al obtener niveles: {str(e)}"},
+                status=500
+            )
+
+    def post(self, request):
+        """POST /usuarios/Nivel/ - Crear un nuevo nivel"""
+        if not self.check_permission(request):
+            return Response(
+                {"error": "Solo SuperAdmin e IsUsuarioEspecial pueden crear niveles"},
+                status=403
+            )
+        
+        try:
+            nombre_nivel = request.data.get('nombrenivel')
+            
+            if not nombre_nivel:
+                return Response(
+                    {"error": "El campo 'nombrenivel' es requerido"},
+                    status=400
+                )
+            
+            # Verificar si el nivel ya existe
+            if Niveles.objects.filter(nombrenivel=nombre_nivel).exists():
+                return Response(
+                    {"error": "El nivel ya existe"},
+                    status=400
+                )
+            
+            nivel = Niveles.objects.create(
+                nombrenivel=nombre_nivel,
+                estadonivel=1
+            )
+            
+            serializer = nivelesSerializer(nivel)
+            return Response({
+                "mensaje": "Nivel creado correctamente",
+                "data": serializer.data
+            }, status=201)
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error al crear nivel: {str(e)}"},
+                status=500
+            )
+
+    def put(self, request):
+        """PUT /usuarios/Nivel/ - Actualizar un nivel"""
+        if not self.check_permission(request):
+            return Response(
+                {"error": "Solo SuperAdmin e IsUsuarioEspecial pueden actualizar niveles"},
+                status=403
+            )
+        
+        try:
+            nivel_id = request.data.get('idnivel')
+            nombre_nivel = request.data.get('nombrenivel')
+            
+            if not nivel_id:
+                return Response(
+                    {"error": "El campo 'idnivel' es requerido"},
+                    status=400
+                )
+            
+            if not nombre_nivel:
+                return Response(
+                    {"error": "El campo 'nombrenivel' es requerido"},
+                    status=400
+                )
+            
+            nivel = Niveles.objects.filter(idnivel=nivel_id).first()
+            
+            if not nivel:
+                return Response(
+                    {"error": "Nivel no encontrado"},
+                    status=404
+                )
+            
+            nivel.nombrenivel = nombre_nivel
+            nivel.save()
+            
+            serializer = nivelesSerializer(nivel)
+            return Response({
+                "mensaje": "Nivel actualizado correctamente",
+                "data": serializer.data
+            }, status=200)
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error al actualizar nivel: {str(e)}"},
+                status=500
+            )
+
+    def delete(self, request):
+        """DELETE /usuarios/Nivel/ - Eliminar (desactivar) un nivel"""
+        if not self.check_permission(request):
+            return Response(
+                {"error": "Solo SuperAdmin e IsUsuarioEspecial pueden eliminar niveles"},
+                status=403
+            )
+        
+        try:
+            nivel_id = request.data.get('idnivel')
+            
+            if not nivel_id:
+                return Response(
+                    {"error": "El campo 'idnivel' es requerido"},
+                    status=400
+                )
+            
+            nivel = Niveles.objects.filter(idnivel=nivel_id).first()
+            
+            if not nivel:
+                return Response(
+                    {"error": "Nivel no encontrado"},
+                    status=404
+                )
+            
+            nivel.estadonivel = 0
+            nivel.save()
+            
+            return Response({
+                "mensaje": "Nivel desactivado correctamente",
+                "nivel_id": nivel.idnivel
+            }, status=200)
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error al eliminar nivel: {str(e)}"},
+                status=500
+            )
+
+
+class DatosRegionView(APIView):
+    """
+    CRUD para gestionar Regionales.
+    Solo SuperAdmin e IsUsuarioEspecial pueden manipular.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def check_permission(self, request):
+        """Verifica si el usuario tiene permisos para manipular regionales"""
+        tipo_usuario = getattr(request.user, 'tipousuario', None)
+        # SuperAdmin (4) o Usuario Especial (3)
+        return tipo_usuario in [3, 4]
+
+    def get(self, request):
+        """GET /usuarios/Region/ - Obtener todas las regionales activas"""
+        try:
+            regionales = Regional.objects.filter(estadoregional=1).order_by('idregional')
+            serializer = regionalesSerializer(regionales, many=True)
+            return Response({
+                "count": regionales.count(),
+                "results": serializer.data
+            }, status=200)
+        except Exception as e:
+            return Response(
+                {"error": f"Error al obtener regionales: {str(e)}"},
+                status=500
+            )
+
+    def post(self, request):
+        """POST /usuarios/Region/ - Crear una nueva regional"""
+        if not self.check_permission(request):
+            return Response(
+                {"error": "Solo SuperAdmin e IsUsuarioEspecial pueden crear regionales"},
+                status=403
+            )
+        
+        try:
+            nombre_regional = request.data.get('nombreregional')
+            
+            if not nombre_regional:
+                return Response(
+                    {"error": "El campo 'nombreregional' es requerido"},
+                    status=400
+                )
+            
+            # Verificar si la regional ya existe
+            if Regional.objects.filter(nombreregional=nombre_regional).exists():
+                return Response(
+                    {"error": "La regional ya existe"},
+                    status=400
+                )
+            
+            regional = Regional.objects.create(
+                nombreregional=nombre_regional,
+                estadoregional=1
+            )
+            
+            serializer = regionalesSerializer(regional)
+            return Response({
+                "mensaje": "Regional creada correctamente",
+                "data": serializer.data
+            }, status=201)
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error al crear regional: {str(e)}"},
+                status=500
+            )
+
+    def put(self, request):
+        """PUT /usuarios/Region/ - Actualizar una regional"""
+        if not self.check_permission(request):
+            return Response(
+                {"error": "Solo SuperAdmin e IsUsuarioEspecial pueden actualizar regionales"},
+                status=403
+            )
+        
+        try:
+            regional_id = request.data.get('idregional')
+            nombre_regional = request.data.get('nombreregional')
+            
+            if not regional_id:
+                return Response(
+                    {"error": "El campo 'idregional' es requerido"},
+                    status=400
+                )
+            
+            if not nombre_regional:
+                return Response(
+                    {"error": "El campo 'nombreregional' es requerido"},
+                    status=400
+                )
+            
+            regional = Regional.objects.filter(idregional=regional_id).first()
+            
+            if not regional:
+                return Response(
+                    {"error": "Regional no encontrada"},
+                    status=404
+                )
+            
+            regional.nombreregional = nombre_regional
+            regional.save()
+            
+            serializer = regionalesSerializer(regional)
+            return Response({
+                "mensaje": "Regional actualizada correctamente",
+                "data": serializer.data
+            }, status=200)
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error al actualizar regional: {str(e)}"},
+                status=500
+            )
+
+    def delete(self, request):
+        """DELETE /usuarios/Region/ - Eliminar (desactivar) una regional"""
+        if not self.check_permission(request):
+            return Response(
+                {"error": "Solo SuperAdmin e IsUsuarioEspecial pueden eliminar regionales"},
+                status=403
+            )
+        
+        try:
+            regional_id = request.data.get('idregional')
+            
+            if not regional_id:
+                return Response(
+                    {"error": "El campo 'idregional' es requerido"},
+                    status=400
+                )
+            
+            regional = Regional.objects.filter(idregional=regional_id).first()
+            
+            if not regional:
+                return Response(
+                    {"error": "Regional no encontrada"},
+                    status=404
+                )
+            
+            regional.estadoregional = 0
+            regional.save()
+            
+            return Response({
+                "mensaje": "Regional desactivada correctamente",
+                "regional_id": regional.idregional
+            }, status=200)
+            
+        except Exception as e:
+            return Response(
+                {"error": f"Error al eliminar regional: {str(e)}"},
+                status=500
+            )

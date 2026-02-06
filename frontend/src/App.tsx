@@ -1,7 +1,7 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { AdminRoute } from "./AdminRoute.tsx";
 import { AuthContext } from "./context/AuthContext";
-import { getUser } from "./services/auth";
+import { getUser, isAuthenticated } from "./services/auth";
 
 import Layout from "./components/Layout";
 import Home from "./pages/Home";
@@ -27,13 +27,28 @@ import ProtectedRoute from "./ProtectedRoute.tsx";
 import CrearExamenes from "./pages/CrearExcamenes";
 import EditarUsuario from "./pages/EditarUsuario";
 import UsersCap from "./pages/UsersCap.tsx";
+import DatosEmpresa from "./pages/DatosEmpresa";
+import CargoNivelRegion from "./pages/CargoNivelRegion";
 
 export default function App() {
   const user = getUser();
 
+  function AuthGate() {
+    const navigate = useNavigate();
+    const location = useLocation();
+
+    // If there's no active token, and user is not on the login page, redirect to /login
+    // This keeps public routes like /login accessible.
+    if (!isAuthenticated() && location.pathname !== "/login") {
+      navigate("/login", { replace: true });
+    }
+    return null;
+  }
+
   return (
     <AuthContext.Provider value={{ user }}>
       <BrowserRouter>
+        <AuthGate />
         <Routes>
 
           {/* RUTAS CON LAYOUT */}
@@ -48,6 +63,8 @@ export default function App() {
             <Route path="/reportes-correos" element={<ProtectedRoute><ReporteCorreos /></ProtectedRoute>} />
             <Route path="/reportes-correos/:correoId/trabajadores" element={<ProtectedRoute><TrabajadoresCorreo /></ProtectedRoute>} />
             <Route path="/CrearExamenes" element={<ProtectedRoute><CrearExamenes /></ProtectedRoute>} />
+            <Route path="/datos-empresa" element={<ProtectedRoute><DatosEmpresa /></ProtectedRoute>} />
+            <Route path="/cargo-nivel-region" element={<ProtectedRoute><CargoNivelRegion /></ProtectedRoute>} />
 
             {/* RUTAS SOLO ADMIN */}
             <Route path="/dashboard" element={
