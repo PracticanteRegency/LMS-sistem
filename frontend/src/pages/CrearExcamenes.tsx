@@ -1,15 +1,11 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState } from 'react';
 import ExamenesService from '../services/Examenes';
 import styles from './Styles/CrearExamenes.module.css';
-import { AuthContext } from '../context/AuthContext';
 
 type Empresa = { idempresa: number; nombre_empresa: string };
 type Cargo = { idcargo: number; nombrecargo: string };
 
 const CrearExamenes: React.FC = () => {
-  // Obtén el usuario del contexto
-  const { user } = useContext(AuthContext);
-
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [cargos, setCargos] = useState<Cargo[]>([]);
   const [nombre, setNombre] = useState('');
@@ -37,11 +33,6 @@ const CrearExamenes: React.FC = () => {
       setCargos(data.cargos || []);
     });
   }, []);
-
-  const handleSelectMultiple = (e: React.ChangeEvent<HTMLSelectElement>, setState: (v: number[]) => void) => {
-    const values = Array.from(e.target.selectedOptions, option => Number(option.value));
-    setState(values);
-  };
 
   const handleCrearExamen = async (e: React.FormEvent) => {
     e.preventDefault();

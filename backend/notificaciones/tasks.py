@@ -4,13 +4,15 @@ from django.utils import timezone
 from datetime import timedelta
 from django.conf import settings
 from capacitaciones.models import progresoCapacitaciones, Capacitaciones
+from capacitaciones.batch_email import enviar_correo_batch
 
 
 @shared_task
 def enviar_correo_capacitaciones_activas():
     """
-    Envía un solo correo masivo a todos los colaboradores inscritos
-    en capacitaciones que inician hoy (se ejecuta automáticamente cada día).
+    Envía correos a todos los colaboradores inscritos en capacitaciones
+    que inician hoy (se ejecuta automáticamente cada día).
+    Usa batching automático para soportar 1500+ colaboradores.
     """
     hoy = timezone.now().date()
 
@@ -72,19 +74,18 @@ def enviar_correo_capacitaciones_activas():
         </html>
         """
 
-        email = EmailMultiAlternatives(
+        # Usar batching automático para soportar 1500+ colaboradores
+        enviar_correo_batch(
+            destinatarios_bcc=correos,
             subject=subject,
-            body=text_message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[],
-            bcc=correos,
+            text_message=text_message,
+            html_message=html_message
         )
-        email.attach_alternative(html_message, "text/html")
-        email.send(fail_silently=False)
 
 
 @shared_task
 def notificar_capacitacion_por_vencer_7_dias():
+    """Notifica sobre capacitaciones que vencen en 7 días. Usa batching automático."""
     hoy = timezone.now().date()
     fecha_objetivo = hoy + timedelta(days=7)
 
@@ -152,45 +153,45 @@ def notificar_capacitacion_por_vencer_7_dias():
         </html>
         """
 
-        email = EmailMultiAlternatives(
+        # Usar batching automático para soportar 1500+ colaboradores
+        enviar_correo_batch(
+            destinatarios_bcc=correos,
             subject=subject,
-            body=text_message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[],
-            bcc=correos
+            text_message=text_message,
+            html_message=html_message
         )
-
-        email.attach_alternative(html_message, "text/html")
-        email.send(fail_silently=False)
 
 @shared_task
 def desactivar_capacitaciones():
+    """Desactiva capacitaciones que vencen hoy"""
     hoy = timezone.now().date()
 
     capacitaciones_a_desactivar = Capacitaciones.objects.filter(
         fecha_fin__date=hoy,
-        estado_capacitacion=1
+        estado=1
     )
 
     for cap in capacitaciones_a_desactivar:
-        cap.estado_capacitacion = 0
+        cap.estado = 0
         cap.save()
 
 @shared_task
 def activar_capacitaciones():
+    """Activa capacitaciones que inician hoy"""
     hoy = timezone.now().date()
 
     capacitaciones_a_activar = Capacitaciones.objects.filter(
         fecha_inicio__date=hoy,
-        estado_capacitacion=0
+        estado=0
     )
 
     for cap in capacitaciones_a_activar:
-        cap.estado_capacitacion = 1
+        cap.estado = 1
         cap.save()
 
 @shared_task
 def notificar_capacitacion_por_vencer_1_dia():
+    """Último aviso para capacitaciones que vencen mañana. Usa batching automático."""
     hoy = timezone.now().date()
     fecha_objetivo = hoy + timedelta(days=1)
 
@@ -257,28 +258,27 @@ def notificar_capacitacion_por_vencer_1_dia():
         </html>
         """
 
-        email = EmailMultiAlternatives(
+        # Usar batching automático para soportar 1500+ colaboradores
+        enviar_correo_batch(
+            destinatarios_bcc=correos,
             subject=subject,
-            body=text_message,
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[],
-            bcc=correos
+            text_message=text_message,
+            html_message=html_message
         )
-
-        email.attach_alternative(html_message, "text/html")
-        email.send(fail_silently=False)
 
 
 @shared_task
 def notificar_jefes_por_colaboradores_sin_progreso():
-    hoy = timezone.now().date()
-
+    """
+    Notifica a los jefes de proyecto sobre colaboradores sin avance en capacitaciones.
+    Se ejecuta cada lunes a las 09:00.
+    """
     registros = (
         progresoCapacitaciones.objects
         .select_related(
             "capacitacion",
             "colaborador",
-            "colaborador__centroOP__id_proyecto__encargado_proyecto"
+            "colaborador__centroop__id_proyecto__encargado_proyecto"
         )
         .filter(
             capacitacion__estado=1,
@@ -291,7 +291,7 @@ def notificar_jefes_por_colaboradores_sin_progreso():
 
     for r in registros:
         colaborador = r.colaborador
-        centro = colaborador.centroOP
+        centro = colaborador.centroop
 
         if not centro:
             continue
@@ -314,11 +314,11 @@ def notificar_jefes_por_colaboradores_sin_progreso():
             }
 
         notificaciones[email_jefe]["items"].append({
-            "colaborador": f"{colaborador.nombre_colaborador} {colaborador.apellido_colaborador}",
+            "colaborador": f"{colaborador.nombrecolaborador} {colaborador.apellidocolaborador}",
             "capacitacion": r.capacitacion.titulo
         })
 
-    # 🚨 Envío de correos
+    # Envío de correos
     for email, data in notificaciones.items():
         jefe = data["jefe"]
         proyecto = data["proyecto"]
@@ -334,7 +334,7 @@ def notificar_jefes_por_colaboradores_sin_progreso():
         html_message = f"""
         <html>
         <body style="font-family: Arial, sans-serif;">
-            <p>Estimado(a) {jefe.nombre_colaborador},</p>
+            <p>Estimado(a) {jefe.nombrecolaborador},</p>
 
             <p>
                 Se identificaron los siguientes colaboradores del proyecto

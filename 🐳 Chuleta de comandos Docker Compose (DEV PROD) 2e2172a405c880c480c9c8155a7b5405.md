@@ -18,6 +18,7 @@
 
 ```bash
 docker compose -f docker-compose.dev.yml up
+docker compose -f docker-compose.mysql.yml up
 
 ```
 
@@ -71,6 +72,10 @@ docker compose -f docker-compose.dev.yml restart
 
 ```bash
 docker compose -f docker-compose.dev.yml restart backend
+docker compose -f docker-compose.dev.yml restart frontend
+docker compose -f docker-compose.dev.yml restart redis
+docker compose -f docker-compose.dev.yml restart nginx
+docker compose -f docker-compose.dev.yml restart mysql
 
 ```
 
@@ -163,6 +168,11 @@ docker exec -it redis sh
 
 ## 🌐 Redes Docker (red externa)
 
+## crear red
+
+```bash
+docker network create shared_net
+```
 ### Listar redes
 
 ```bash

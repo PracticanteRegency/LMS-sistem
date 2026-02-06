@@ -22,7 +22,7 @@ export default function UsersCap() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
+  const [downloadingReport, setDownloadingReport] = useState(false);
   const pageSize = 20;
   const [filterCompleted, setFilterCompleted] = useState<'all'|'yes'|'no'>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -45,7 +45,6 @@ export default function UsersCap() {
     }
     setFilteredUsers(result);
     setPage(1);
-    setTotal(result.length);
   }, [users, filterCompleted, searchTerm]);
 
   const fetchUsers = async () => {
@@ -56,17 +55,42 @@ export default function UsersCap() {
       if (!id) {
         setError("ID de capacitación no especificado");
         setUsers([]);
-        setTotal(0);
         setLoading(false);
         return;
       }
       const data: any = await CapListService.GetUsersCapacitacion(id);
       setUsers(data.results || []);
-      setTotal(data.count || 0);
     } catch (err: any) {
       setError("Error al cargar usuarios");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDescargarReporte = async () => {
+    if (!id) {
+      alert("ID de capacitación no especificado");
+      return;
+    }
+
+    try {
+      setDownloadingReport(true);
+      const blob = await CapListService.descargarReporteCapacitacion(id);
+      
+      // Crear URL para descargar el archivo
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `reporte_capacitacion_${id}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(link);
+    } catch (err: any) {
+      alert("Error al descargar el reporte: " + (err.message || "Error desconocido"));
+      console.error("Error descargando reporte:", err);
+    } finally {
+      setDownloadingReport(false);
     }
   };
 
@@ -75,9 +99,19 @@ export default function UsersCap() {
       <div className={styles.header}>
         <div className={styles.headerContent}>
           <h1 style={{fontSize:'2rem', fontWeight:800, marginBottom:8}}>Usuarios de la capacitación</h1>
-          <button className={styles.btnBack} onClick={() => navigate(-1)}>
-            ← Volver
-          </button>
+          <div style={{display:'flex', gap:12, alignItems:'center'}}>
+            <button 
+              className={styles.btnReport}
+              onClick={handleDescargarReporte}
+              disabled={downloadingReport}
+              title="Descargar reporte de capacitación en Excel"
+            >
+              {downloadingReport ? '⏳ Descargando...' : '📊 Generar Reporte'}
+            </button>
+            <button className={styles.btnBack} onClick={() => navigate(-1)}>
+              ← Volver
+            </button>
+          </div>
         </div>
       </div>
       {loading ? (
@@ -124,7 +158,7 @@ export default function UsersCap() {
               <tbody className={styles.tbody}>
                 {filteredUsers
                   .slice((page - 1) * pageSize, page * pageSize)
-                  .map((u, idx) => (
+                  .map(u => (
                     <tr key={u.id}>
                       <td className={styles.tdNombre}>{u.nombre}</td>
                       <td className={styles.tdApellido}>{u.apellido}</td>

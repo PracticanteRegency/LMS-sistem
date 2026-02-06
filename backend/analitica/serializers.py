@@ -72,15 +72,38 @@ class UnidadNegocioSerializer(serializers.ModelSerializer):
 
 # --- Proyecto ---
 class ProyectoSerializer(serializers.ModelSerializer):
+    id_unidad = serializers.IntegerField(write_only=True, required=False)
     centros = serializers.SerializerMethodField()
 
     class Meta:
         model = Proyecto
-        fields = 'idproyecto', 'nombreproyecto', 'centros'
+        fields = ['idproyecto', 'nombreproyecto', 'estadoproyecto', 'id_unidad', 'idcolaborador', 'centros']
 
     def create(self, validated_data):
+        unidad_id = validated_data.pop('id_unidad', None)
+        
+        if unidad_id:
+            unidad = Unidadnegocio.objects.filter(idunidad=unidad_id).first()
+            if not unidad:
+                raise serializers.ValidationError({"id_unidad": "La unidad indicada no existe."})
+            validated_data['id_unidad'] = unidad
+        
         proyecto = Proyecto.objects.create(**validated_data)
         return proyecto
+
+    def update(self, instance, validated_data):
+        unidad_id = validated_data.pop('id_unidad', None)
+        
+        if unidad_id:
+            unidad = Unidadnegocio.objects.filter(idunidad=unidad_id).first()
+            if not unidad:
+                raise serializers.ValidationError({"id_unidad": "La unidad indicada no existe."})
+            instance.id_unidad = unidad
+        
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
 
     def get_centros(self, obj):
         centros = obj.centroop_set.all()

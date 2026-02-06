@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import styles from "./Styles/Usuarios.module.css";
 import Perfil from "../services/perfil";
 import { useNavigate } from "react-router-dom";
+import { getUserRole } from "../services/auth";
 
 interface Usuario {
   id_colaborador: number;
@@ -28,10 +29,12 @@ export default function Usuarios() {
   const [pendingSearch, setPendingSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [openMenus, setOpenMenus] = useState<MenuState>({});
   const menuRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
   const [menuCoords, setMenuCoords] = useState<{ [key: number]: { top: number; left: number } }>({});
   const navigate = useNavigate();
+  const userRole = Number(getUserRole());
 
 
   useEffect(() => {
@@ -155,7 +158,57 @@ export default function Usuarios() {
   const handleAction = (action: string, user: Usuario) => {
     toggleActionMenu(user.id_colaborador);
 
-    if (action === "Ver") navigate(`/user/perfil/${user.id_colaborador}`);
+    if (action === "Ver") {
+      navigate(`/user/perfil/${user.id_colaborador}`);
+    } else if (action === "Cambiar Estado") {
+      handleCambiarEstado(user);
+    } else if (action === "Cambiar Rol") {
+      handleCambiarRol(user);
+    }
+  };
+
+  const handleCambiarEstado = async (user: Usuario) => {
+    const nuevoEstado = user.estado_colaborador === 1 ? 0 : 1;
+    const confirmMsg = nuevoEstado === 1 
+      ? `¿Activar a ${user.nombre_colaborador} ${user.apellido_colaborador}?`
+      : `¿Desactivar a ${user.nombre_colaborador} ${user.apellido_colaborador}?`;
+    
+    if (!confirm(confirmMsg)) return;
+
+    try {
+      await (Perfil as any).cambiarEstadoUsuario(user.id_colaborador, { estado: nuevoEstado });
+      setSuccess(`Estado del usuario actualizado correctamente`);
+      await loadUsuarios(page);
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || "Error al cambiar estado del usuario");
+      setTimeout(() => setError(null), 3000);
+    }
+  };
+
+  const handleCambiarRol = async (user: Usuario) => {
+    const nuevoRol = prompt(
+      "Ingresa el nuevo tipo de usuario (0=Usuario, 1=Admin Capacitaciones, 3=Admin Examenes, 4=SuperAdmin):"
+    );
+    
+    if (nuevoRol === null) return;
+    
+    const rol = parseInt(nuevoRol);
+    if (isNaN(rol) || ![0, 1, 3, 4].includes(rol)) {
+      setError("Tipo de usuario inválido");
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    try {
+      await (Perfil as any).actualizarRolUsuario(user.id_colaborador, { tipo_usuario: rol });
+      setSuccess(`Rol del usuario actualizado correctamente`);
+      await loadUsuarios(page);
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || "Error al cambiar rol del usuario");
+      setTimeout(() => setError(null), 3000);
+    }
   };
 
   if (loading) {
@@ -185,6 +238,19 @@ export default function Usuarios() {
           </div>
         </div>
       </div>
+
+      {/* Mensajes de error y éxito */}
+      {error && (
+        <div className={styles.alertError}>
+          {error}
+        </div>
+      )}
+      
+      {success && (
+        <div className={styles.alertSuccess}>
+          {success}
+        </div>
+      )}
 
       {/* Search */}
       <div className={styles.searchSection}>
@@ -272,9 +338,24 @@ export default function Usuarios() {
                             >
                               Editar
                             </button>
-                            <button className={`${styles.btn} ${styles.btnDelete}`}>
-                              Eliminar
-                            </button>
+                            {(userRole === 1 || userRole === 4) && (
+                              <button
+                                className={`${styles.btn} ${styles.btnEdit}`}
+                                onClick={() => handleAction("Cambiar Estado", u)}
+                                title="Cambiar estado del usuario"
+                              >
+                                Cambiar Estado
+                              </button>
+                            )}
+                            {userRole === 4 && (
+                              <button
+                                className={`${styles.btn} ${styles.btnEdit}`}
+                                onClick={() => handleAction("Cambiar Rol", u)}
+                                title="Cambiar rol del usuario"
+                              >
+                                Cambiar Rol
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>

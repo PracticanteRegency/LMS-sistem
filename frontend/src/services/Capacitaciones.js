@@ -293,6 +293,31 @@ const GetUsersCapacitacion = async (capacitacionId) => {
   });
 };
 
+const descargarReporteCapacitacion = async (capacitacionId) => {
+  return dedupe('cap:descargarReporteCapacitacion', capacitacionId, async () => {
+    const response = await api.get(
+      `capacitaciones/reporte-capacitaciones/?capacitacion_id=${capacitacionId}`,
+      {
+        responseType: 'blob',
+      }
+    );
+    return response.data;
+  });
+};
+
+// GET: Descargar reporte de capacitaciones por rango de fechas en Excel
+const descargarReporteRangoFechas = async (fechaInicio, fechaFin) => {
+  return dedupe('cap:descargarReporteRangoFechas', { fechaInicio, fechaFin }, async () => {
+    const response = await api.get(
+      `capacitaciones/reporte-capacitaciones/?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`,
+      {
+        responseType: 'blob',
+      }
+    );
+    return response.data;
+  });
+};
+
 const CapListService = {
   getCapList,
   getMisCapacitaciones,
@@ -323,6 +348,8 @@ const CapListService = {
   getEditarColaboradores,
   putEditarColaboradores,
   GetUsersCapacitacion,
+  descargarReporteCapacitacion,
+  descargarReporteRangoFechas,
 };
 
 export default CapListService;
