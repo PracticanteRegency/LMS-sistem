@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./Styles/perfil.module.css";
-import CapListService from "../services/Capacitaciones";
 // @ts-ignore
 import perfilService from "../services/perfil.js";
 
@@ -40,7 +39,6 @@ export default function Perfil() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"capacitaciones" | "certificados" | "informacion">("capacitaciones");
-  const [downloading, setDownloading] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     loadPerfil();
@@ -51,7 +49,7 @@ export default function Perfil() {
       setLoading(true);
       setError(null);
       const data = await perfilService.getPerfil();
-      setPerfil(data);
+      setPerfil(data as PerfilData);
     } catch (err: any) {
       console.error("Error al cargar perfil:", err);
       setError(err.message || "Error al cargar el perfil");

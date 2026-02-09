@@ -84,12 +84,22 @@ export default function Home() {
                 </div>
 
                 <div className={styles.btnRow}>
-                  <button
-                    className={perfilStyles.buttonContinuar}
-                    onClick={() => navigate(`/capacitaciones/${id}`)}
-                  >
-                    ▶ continuar
-                  </button>
+                  {cap.completada || (cap.progreso !== undefined && Number(cap.progreso) >= 100) || (cap.porcentaje_completado !== undefined && Number(cap.porcentaje_completado) >= 100) ? (
+                    <button className={perfilStyles.buttonCompletada} disabled>
+                      Capacitación completada
+                    </button>
+                  ) : cap.estado_capacitacion !== 1 ? (
+                    <button className={perfilStyles.buttonFinalizada} disabled>
+                      Capacitación desactivada
+                    </button>
+                  ) : (
+                    <button
+                      className={perfilStyles.buttonContinuar}
+                      onClick={() => navigate(`/capacitaciones/${id}`)}
+                    >
+                      ▶ continuar
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

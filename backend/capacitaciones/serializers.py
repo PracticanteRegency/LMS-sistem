@@ -507,6 +507,7 @@ class MisCapacitacionesSerializer(serializers.ModelSerializer):
     completada = serializers.SerializerMethodField()
     lecciones_completadas = serializers.SerializerMethodField()
     total_lecciones = serializers.IntegerField(source='total_lecciones_count', read_only=True)
+    estado_capacitacion = serializers.IntegerField(source='estado')
 
     class Meta:
         model = Capacitaciones
@@ -517,7 +518,8 @@ class MisCapacitacionesSerializer(serializers.ModelSerializer):
             'imagen',
             'completada',
             'lecciones_completadas',
-            'total_lecciones'
+            'total_lecciones',
+            'estado_capacitacion'
         ]
 
     def get_progreso(self, obj):

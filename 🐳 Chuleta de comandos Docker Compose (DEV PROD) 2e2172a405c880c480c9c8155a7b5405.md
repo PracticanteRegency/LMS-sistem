@@ -184,7 +184,6 @@ docker network ls
 
 ```bash
 docker network inspect shared_net
-
 ```
 
 ---
@@ -202,6 +201,12 @@ docker exec -it nginx ping backend
 ✔️ Si responde → red correcta
 
 ❌ Si falla → problema de red o servicio fuera de `shared_net`
+
+### si un docker no esta conectada a una red usar
+
+```bash
+docker network connect shared_net backend
+```
 
 ---
 

@@ -11,7 +11,7 @@ from usuarios.models import Colaboradores, Usuarios, Cargo, Niveles, Regional
 from capacitaciones.models import Capacitaciones, progresoCapacitaciones, Modulos, Lecciones, progresolecciones
 from capacitaciones.serializers import CapacitacionProgresoSerializer
 from usuarios.serializers import ColaboradorListadoSerializer, cargosSerializer, nivelesSerializer, regionalesSerializer
-from django.db.models import Count, Q, Prefetch, OuterRef, Subquery, IntegerField
+from django.db.models import Count, Q, Prefetch, OuterRef, Subquery, IntegerField, Case, When
 from django.db.models.functions import Coalesce
 
 
@@ -64,7 +64,6 @@ class Perfil(APIView):
         progresos = (
             progresoCapacitaciones.objects
             .filter(colaborador=colaborador)
-            .exclude(capacitacion__estado=3)
             .select_related('capacitacion')
             .annotate(
                 total_lecciones=Count(
@@ -74,8 +73,14 @@ class Perfil(APIView):
                 lecciones_completadas=Coalesce(
                     Subquery(lecciones_completadas_subq, output_field=IntegerField()),
                     0
+                ),
+                estado_orden=Case(
+                    When(capacitacion__estado=3, then=2),  # desactivadas (estado 3) en medio
+                    default=1,  # activas (estado 0, 1) primero
+                    output_field=IntegerField()
                 )
             )
+            .order_by('-fecha_registro', 'estado_orden')
         )
 
         capacitaciones_totales = progresos.count()
@@ -187,6 +192,11 @@ class Register(APIView):
         ]
         if any(key not in colab_data for key in required_colab):
             return JsonResponse({'error': 'Faltan datos del colaborador'}, status=400)
+
+        # Validar que la cédula no exista
+        cc_colaborador = colab_data.get('cc_colaborador', '').strip()
+        if Colaboradores.objects.filter(cccolaborador=cc_colaborador).exists():
+            return JsonResponse({'error': f'La cédula {cc_colaborador} ya existe en la base de datos'}, status=400)
 
         try:
             colaborador = Colaboradores.objects.create(
@@ -321,6 +331,11 @@ class RegisterTemporal(APIView):
         ]
         if any(key not in colab_data for key in required_colab_min):
             return JsonResponse({'error': 'Faltan datos mínimos del colaborador'}, status=400)
+
+        # Validar que la cédula no exista
+        cc_colaborador = colab_data.get('cc_colaborador', '').strip()
+        if Colaboradores.objects.filter(cccolaborador=cc_colaborador).exists():
+            return JsonResponse({'error': f'La cédula {cc_colaborador} ya existe en la base de datos'}, status=400)
 
         try:
             colaborador = Colaboradores.objects.create(

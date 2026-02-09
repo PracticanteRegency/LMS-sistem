@@ -4,21 +4,116 @@ from django.utils import timezone
 from datetime import timedelta
 from django.conf import settings
 from capacitaciones.models import progresoCapacitaciones, Capacitaciones
-from capacitaciones.batch_email import enviar_correo_batch
+import time
+
+
+def enviar_correo_batch(destinatarios_bcc, subject, text_message, html_message, max_por_lote=500, delay=2):
+    """
+    Envía correos masivos dividiendo en lotes de máximo 500 destinatarios (límite SMTP).
+    
+    Args:
+        destinatarios_bcc (list): Lista de correos a enviar por BCC
+        subject (str): Asunto del correo
+        text_message (str): Contenido de texto
+        html_message (str): Contenido HTML
+        max_por_lote (int): Máximo de destinatarios por email (default: 500 - límite SMTP)
+        delay (int): Segundos de espera entre lotes (default: 2)
+    
+    Returns:
+        dict: Estadísticas de envío {enviados, fallidos, total, tasa_exito}
+    """
+    if not destinatarios_bcc:
+        return {"enviados": 0, "fallidos": 0, "total": 0, "tasa_exito": 0}
+    
+    destinatarios_bcc = list(set(destinatarios_bcc))  # Eliminar duplicados
+    total = len(destinatarios_bcc)
+    enviados = 0
+    fallidos = 0
+    
+    # Dividir en lotes
+    for i in range(0, total, max_por_lote):
+        lote = destinatarios_bcc[i:i+max_por_lote]
+        
+        try:
+            email_msg = EmailMultiAlternatives(
+                subject=subject,
+                body=text_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[],  # No usamos TO para no aparecer en el correo
+                bcc=lote  # Enviar a todos en BCC
+            )
+            
+            if html_message:
+                email_msg.attach_alternative(html_message, "text/html")
+            
+            email_msg.send(fail_silently=False)
+            enviados += len(lote)
+        except Exception as e:
+            fallidos += len(lote)
+            print(f"Error enviando lote: {e}")
+        
+        # Esperar entre lotes para evitar throttling
+        if i + max_por_lote < total:
+            time.sleep(delay)
+    
+    tasa_exito = round((enviados / total * 100), 2) if total > 0 else 0
+    
+    return {
+        "enviados": enviados,
+        "fallidos": fallidos,
+        "total": total,
+        "tasa_exito": tasa_exito,
+        "lotes": (total + max_por_lote - 1) // max_por_lote
+    }
+
+
+
+def enviar_correos_por_lotes(destinatarios_bcc, subject, text_message, html_message, delay=2):
+    """
+    Función auxiliar para enviar correos masivos dividiendo en lotes de máximo 500 destinatarios.
+    
+    Args:
+        destinatarios_bcc (list): Lista de correos a enviar
+        subject (str): Asunto del correo
+        text_message (str): Contenido de texto
+        html_message (str): Contenido HTML
+        delay (int): Segundos de espera entre lotes (default: 2)
+    
+    Returns:
+        dict: Estadísticas de envío {enviados, fallidos, total, tasa_exito}
+    """
+    if not destinatarios_bcc:
+        return {"enviados": 0, "fallidos": 0, "total": 0, "tasa_exito": 0}
+    
+    # Usar la función de batching existente
+    return enviar_correo_batch(
+        destinatarios_bcc=destinatarios_bcc,
+        subject=subject,
+        text_message=text_message,
+        html_message=html_message
+    )
 
 
 @shared_task
-def enviar_correo_capacitaciones_activas():
+def enviar_correo_capacitaciones_activas_y_activar():
     """
-    Envía correos a todos los colaboradores inscritos en capacitaciones
-    que inician hoy (se ejecuta automáticamente cada día).
-    Usa batching automático para soportar 1500+ colaboradores.
+    Activa capacitaciones que inician hoy Y envía correos a colaboradores.
+    Combina dos tareas: activación + notificación con batching automático.
+    Se ejecuta cada día a las 12:00.
     """
     hoy = timezone.now().date()
+    
+    # Paso 1: Activar capacitaciones que inician hoy
+    capacitaciones_a_activar = Capacitaciones.objects.filter(
+        fecha_inicio__date=hoy,
+        estado=0
+    )
 
-    capacitaciones_activas = Capacitaciones.objects.filter(fecha_inicio__date=hoy)
-
-    for cap in capacitaciones_activas:
+    for cap in capacitaciones_a_activar:
+        cap.estado = 1
+        cap.save()
+        
+        # Paso 2: Enviar correos a colaboradores de esta capacitación
         correos = list(
             progresoCapacitaciones.objects.filter(capacitacion=cap)
             .values_list("colaborador__correocolaborador", flat=True)
@@ -30,15 +125,15 @@ def enviar_correo_capacitaciones_activas():
         if not correos:
             continue
 
-        subject = f"🎓 Nueva Capacitación Activa: {cap.titulo}"
+        subject = f"🎓 Nueva Capacitación Activada: {cap.titulo}"
 
         text_message = (
-            f"Estimado colaborador@,\n\n"
+            f"Estimado colaborador,\n\n"
             f"Reciba un cordial saludo.\n"
             f"Nos complace informarle que ha sido matriculado en la formación '{cap.titulo}'.\n\n"
             f"Fecha de inicio: {cap.fecha_inicio.date()}\n"
             f"Fecha de finalización: {cap.fecha_fin.date()}\n\n"
-            f"Podrá acceder a la plataforma en el siguiente enlace: [enlace a la plataforma]\n\n"
+            f"Podrá acceder a la plataforma en: https://formacion.cloudregencyapps.com/login\n\n"
             f"Agradecemos su disposición e interés en fortalecer sus competencias.\n"
             f"Atentamente,\n\n"
             f"Área de Formación Empresarial"
@@ -59,7 +154,7 @@ def enviar_correo_capacitaciones_activas():
             </ul>
             <p>
                 Podrá acceder a la plataforma de formación a través del siguiente enlace:<br>
-                <a href="https://tu-plataforma.com" target="_blank">Acceder a la plataforma</a>
+                <a href="https://formacion.cloudregencyapps.com/login" target="_blank">Acceder a la plataforma</a>
             </p>
             <p>
                 Si olvidó su contraseña, puede restablecerla desde la plataforma.
@@ -75,17 +170,26 @@ def enviar_correo_capacitaciones_activas():
         """
 
         # Usar batching automático para soportar 1500+ colaboradores
-        enviar_correo_batch(
+        # Máximo 500 correos por email, con 2 segundos de espera entre lotes
+        enviar_correos_por_lotes(
             destinatarios_bcc=correos,
             subject=subject,
             text_message=text_message,
-            html_message=html_message
+            html_message=html_message,
+            delay=2
         )
+        
+        # Esperar 1 segundo entre capacitaciones
+        time.sleep(1)
 
 
 @shared_task
 def notificar_capacitacion_por_vencer_7_dias():
-    """Notifica sobre capacitaciones que vencen en 7 días. Usa batching automático."""
+    """
+    Notifica sobre capacitaciones que vencen en 7 días. 
+    Usa batching automático para soportar 1500+ colaboradores.
+    Se ejecuta cada día a las 07:00.
+    """
     hoy = timezone.now().date()
     fecha_objetivo = hoy + timedelta(days=7)
 
@@ -111,20 +215,16 @@ def notificar_capacitacion_por_vencer_7_dias():
 
         subject = f"⚠️ Capacitación próxima a finalizar: {cap.titulo}"
 
-        text_message = f"""
-            Estimado colaborador,
-
-            Le recordamos que la capacitación "{cap.titulo}" finalizará en 7 días.
-
-            Fecha de finalización: {cap.fecha_fin.date()}
-
-            Según nuestros registros, aún no ha completado esta formación.
-
-            Lo invitamos a ingresAR a la plataforma y finalizarla lo antes posible.
-
-            Atentamente,
-            Área de Formación Empresarial
-"""
+        text_message = (
+            f"Estimado colaborador,\n\n"
+            f"Le recordamos que la capacitación \"{cap.titulo}\" finalizará en 7 días.\n\n"
+            f"Fecha de finalización: {cap.fecha_fin.date()}\n\n"
+            f"Según nuestros registros, aún no ha completado esta formación.\n\n"
+            f"Acceda a la plataforma: https://formacion.cloudregencyapps.com/login\n\n"
+            f"Lo invitamos a ingresar a la plataforma y finalizarla lo antes posible.\n\n"
+            f"Atentamente,\n"
+            f"Área de Formación Empresarial"
+        )
 
         html_message = f"""
         <html>
@@ -140,7 +240,7 @@ def notificar_capacitacion_por_vencer_7_dias():
             <p>
                 Le recomendamos ingresar a la plataforma para completar sus actividades:
                 <br>
-                <a href="https://tu-plataforma.com" target="_blank">Ir a la plataforma</a>
+                <a href="https://formacion.cloudregencyapps.com/login" target="_blank">Ir a la plataforma</a>
             </p>
             <p>
                 <strong>Quedan solo 7 días.</strong>
@@ -154,16 +254,24 @@ def notificar_capacitacion_por_vencer_7_dias():
         """
 
         # Usar batching automático para soportar 1500+ colaboradores
-        enviar_correo_batch(
+        # Máximo 500 correos por email
+        enviar_correos_por_lotes(
             destinatarios_bcc=correos,
             subject=subject,
             text_message=text_message,
-            html_message=html_message
+            html_message=html_message,
+            delay=2
         )
+        
+        # Esperar 1 segundo entre capacitaciones
+        time.sleep(1)
 
 @shared_task
 def desactivar_capacitaciones():
-    """Desactiva capacitaciones que vencen hoy"""
+    """
+    Desactiva capacitaciones que vencen hoy.
+    Se ejecuta cada día a las 23:59.
+    """
     hoy = timezone.now().date()
 
     capacitaciones_a_desactivar = Capacitaciones.objects.filter(
@@ -176,22 +284,12 @@ def desactivar_capacitaciones():
         cap.save()
 
 @shared_task
-def activar_capacitaciones():
-    """Activa capacitaciones que inician hoy"""
-    hoy = timezone.now().date()
-
-    capacitaciones_a_activar = Capacitaciones.objects.filter(
-        fecha_inicio__date=hoy,
-        estado=0
-    )
-
-    for cap in capacitaciones_a_activar:
-        cap.estado = 1
-        cap.save()
-
-@shared_task
 def notificar_capacitacion_por_vencer_1_dia():
-    """Último aviso para capacitaciones que vencen mañana. Usa batching automático."""
+    """
+    Último aviso para capacitaciones que vencen mañana. 
+    Usa batching automático para soportar 1500+ colaboradores.
+    Se ejecuta cada día a las 07:30.
+    """
     hoy = timezone.now().date()
     fecha_objetivo = hoy + timedelta(days=1)
 
@@ -217,20 +315,16 @@ def notificar_capacitacion_por_vencer_1_dia():
 
         subject = f"🚨 Último aviso: {cap.titulo} vence mañana"
 
-        text_message = f"""
-            Estimado colaborador,
-
-            Le informamos que mañana finaliza la capacitación "{cap.titulo}".
-
-            Aún aparece como NO completada en el sistema.
-
-            Fecha de finalización: {cap.fecha_fin.date()}
-
-            Le recomendamos completarla hoy mismo para evitar quedar como pendiente.
-
-            Atentamente,
-            Área de Formación Empresarial
-            """
+        text_message = (
+            f"Estimado colaborador,\n\n"
+            f"Le informamos que mañana finaliza la capacitación \"{cap.titulo}\".\n\n"
+            f"Aún aparece como NO completada en el sistema.\n\n"
+            f"Fecha de finalización: {cap.fecha_fin.date()}\n\n"
+            f"Acceda a la plataforma: https://formacion.cloudregencyapps.com/login\n\n"
+            f"Le recomendamos completarla hoy mismo para evitar quedar como pendiente.\n\n"
+            f"Atentamente,\n"
+            f"Área de Formación Empresarial"
+        )
 
         html_message = f"""
         <html>
@@ -249,7 +343,7 @@ def notificar_capacitacion_por_vencer_1_dia():
             <p>
                 Acceda aquí y finalice su capacitación:
                 <br>
-                <a href="https://tu-plataforma.com" target="_blank">Ir a la plataforma</a>
+                <a href="https://formacion.cloudregencyapps.com/login" target="_blank">Ir a la plataforma</a>
             </p>
             <p>
                 Área de Formación Empresarial
@@ -259,12 +353,17 @@ def notificar_capacitacion_por_vencer_1_dia():
         """
 
         # Usar batching automático para soportar 1500+ colaboradores
-        enviar_correo_batch(
+        # Máximo 500 correos por email
+        enviar_correos_por_lotes(
             destinatarios_bcc=correos,
             subject=subject,
             text_message=text_message,
-            html_message=html_message
+            html_message=html_message,
+            delay=2
         )
+        
+        # Esperar 1 segundo entre capacitaciones
+        time.sleep(1)
 
 
 @shared_task
@@ -272,6 +371,7 @@ def notificar_jefes_por_colaboradores_sin_progreso():
     """
     Notifica a los jefes de proyecto sobre colaboradores sin avance en capacitaciones.
     Se ejecuta cada lunes a las 09:00.
+    Usa batching automático para soportar múltiples notificaciones.
     """
     registros = (
         progresoCapacitaciones.objects
@@ -318,39 +418,47 @@ def notificar_jefes_por_colaboradores_sin_progreso():
             "capacitacion": r.capacitacion.titulo
         })
 
-    # Envío de correos
-    for email, data in notificaciones.items():
-        jefe = data["jefe"]
-        proyecto = data["proyecto"]
-        items = data["items"]
-
-        listado_html = "".join(
-            f"<li>{i['colaborador']} – <strong>{i['capacitacion']}</strong></li>"
-            for i in items
-        )
-
-        subject = f"⚠️ Colaboradores sin avance - Proyecto {proyecto.nombre_proyecto}"
-
-        html_message = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif;">
-            <p>Estimado(a) {jefe.nombrecolaborador},</p>
-
+    # Agrupar notificaciones por lotes de máximo 50 jefes por email
+    # y enviar masivamente
+    emails_jefes = list(notificaciones.keys())
+    
+    # Dividir en lotes de 50 correos BCC
+    lote_size = 50
+    for i in range(0, len(emails_jefes), lote_size):
+        lote_emails = emails_jefes[i:i+lote_size]
+        
+        # Construir cuerpo consolidado para este lote
+        html_consolidado = "<html><body style='font-family: Arial, sans-serif;'>"
+        
+        for email_jefe in lote_emails:
+            data = notificaciones[email_jefe]
+            jefe = data["jefe"]
+            proyecto = data["proyecto"]
+            items = data["items"]
+            
+            listado_html = "".join(
+                f"<li>{i['colaborador']} – <strong>{i['capacitacion']}</strong></li>"
+                for i in items
+            )
+            
+            html_consolidado += f"""
+            <p><strong>{jefe.nombrecolaborador},</strong></p>
             <p>
                 Se identificaron los siguientes colaboradores del proyecto
                 <strong>{proyecto.nombre_proyecto}</strong>
                 que no presentan avance en las capacitaciones asignadas:
             </p>
-
             <ul>
                 {listado_html}
             </ul>
-
             <p>
                 Le recomendamos realizar el seguimiento correspondiente
                 para garantizar el cumplimiento del proceso de formación.
             </p>
-
+            <hr>
+            """
+        
+        html_consolidado += """
             <p>
                 <strong>Atentamente,</strong><br>
                 Plataforma de Formación Empresarial
@@ -358,13 +466,19 @@ def notificar_jefes_por_colaboradores_sin_progreso():
         </body>
         </html>
         """
-
-        email_msg = EmailMultiAlternatives(
+        
+        subject = "⚠️ Colaboradores sin avance en capacitaciones - Reporte Semanal"
+        text_message = "Reporte de colaboradores sin avance en capacitaciones."
+        
+        # Usar batching para enviar a múltiples jefes
+        # Máximo 500 correos por email, con 2 segundos de espera
+        enviar_correos_por_lotes(
+            destinatarios_bcc=lote_emails,
             subject=subject,
-            body="Colaboradores sin avance en capacitaciones.",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            to=[email]
+            text_message=text_message,
+            html_message=html_consolidado,
+            delay=2
         )
-
-        email_msg.attach_alternative(html_message, "text/html")
-        email_msg.send(fail_silently=False)
+        
+        # Esperar 1 segundo entre lotes
+        time.sleep(1)
