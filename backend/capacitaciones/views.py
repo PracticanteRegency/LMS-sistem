@@ -18,7 +18,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Count, Prefetch
+from django.db.models import Count, Prefetch, OuterRef, Subquery
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -62,8 +62,7 @@ from capacitaciones.serializers import (
     CrearCapacitacionSerializer,
     MisCapacitacionesSerializer,
 )
-from capacitaciones.utils import actualizar_progreso_leccion, enviar_correo_capacitacion_creada, enviar_correo_cap_activada
-from capacitaciones.batch_email import enviar_correo_capacitacion_creada_batch
+from capacitaciones.utils import actualizar_progreso_leccion
 from usuarios.models import Colaboradores
 from usuarios.permissions import IsAdminUser, IsSuperAdmin
 
@@ -1311,7 +1310,13 @@ class MisCapacitacionesListView(APIView):
                 progresocapacitaciones__colaborador=colaborador,
                 estado=1
             ).annotate(
-                total_lecciones_count=Count('modulos__lecciones', distinct=True)
+                total_lecciones_count=Count('modulos__lecciones', distinct=True),
+                fecha_registro_progreso=Subquery(
+                    progresoCapacitaciones.objects.filter(
+                        capacitacion=OuterRef('pk'),
+                        colaborador=colaborador
+                    ).values('fecha_registro')[:1]
+                )
             ).prefetch_related(
                 Prefetch(
                     'progresocapacitaciones_set',
@@ -1333,7 +1338,7 @@ class MisCapacitacionesListView(APIView):
                         )
                     )
                 )
-            ).distinct().order_by('-fecha_creacion')
+            ).distinct().order_by('-fecha_registro_progreso')
             
             serializer = MisCapacitacionesSerializer(capacitaciones, many=True)
             
@@ -1372,8 +1377,9 @@ class DesactivarCapacitacionesView(APIView):
             # If the capacitacion was activated, trigger the notification task after commit
             if capacitacion.estado == 1:
                 try:
-                    # schedule sending in a background thread after DB commit
-                    transaction.on_commit(lambda: threading.Thread(target=enviar_correo_cap_activada, args=(capacitacion,)).start())
+                    # Enqueue email notification via Celery after DB commit
+                    from notificaciones.tasks import enviar_correo_capacitaciones_activas_y_activar
+                    transaction.on_commit(lambda: enviar_correo_capacitaciones_activas_y_activar.delay())
                 except Exception:
                     # don't let scheduling/errors break the response
                     pass
@@ -1513,7 +1519,8 @@ class EditarColaboradorCapacitacionView(APIView):
                 # NOTA: Usar batching para soportar 1500+ colaboradores
                 if added and capacitacion.estado == 1:
                     try:
-                        transaction.on_commit(lambda: enviar_correo_capacitacion_creada_batch(capacitacion, colaboradores_ids=added))
+                        from notificaciones.tasks import enviar_correo_capacitaciones_activas_y_activar
+                        transaction.on_commit(lambda: enviar_correo_capacitaciones_activas_y_activar.delay())
                     except Exception:
                         # No queremos que el envio de correos impida la operación
                         pass
@@ -1668,7 +1675,13 @@ class ReporteCapacitacionesView(APIView):
             # Obtener colaboradores inscritos (solo activos)
             progreso_qs = progresoCapacitaciones.objects.filter(
                 capacitacion=capacitacion
-            ).select_related('colaborador').order_by('colaborador__nombrecolaborador')
+            ).select_related(
+                'colaborador',
+                'colaborador__centroop',
+                'colaborador__centroop__id_proyecto',
+                'colaborador__centroop__id_proyecto__id_unidad',
+                'colaborador__centroop__id_proyecto__id_unidad__id_empresa'
+            ).order_by('colaborador__nombrecolaborador')
             
             # Crear workbook
             wb = Workbook()
@@ -1689,7 +1702,6 @@ class ReporteCapacitacionesView(APIView):
             # Información de la capacitación (encabezado)
             ws['A1'] = "REPORTE DE CAPACITACIÓN"
             ws['A1'].font = Font(bold=True, size=14)
-            ws.merge_cells('A1:H1')
             
             ws['A2'] = f"Título: {capacitacion.titulo}"
             ws['A3'] = f"Tipo: {capacitacion.tipo}"
@@ -1700,6 +1712,11 @@ class ReporteCapacitacionesView(APIView):
                 "Nombre",
                 "Apellido",
                 "Cédula",
+                "Correo",
+                "Centro Op",
+                "Proyecto",
+                "Unidad",
+                "Empresa",
                 "% Completación",
                 "Fecha Registro",
                 "Fecha Completación",
@@ -1707,7 +1724,7 @@ class ReporteCapacitacionesView(APIView):
             ]
             
             for col, header in enumerate(headers, 1):
-                cell = ws.cell(row=7, column=col)
+                cell = ws.cell(row=6, column=col)
                 cell.value = header
                 cell.fill = header_fill
                 cell.font = header_font
@@ -1715,7 +1732,7 @@ class ReporteCapacitacionesView(APIView):
                 cell.border = border
             
             # Datos de colaboradores
-            row = 8
+            row = 7
             for progreso in progreso_qs:
                 colaborador = progreso.colaborador
                 
@@ -1723,12 +1740,23 @@ class ReporteCapacitacionesView(APIView):
                 if colaborador.estadocolaborador != 1:
                     continue
                 
+                # Obtener datos de las relaciones
+                centro_op = colaborador.centroop.nombrecentrop if colaborador.centroop else 'N/A'
+                proyecto = colaborador.centroop.id_proyecto.nombreproyecto if colaborador.centroop and colaborador.centroop.id_proyecto else 'N/A'
+                unidad = colaborador.centroop.id_proyecto.id_unidad.nombreunidad if colaborador.centroop and colaborador.centroop.id_proyecto and colaborador.centroop.id_proyecto.id_unidad else 'N/A'
+                empresa = colaborador.centroop.id_proyecto.id_unidad.id_empresa.nombre_empresa if colaborador.centroop and colaborador.centroop.id_proyecto and colaborador.centroop.id_proyecto.id_unidad and colaborador.centroop.id_proyecto.id_unidad.id_empresa else 'N/A'
+                
                 ws.cell(row=row, column=1).value = colaborador.nombrecolaborador
                 ws.cell(row=row, column=2).value = colaborador.apellidocolaborador
                 ws.cell(row=row, column=3).value = colaborador.cccolaborador
-                ws.cell(row=row, column=4).value = float(progreso.progreso)
-                ws.cell(row=row, column=5).value = progreso.fecha_registro.strftime('%d/%m/%Y %H:%M') if progreso.fecha_registro else 'N/A'
-                ws.cell(row=row, column=6).value = progreso.fecha_completada.strftime('%d/%m/%Y %H:%M') if progreso.fecha_completada else 'N/A'
+                ws.cell(row=row, column=4).value = colaborador.correocolaborador
+                ws.cell(row=row, column=5).value = centro_op
+                ws.cell(row=row, column=6).value = proyecto
+                ws.cell(row=row, column=7).value = unidad
+                ws.cell(row=row, column=8).value = empresa
+                ws.cell(row=row, column=9).value = float(progreso.progreso)
+                ws.cell(row=row, column=10).value = progreso.fecha_registro.strftime('%d/%m/%Y %H:%M') if progreso.fecha_registro else 'N/A'
+                ws.cell(row=row, column=11).value = progreso.fecha_completada.strftime('%d/%m/%Y %H:%M') if progreso.fecha_completada else 'N/A'
                 
                 # Determinar estado: Completada, No Completado (si pasó fecha fin) o En Progreso
                 if progreso.completada == 1:
@@ -1737,31 +1765,44 @@ class ReporteCapacitacionesView(APIView):
                     estado = "No Completado"
                 else:
                     estado = "En Progreso"
-                ws.cell(row=row, column=7).value = estado
+                ws.cell(row=row, column=12).value = estado
                 
                 # Formato
-                for col in range(1, 8):
+                for col in range(1, 13):
                     cell = ws.cell(row=row, column=col)
                     cell.border = border
-                    if col == 4:  # Porcentaje
+                    if col == 9:  # Porcentaje
                         cell.alignment = center_alignment
                         cell.number_format = '0.00"%"'
-                    elif col in [5, 6]:  # Fechas
+                    elif col in [10, 11]:  # Fechas
                         cell.alignment = center_alignment
-                    elif col == 7:  # Estado
+                    elif col == 12:  # Estado
                         cell.alignment = center_alignment
                 
                 row += 1
             
             # Ajustar anchos de columna
-            ws.column_dimensions['A'].width = 18
-            ws.column_dimensions['B'].width = 18
-            ws.column_dimensions['C'].width = 18
-            ws.column_dimensions['D'].width = 16
-            ws.column_dimensions['E'].width = 20
+            ws.column_dimensions['A'].width = 15
+            ws.column_dimensions['B'].width = 15
+            ws.column_dimensions['C'].width = 15
+            ws.column_dimensions['D'].width = 25
+            ws.column_dimensions['E'].width = 18
             ws.column_dimensions['F'].width = 20
-            ws.column_dimensions['G'].width = 16
+            ws.column_dimensions['G'].width = 18
+            ws.column_dimensions['H'].width = 25
+            ws.column_dimensions['I'].width = 16
+            ws.column_dimensions['J'].width = 18
+            ws.column_dimensions['K'].width = 18
+            ws.column_dimensions['L'].width = 14
             
+            # Habilitar filtros y congelar encabezado (facilita filtrado en Excel)
+            try:
+                last_row = row - 1
+                ws.auto_filter.ref = f"A6:L{last_row}"
+                ws.freeze_panes = ws['A7']
+            except Exception:
+                pass
+
             # Guardar a bytes
             from io import BytesIO
             output = BytesIO()
@@ -1819,8 +1860,6 @@ class ReporteCapacitacionesView(APIView):
             # Estilos
             header_fill = PatternFill(start_color="1F4788", end_color="1F4788", fill_type="solid")
             header_font = Font(bold=True, color="FFFFFF", size=11)
-            subheader_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
-            subheader_font = Font(bold=True, color="FFFFFF", size=10)
             border = Border(
                 left=Side(style='thin'),
                 right=Side(style='thin'),
@@ -1832,22 +1871,25 @@ class ReporteCapacitacionesView(APIView):
             # Título
             ws['A1'] = "REPORTE GENERAL DE CAPACITACIONES"
             ws['A1'].font = Font(bold=True, size=14)
-            ws.merge_cells('A1:H1')
             
             ws['A2'] = f"Período: {fecha_inicio.strftime('%d/%m/%Y')} al {fecha_fin.strftime('%d/%m/%Y')}"
-            ws.merge_cells('A2:H2')
             
             # Headers principales
             headers = [
                 "Capacitación",
                 "Tipo",
                 "Fecha Creación",
-                "total colaboradores",
-                "total completados",
+                "Total Colaboradores",
+                "Total Completados",
                 "% Completación General",
                 "Nombre Colaborador",
                 "Apellido Colaborador",
                 "Cédula",
+                "Correo",
+                "Centro Op",
+                "Proyecto",
+                "Unidad",
+                "Empresa",
                 "% Completación",
                 "Estado Avance"
             ]
@@ -1867,7 +1909,13 @@ class ReporteCapacitacionesView(APIView):
                 # Obtener colaboradores inscritos en esta capacitación (solo activos)
                 progreso_qs = progresoCapacitaciones.objects.filter(
                     capacitacion=capacitacion
-                ).select_related('colaborador').order_by('colaborador__nombrecolaborador')
+                ).select_related(
+                    'colaborador',
+                    'colaborador__centroop',
+                    'colaborador__centroop__id_proyecto',
+                    'colaborador__centroop__id_proyecto__id_unidad',
+                    'colaborador__centroop__id_proyecto__id_unidad__id_empresa'
+                ).order_by('colaborador__nombrecolaborador')
                 
                 if progreso_qs.exists():
                     # Calcular totales una sola vez por capacitación
@@ -1882,6 +1930,12 @@ class ReporteCapacitacionesView(APIView):
                         if colaborador.estadocolaborador != 1:
                             continue
                         
+                        # Obtener datos de las relaciones
+                        centro_op = colaborador.centroop.nombrecentrop if colaborador.centroop else 'N/A'
+                        proyecto = colaborador.centroop.id_proyecto.nombreproyecto if colaborador.centroop and colaborador.centroop.id_proyecto else 'N/A'
+                        unidad = colaborador.centroop.id_proyecto.id_unidad.nombreunidad if colaborador.centroop and colaborador.centroop.id_proyecto and colaborador.centroop.id_proyecto.id_unidad else 'N/A'
+                        empresa = colaborador.centroop.id_proyecto.id_unidad.id_empresa.nombre_empresa if colaborador.centroop and colaborador.centroop.id_proyecto and colaborador.centroop.id_proyecto.id_unidad and colaborador.centroop.id_proyecto.id_unidad.id_empresa else 'N/A'
+                        
                         # Mostrar info de capacitación en TODAS las filas
                         ws.cell(row=row, column=1).value = capacitacion.titulo
                         ws.cell(row=row, column=2).value = capacitacion.tipo
@@ -1894,7 +1948,12 @@ class ReporteCapacitacionesView(APIView):
                         ws.cell(row=row, column=7).value = colaborador.nombrecolaborador
                         ws.cell(row=row, column=8).value = colaborador.apellidocolaborador
                         ws.cell(row=row, column=9).value = colaborador.cccolaborador
-                        ws.cell(row=row, column=10).value = float(progreso.progreso)
+                        ws.cell(row=row, column=10).value = colaborador.correocolaborador
+                        ws.cell(row=row, column=11).value = centro_op
+                        ws.cell(row=row, column=12).value = proyecto
+                        ws.cell(row=row, column=13).value = unidad
+                        ws.cell(row=row, column=14).value = empresa
+                        ws.cell(row=row, column=15).value = float(progreso.progreso)
                         
                         # Determinar estado: Completada, No Completado (si pasó fecha fin) o En Progreso
                         if progreso.completada == 1:
@@ -1903,16 +1962,16 @@ class ReporteCapacitacionesView(APIView):
                             estado = "No Completado"
                         else:
                             estado = "En Progreso"
-                        ws.cell(row=row, column=11).value = estado
+                        ws.cell(row=row, column=16).value = estado
                         
                         # Aplicar bordes y formato
-                        for col in range(1, 12):
+                        for col in range(1, 17):
                             cell = ws.cell(row=row, column=col)
                             cell.border = border
-                            if col in [6, 10]:  # Porcentajes
+                            if col in [6, 15]:  # Porcentajes
                                 cell.alignment = center_alignment
                                 cell.number_format = '0.00"%"'
-                            elif col == 11:  # Estado
+                            elif col == 16:  # Estado
                                 cell.alignment = center_alignment
                             else:
                                 cell.alignment = Alignment(vertical='center')
@@ -1925,7 +1984,7 @@ class ReporteCapacitacionesView(APIView):
                     ws.cell(row=row, column=3).value = capacitacion.fecha_creacion.strftime('%d/%m/%Y') if capacitacion.fecha_creacion else 'N/A'
                     ws.cell(row=row, column=4).value = "Sin colaboradores"
                     
-                    for col in range(1, 12):
+                    for col in range(1, 17):
                         cell = ws.cell(row=row, column=col)
                         cell.border = border
                     
@@ -1938,9 +1997,25 @@ class ReporteCapacitacionesView(APIView):
             ws.column_dimensions['D'].width = 18
             ws.column_dimensions['E'].width = 18
             ws.column_dimensions['F'].width = 18
-            ws.column_dimensions['G'].width = 16
-            ws.column_dimensions['H'].width = 16
+            ws.column_dimensions['G'].width = 15
+            ws.column_dimensions['H'].width = 15
+            ws.column_dimensions['I'].width = 15
+            ws.column_dimensions['J'].width = 25
+            ws.column_dimensions['K'].width = 18
+            ws.column_dimensions['L'].width = 20
+            ws.column_dimensions['M'].width = 18
+            ws.column_dimensions['N'].width = 25
+            ws.column_dimensions['O'].width = 16
+            ws.column_dimensions['P'].width = 14
             
+            # Habilitar filtros y congelar encabezado (facilita filtrado en Excel)
+            try:
+                last_row = row - 1
+                ws.auto_filter.ref = f"A4:P{last_row}"
+                ws.freeze_panes = ws['A5']
+            except Exception:
+                pass
+
             # Guardar a bytes
             from io import BytesIO
             output = BytesIO()

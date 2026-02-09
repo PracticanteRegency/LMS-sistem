@@ -55,7 +55,7 @@ export default function PerfilUser() {
       // El servicio sin id corresponde al perfil del usuario logueado
       const data = await perfilService.getPerfil();
       console.log("Perfil (logueado) cargado:", data);
-        setPerfil(data);
+        setPerfil(data as PerfilData);
     } catch (err: any) {
         console.error("Error al cargar perfil logueado:", err);
         setError(err.message || "Error al cargar el perfil");

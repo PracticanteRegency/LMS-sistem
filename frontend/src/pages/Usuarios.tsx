@@ -201,7 +201,7 @@ export default function Usuarios() {
     }
 
     try {
-      await (Perfil as any).actualizarRolUsuario(user.id_colaborador, { tipo_usuario: rol });
+      await (Perfil as any).actualizarRolUsuario(user.id_colaborador, { tipousuario: rol });
       setSuccess(`Rol del usuario actualizado correctamente`);
       await loadUsuarios(page);
       setTimeout(() => setSuccess(null), 3000);
