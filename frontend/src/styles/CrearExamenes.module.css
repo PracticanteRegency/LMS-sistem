@@ -6,3 +6,10 @@
   margin-bottom: 20px;
   margin-top: 20px; /* Espacio extra arriba para separar de searchResults */
 }
+
+@media (prefers-color-scheme: dark) {
+  .previewSection {
+    background: #1a2332;
+    border-left-color: #4a7fc7;
+  }
+}

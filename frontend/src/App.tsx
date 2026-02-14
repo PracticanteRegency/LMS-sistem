@@ -18,6 +18,7 @@ import PerfilUserCap from "./pages/PerfilUserCap";
 import CrearCapacitacion from "./pages/CrearCapacitacion";
 import VerCapacitacion from "./pages/VerCapacitacion";
 import EditarColaboradores from "./pages/EditarColaboradores";
+import DesactivarUsuarios from "./pages/DesactivarUsuarios";
 import CrearUsuario from "./pages/CrearUsuario";
 import ReproductorVideo from "./pages/ReproductorVideo";
 import ReproductorImagenes from "./pages/ReproductorImagenes";
@@ -82,6 +83,10 @@ export default function App() {
 
             <Route path="/capacitaciones/:id/colaboradores" element={
               <AdminRoute><EditarColaboradores /></AdminRoute>
+            } />
+
+            <Route path="/desactivar-usuarios" element={
+              <AdminRoute><DesactivarUsuarios /></AdminRoute>
             } />
 
             <Route path="/" element={

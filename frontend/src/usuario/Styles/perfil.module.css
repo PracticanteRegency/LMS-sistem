@@ -940,3 +940,141 @@ button:disabled,
   }
 }
 
+/* ===== DARK MODE ===== */
+@media (prefers-color-scheme: dark) {
+  .container {
+    background: #121212;
+    color: #e0e0e0;
+  }
+  .profileHeader {
+    background: #1e1e1e;
+    border-color: #444;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+  .profileInfo {
+    color: #e0e0e0;
+  }
+  .profileName {
+    color: #f0f0f0;
+  }
+  .profileEmail {
+    color: #999;
+  }
+  .profileLabel {
+    color: #ccc;
+  }
+  .profileValue {
+    color: #e0e0e0;
+  }
+  .statsContainer .stat {
+    background: #252525;
+    border-color: #444;
+  }
+  .statsContainer .stat:hover {
+    border-color: #C0281B;
+    box-shadow: 0 4px 12px rgba(192, 40, 27, 0.2);
+  }
+  .statLabel {
+    color: #999;
+  }
+  .statValue {
+    color: #f0f0f0;
+  }
+  .tab {
+    background: #333;
+    color: #e0e0e0;
+  }
+  .tab:hover {
+    background: #444;
+  }
+  .tab.active {
+    background-color: #C0281B;
+    color: white;
+  }
+  .capacitacionCard {
+    background: #1e1e1e;
+    border-color: #444;
+  }
+  .capacitacionCard:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+  .cardTitle {
+    color: #f0f0f0;
+  }
+  .badgeCompleted {
+    background: #1a2e1a;
+    color: #6fc76f;
+  }
+  .badgeProgress {
+    background: #2e2a1a;
+    color: #ffb74d;
+  }
+  .progressLabel {
+    color: #999;
+  }
+  .progressBar {
+    background: #333;
+  }
+  .progressText {
+    color: #e0e0e0;
+  }
+  .progressNumber {
+    color: #f0f0f0;
+  }
+  .leccionesInfo {
+    color: #999;
+  }
+  .buttonContinuar {
+    background: #333;
+    color: #e0e0e0;
+  }
+  .buttonContinuar:hover {
+    background: #C0281B;
+    color: white;
+  }
+  .emptyState {
+    background: #1e1e1e;
+    color: #888;
+  }
+  .certificadosGrid .certCard {
+    background: #1e1e1e;
+    border-color: #444;
+  }
+  .certTitle {
+    color: #f0f0f0;
+  }
+  .certMeta {
+    color: #999;
+  }
+  .certNumber {
+    color: #f0f0f0;
+  }
+  .certIcon {
+    background: linear-gradient(135deg, #2a2a2a, #333);
+  }
+  .buttonGenerar {
+    background: #333;
+    color: #e0e0e0;
+  }
+  .informacionContainer .infoItem {
+    border-bottom-color: #333;
+  }
+  .infoLabel {
+    color: #C0281B;
+  }
+  .infoValue {
+    color: #e0e0e0;
+  }
+  .loading {
+    background: #1e1e1e;
+    color: #999;
+  }
+  .error {
+    background-color: #2a1515;
+    color: #e57373;
+  }
+  .badge {
+    border: none;
+  }
+}
+

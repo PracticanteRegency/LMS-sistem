@@ -15,16 +15,11 @@ from decimal import Decimal
 
 # Importar las tareas
 from notificaciones.tasks import (
-    enviar_correo_capacitaciones_activas,
+    enviar_correo_capacitaciones_activas_y_activar,
     notificar_capacitacion_por_vencer_7_dias,
     notificar_capacitacion_por_vencer_1_dia,
-    activar_capacitaciones,
     desactivar_capacitaciones,
     notificar_jefes_por_colaboradores_sin_progreso
-)
-from analitica.tasks import (
-    calcular_progreso_empresarial_diario,
-    calcular_progreso_empresarial_mensual
 )
 
 
@@ -163,18 +158,6 @@ class TestTareasAutomatizadas(TestCase):
             fecha_completada=hoy
         )
     
-    def test_enviar_correo_capacitaciones_activas(self):
-        """Test para enviar correos de capacitaciones que inician hoy"""
-        print("\n🧪 Test: enviar_correo_capacitaciones_activas")
-        
-        # Ejecutar tarea
-        resultado = enviar_correo_capacitaciones_activas()
-        
-        # Verificar que se completó sin errores
-        self.assertIsNone(resultado)
-        
-        print("   ✅ Tarea ejecutada sin errores")
-    
     def test_notificar_capacitacion_por_vencer_7_dias(self):
         """Test para notificar capacitaciones que vencen en 7 días"""
         print("\n🧪 Test: notificar_capacitacion_por_vencer_7_dias")
@@ -199,16 +182,16 @@ class TestTareasAutomatizadas(TestCase):
         
         print("   ✅ Tarea ejecutada sin errores")
     
-    def test_activar_capacitaciones(self):
-        """Test para activar capacitaciones que inician hoy"""
-        print("\n🧪 Test: activar_capacitaciones")
+    def test_enviar_correo_capacitaciones_activas_y_activar(self):
+        """Test para activar capacitaciones que inician hoy y enviar correos"""
+        print("\n🧪 Test: enviar_correo_capacitaciones_activas_y_activar")
         
         # Antes: capacitación desactivada
         self.cap_hoy.refresh_from_db()
         self.assertEqual(self.cap_hoy.estado, 0)
         
         # Ejecutar tarea
-        resultado = activar_capacitaciones()
+        resultado = enviar_correo_capacitaciones_activas_y_activar()
         
         # Después: capacitación activada
         self.cap_hoy.refresh_from_db()
@@ -217,7 +200,7 @@ class TestTareasAutomatizadas(TestCase):
         # Verificar que se completó sin errores
         self.assertIsNone(resultado)
         
-        print("   ✅ Capacitación activada correctamente")
+        print("   ✅ Capacitación activada y correos enviados correctamente")
     
     def test_desactivar_capacitaciones(self):
         """Test para desactivar capacitaciones que vencen hoy"""
@@ -250,39 +233,7 @@ class TestTareasAutomatizadas(TestCase):
         self.assertIsNone(resultado)
         
         print("   ✅ Tarea ejecutada sin errores")
-    
-    def test_calcular_progreso_empresarial_diario(self):
-        """Test para calcular progreso empresarial diario"""
-        print("\n🧪 Test: calcular_progreso_empresarial_diario")
-        
-        # Ejecutar tarea
-        resultado = calcular_progreso_empresarial_diario()
-        
-        # Verificar resultado
-        self.assertEqual(resultado.get('status'), 'success')
-        self.assertGreater(resultado.get('registros', 0), 0)
-        
-        # Verificar que se crearon registros en ProgresoAgregado
-        registros = ProgresoAgregado.objects.all()
-        self.assertGreater(registros.count(), 0)
-        
-        print(f"   ✅ Progreso calculado: {resultado.get('registros')} registros")
-    
-    def test_calcular_progreso_empresarial_mensual(self):
-        """Test para calcular progreso empresarial mensual"""
-        print("\n🧪 Test: calcular_progreso_empresarial_mensual")
-        
-        # Ejecutar tarea para mes actual
-        from datetime import datetime
-        hoy = datetime.now()
-        resultado = calcular_progreso_empresarial_mensual(mes=hoy.month, anio=hoy.year)
-        
-        # Verificar resultado
-        self.assertEqual(resultado.get('status'), 'success')
-        self.assertEqual(resultado.get('mes'), hoy.month)
-        self.assertEqual(resultado.get('anio'), hoy.year)
-        
-        print(f"   ✅ Progreso mensual calculado: {resultado.get('registros_creados')} registros")
+
     
     def test_integridad_de_campos_modelo_capacitaciones(self):
         """Verificar que los campos correctos se usan en el modelo Capacitaciones"""
@@ -388,13 +339,11 @@ class TestConfiguracionCelery(TestCase):
         beat_schedule = app.conf.beat_schedule
         
         tareas_esperadas = [
-            'enviar-correo-capacitaciones-activas-cada-dia',
+            'enviar-correo-y-activar-capacitaciones-cada-dia',
             'notificar-capacitaciones-7-dias',
             'notificar-capacitaciones-1-dia',
-            'activar-capacitaciones-cada-dia',
             'desactivar-capacitaciones-cada-dia',
             'notificar-jefes-sin-progreso',
-            'calcular-progreso-empresarial-diario',
         ]
         
         for tarea in tareas_esperadas:

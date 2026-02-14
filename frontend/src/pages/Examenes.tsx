@@ -272,8 +272,7 @@ export default function Examenes() {
       setMasivoResult(result);
       setCsvFile(null);
       
-      if (result.enviados > 0) {
-        alert(`Envío masivo completado: ${result.enviados} correos enviados`);
+      if (result.total_trabajadores > 0) {
       }
     } catch (err: any) {
       const backendData = err?.response?.data;
@@ -571,27 +570,19 @@ export default function Examenes() {
                 <h3>Resultado del Envío</h3>
                 <div className={styles.resultStats}>
                   <div className={styles.stat}>
-                    <span className={styles.statLabel}>Enviados:</span>
-                    <span className={styles.statValue}>{masivoResult.enviados || 0}</span>
+                    <span className={styles.statLabel}>Trabajadores Procesados:</span>
+                    <span className={styles.statValue}>{masivoResult.total_trabajadores || 0}</span>
                   </div>
                   <div className={styles.stat}>
-                    <span className={styles.statLabel}>Errores:</span>
-                    <span className={styles.statValue}>{masivoResult.errores?.length || 0}</span>
+                    <span className={styles.statLabel}>Destinatarios:</span>
+                    <span className={styles.statValue}>{masivoResult.enviado_a?.length || 0}</span>
                   </div>
                 </div>
-
-                {masivoResult.errores && masivoResult.errores.length > 0 && (
-                  <div className={styles.errorList}>
-                    <h4>Detalles de Errores:</h4>
-                    <ul>
-                      {masivoResult.errores.map((error: any, idx: number) => (
-                        <li key={idx}>
-                          <strong>Fila {error.fila || idx + 1}:</strong> {error.error || error.mensaje}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                <div className={styles.resultDetails}>
+                  <p><strong>UUID:</strong> {masivoResult.uuid_correo}</p>
+                  <p><strong>Estado:</strong> {masivoResult.estado}</p>
+                  <p><strong>Detalle:</strong> {masivoResult.detalle}</p>
+                </div>
               </div>
             )}
 
@@ -621,7 +612,7 @@ export default function Examenes() {
               <div className={styles.formActions}>
                 
                 <a
-                  href="/templates/cargar_examanes.csv"
+                  href="/templates/ejemplo-envio-de-examanes-masivo.csv"
                   download
                   className={styles.downloadButton}
                   style={{ marginRight: 12 }}

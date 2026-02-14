@@ -182,7 +182,6 @@
 
 /* Organizational Tree */
 .orgTree {
-  background: #fafafa;
   border-radius: 6px;
   padding: 12px;
   border: 1px solid #e0e0e0;
@@ -542,6 +541,73 @@ button:disabled,
   .progressText {
     font-size: 10px;
     min-width: 25px;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .dashboardContainer {
+    background: #121212;
+    color: #e0e0e0;
+  }
+  .header h1 {
+    color: #f0f0f0;
+  }
+  .subtitle {
+    color: #888;
+  }
+  .kpiCard {
+    background: #1e1e1e;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+  .kpiCard:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  }
+  .kpiLabel {
+    color: #999;
+  }
+  .kpiValue {
+    color: #f0f0f0;
+  }
+  .chartCard {
+    background: #1e1e1e;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    color: #e0e0e0;
+  }
+  .chartTitle {
+    color: #f0f0f0;
+  }
+  .hierarchyInfo {
+    color: #888;
+  }
+  .courseItem {
+    border-bottom-color: #333;
+  }
+  .courseName {
+    color: #e0e0e0;
+  }
+  .courseInfo {
+    color: #999;
+  }
+  .orgTree {
+    border-color: #333;
+  }
+  .orgRow {
+    border-bottom-color: #333;
+  }
+  .orgRow:hover {
+    background-color: #2a2a2a;
+  }
+  .itemName {
+    color: #e0e0e0;
+  }
+  .progressBar {
+    background: #333;
+  }
+  .progressText {
+    color: #e0e0e0;
+  }
+  .arrow {
+    color: #777;
   }
 }
 

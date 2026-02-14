@@ -90,3 +90,27 @@
     height: 140px;
   }
 }
+
+/* ===== DARK MODE ===== */
+@media (prefers-color-scheme: dark) {
+  .mainTitle {
+    color: #f0f0f0;
+  }
+  .container {
+    background: #121212;
+    color: #e0e0e0;
+  }
+  .card {
+    background: #1e1e1e;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  }
+  .cardBody {
+    color: #e0e0e0;
+  }
+  .cardTitle {
+    color: #f0f0f0;
+  }
+  .metaSmall {
+    color: #999;
+  }
+}

@@ -701,3 +701,106 @@
     font-size: 10px;
   }
 }
+
+/* ===== DARK MODE ===== */
+@media (prefers-color-scheme: dark) {
+  .container {
+    background-color: #121212;
+    color: #e0e0e0;
+  }
+  .header {
+    background-color: #1e1e1e;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  }
+  .headerTop {
+    background-color: #1e1e1e;
+  }
+  .headerTitle {
+    color: #f0f0f0;
+  }
+  .descriptionTitle {
+    color: #f0f0f0;
+  }
+  .description {
+    color: #bbb;
+  }
+  .progressLabel {
+    color: #ccc;
+  }
+  .progressBar {
+    background-color: #333;
+  }
+  .progressPercent {
+    color: #999;
+  }
+  .moduloCard {
+    background-color: #1e1e1e;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  }
+  .moduloHeader {
+    background-color: #252525;
+  }
+  .moduloHeader:hover {
+    background-color: #2a2a2a;
+  }
+  .moduloTitle {
+    color: #f0f0f0;
+  }
+  .moduloInfo {
+    color: #888;
+  }
+  .progressPercentSmall {
+    color: #ccc;
+  }
+  .progressBarSmall {
+    background-color: #333;
+  }
+  .expandIcon {
+    color: #999;
+  }
+  .leccionesList {
+    background-color: #1a1a1a;
+    border-top-color: #333;
+  }
+  .leccionItem {
+    background-color: #252525;
+    border-left-color: #C0281B;
+  }
+  .leccionItem:hover {
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  }
+  .leccionTitle {
+    color: #e0e0e0;
+  }
+  .leccionDuration {
+    color: #888;
+  }
+  .btnReproducir {
+    background-color: #2a2a2a;
+    color: #e0e0e0;
+  }
+  .btnReproducir:hover {
+    background-color: #333;
+  }
+  .btnDisabled {
+    background-color: #1a1a1a;
+    color: #666;
+  }
+  .hint {
+    color: #888;
+  }
+  .noLecciones,
+  .noModulos {
+    color: #777;
+  }
+  .loading {
+    color: #999;
+  }
+  .errorBox {
+    background-color: #1e1e1e;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+  .imagePlaceholder {
+    background-color: #C0281B;
+  }
+}

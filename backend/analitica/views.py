@@ -16,7 +16,7 @@ from calendar import monthrange
 
 from usuarios.models import Colaboradores
 
-from usuarios.permissions import IsSuperAdmin, IsAdminUser, IsUsuarioEspecial
+from usuarios.permissions import IsSuperAdmin, IsAdminUser, IsUsuarioEspecial, IsSuperUserOrAdmin
 
 from .models import Epresa, Unidadnegocio, Proyecto, Centroop
 from .serializers import (
@@ -26,6 +26,7 @@ from .serializers import (
 	CentroOpSerializer,
 	CentroOpSimpleSerializer,
 	CargarEstructuraSerializer,
+	JefesProyectoSerializer,
 )
 from rest_framework.permissions import IsAuthenticated
 from capacitaciones.models import progresoCapacitaciones
@@ -75,13 +76,15 @@ class ProgresoEmpresarialView(APIView):
                         }
 
                     # Obtener centros del proyecto con promedio anotado
+                    # IMPORTANTE: Filtrar solo colaboradores ACTIVOS (estadocolaborador=1)
                     centros = Centroop.objects.filter(id_proyecto=proyecto).annotate(
                         promedio_progreso=Avg(
                             'colaboradores__progresocapacitaciones__progreso',
                             filter=(
                                 Q(colaboradores__progresocapacitaciones__capacitacion__fecha_inicio__lte=fin_mes) &
                                 Q(colaboradores__progresocapacitaciones__capacitacion__fecha_fin__gte=inicio_mes) &
-                                ~Q(colaboradores__progresocapacitaciones__capacitacion__estado__in=[0, 3])
+                                ~Q(colaboradores__progresocapacitaciones__capacitacion__estado__in=[0, 3]) &
+                                Q(colaboradores__estadocolaborador=1)  # FILTRO: Solo colaboradores activos
                             )
                         )
                     )
@@ -232,7 +235,7 @@ class VerEmpresaView(APIView):
 
 
 class ListaEmpresasView(APIView):
-    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
+    permission_classes = [IsAuthenticated, IsSuperUserOrAdmin | IsUsuarioEspecial]
 
     def get(self, request):
         empresas = Epresa.objects.filter(estadoempresa=1)
@@ -290,7 +293,7 @@ class VerUnidadNegocioView(APIView):
 
 
 class ListaUnidadesNegocioView(APIView):
-    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial, IsAdminUser]
 
     def get(self, request):
         unidades = Unidadnegocio.objects.select_related('id_empresa').all()
@@ -369,7 +372,108 @@ class ListaProyectosView(APIView):
         return Response({"proyectos": serializer.data})
 
 
+class JefesProyectoView(APIView):
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
 
+    def get(self, request, proyecto_id):
+        """Obtener el jefe de un proyecto"""
+        try:
+            proyecto = Proyecto.objects.filter(idproyecto=proyecto_id).first()
+            if not proyecto:
+                return Response({"error": "Proyecto no encontrado"}, status=status.HTTP_404_NOT_FOUND)
+            
+            if proyecto.idcolaborador:
+                colaborador = proyecto.idcolaborador
+                return Response({
+                    "jefe_proyecto": {
+                        "idcolaborador": colaborador.idcolaborador,
+                        "nombre": colaborador.nombrecolaborador,
+                        "apellido": colaborador.apellidocolaborador,
+                        "cedula": colaborador.cccolaborador,
+                        "correo": colaborador.correocolaborador
+                    }
+                })
+            
+            return Response({"jefe_proyecto": None})
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def post(self, request, proyecto_id):
+        """Asignar un jefe al proyecto"""
+        try:
+            proyecto = Proyecto.objects.filter(idproyecto=proyecto_id).first()
+            if not proyecto:
+                return Response({"error": "Proyecto no encontrado"}, status=status.HTTP_404_NOT_FOUND)
+            
+            colaborador_id = request.data.get('idcolaborador')
+            if not colaborador_id:
+                return Response({"error": "Debe especificar un colaborador"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            colaborador = Colaboradores.objects.filter(idcolaborador=colaborador_id).first()
+            if not colaborador:
+                return Response({"error": "Colaborador no encontrado"}, status=status.HTTP_404_NOT_FOUND)
+            
+            proyecto.idcolaborador = colaborador
+            proyecto.save()
+            
+            return Response({
+                "message": "Jefe de proyecto asignado correctamente",
+                "jefe_proyecto": {
+                    "idcolaborador": colaborador.idcolaborador,
+                    "nombre": colaborador.nombrecolaborador,
+                    "apellido": colaborador.apellidocolaborador,
+                    "cedula": colaborador.cccolaborador,
+                    "correo": colaborador.correocolaborador
+                }
+            }, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def put(self, request, proyecto_id):
+        """Actualizar el jefe del proyecto"""
+        try:
+            proyecto = Proyecto.objects.filter(idproyecto=proyecto_id).first()
+            if not proyecto:
+                return Response({"error": "Proyecto no encontrado"}, status=status.HTTP_404_NOT_FOUND)
+            
+            colaborador_id = request.data.get('idcolaborador')
+            if not colaborador_id:
+                return Response({"error": "Debe especificar un colaborador"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            colaborador = Colaboradores.objects.filter(idcolaborador=colaborador_id).first()
+            if not colaborador:
+                return Response({"error": "Colaborador no encontrado"}, status=status.HTTP_404_NOT_FOUND)
+            
+            proyecto.idcolaborador = colaborador
+            proyecto.save()
+            
+            return Response({
+                "message": "Jefe de proyecto actualizado correctamente",
+                "jefe_proyecto": {
+                    "idcolaborador": colaborador.idcolaborador,
+                    "nombre": colaborador.nombrecolaborador,
+                    "apellido": colaborador.apellidocolaborador,
+                    "cedula": colaborador.cccolaborador,
+                    "correo": colaborador.correocolaborador
+                }
+            })
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def delete(self, request, proyecto_id):
+        """Remover el jefe del proyecto"""
+        try:
+            proyecto = Proyecto.objects.filter(idproyecto=proyecto_id).first()
+            if not proyecto:
+                return Response({"error": "Proyecto no encontrado"}, status=status.HTTP_404_NOT_FOUND)
+            
+            proyecto.idcolaborador = None
+            proyecto.save()
+            
+            return Response({"message": "Jefe del proyecto removido correctamente"})
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
 # ============================
 # CENTRO OPERATIVO
 # ============================

@@ -24,7 +24,7 @@ export default function EditarUsuario() {
       setLoading(true);
       try {
         if (!id) throw new Error("ID de usuario no válido.");
-        const userData = await Perfil.GetEditarPerfil(id, {});
+        const userData = await Perfil.GetEditarPerfil(Number(id), {});
         setForm(userData);
         const { cargos, niveles, regionales } = await Perfil.getCargoRegionesNiveles();
         // Adaptar estructura a {id, nombre}
@@ -86,7 +86,7 @@ export default function EditarUsuario() {
         setSaving(false);
         return;
       }
-      await Perfil.PutEditarPerfil(id, form);
+      await Perfil.PutEditarPerfil(Number(id), form);
       navigate("/usuarios");
     } catch (e: any) {
       setError("Error al guardar cambios: " + (e?.message || e));

@@ -213,6 +213,54 @@ const deleteRegional = async (id) => {
   return response.data;
 };
 
+// GET: obtener jefe de proyecto
+const getJefeProyecto = async (proyectoId) => {
+  try {
+    const response = await api.get(`analitica/jefes-proyecto/${proyectoId}/`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching jefe proyecto:', error);
+    throw error;
+  }
+};
+
+// POST: asignar jefe a proyecto
+const assignJefeProyecto = async (proyectoId, colaboradorId) => {
+  try {
+    const response = await api.post(`analitica/jefes-proyecto/${proyectoId}/`, {
+      idcolaborador: colaboradorId
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error assigning jefe proyecto:', error);
+    throw error;
+  }
+};
+
+// PUT: actualizar jefe de proyecto
+const updateJefeProyecto = async (proyectoId, colaboradorId) => {
+  try {
+    const response = await api.put(`analitica/jefes-proyecto/${proyectoId}/`, {
+      idcolaborador: colaboradorId
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating jefe proyecto:', error);
+    throw error;
+  }
+};
+
+// DELETE: remover jefe de proyecto
+const removeJefeProyecto = async (proyectoId) => {
+  try {
+    const response = await api.delete(`analitica/jefes-proyecto/${proyectoId}/`);
+    return response.data;
+  } catch (error) {
+    console.error('Error removing jefe proyecto:', error);
+    throw error;
+  }
+};
+
 
 const analiticaService = {
   getProgreso,
@@ -240,6 +288,10 @@ const analiticaService = {
   createRegional,
   updateRegional,
   deleteRegional,
+  getJefeProyecto,
+  assignJefeProyecto,
+  updateJefeProyecto,
+  removeJefeProyecto,
 };
 
 export default analiticaService;

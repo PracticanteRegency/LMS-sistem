@@ -102,6 +102,7 @@
 .select {
   padding: 10px 12px;
   border: 1px solid #d1d5db;
+  background-color: whitesmoke;
   border-radius: 8px;
   outline: none;
   font-size: 14px;
@@ -109,6 +110,7 @@
   box-sizing: border-box;
   transition: all 0.2s;
   font-family: inherit;
+  color: black;
 }
 
 @media (min-width: 768px) {
@@ -121,8 +123,8 @@
 
 .input:focus,
 .select:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: #C0281B;
+  box-shadow: 0 0 0 3px rgba(192, 40, 27, 0.1);
 }
 
 .select {
@@ -134,12 +136,13 @@
   background-position: right 10px center;
   background-size: 20px;
   padding-right: 36px;
+  background-color: whitesmoke;
 }
 
 .button {
   margin-top: 12px;
   padding: 11px 16px;
-  background: #2563eb;
+  background: #C0281B;
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -159,9 +162,9 @@
 }
 
 .button:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: #A52A1B;
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 4px 12px rgba(192, 40, 27, 0.3);
 }
 
 .button:disabled {
@@ -302,18 +305,18 @@
 }
 
 .typeButton:hover {
-  border-color: #2563eb;
-  background: #eff6ff;
+  border-color: #C0281B;
+  background: #FCE4E0;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 4px 12px rgba(192, 40, 27, 0.1);
 }
 
 .typeButton.active {
-  border-color: #2563eb;
-  background: #2563eb;
+  border-color: #C0281B;
+  background: #C0281B;
   color: #fff;
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 4px 12px rgba(192, 40, 27, 0.3);
 }
 
 .selectedList {
@@ -439,6 +442,7 @@
   width: 100%;
   padding: 11px 12px;
   border: 1px solid #d1d5db;
+  background-color: whitesmoke;
   border-radius: 6px;
   margin-bottom: 14px;
   font-size: 14px;
@@ -458,8 +462,8 @@
 }
 
 .searchInput:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: #C0281B;
+  box-shadow: 0 0 0 3px rgba(192, 40, 27, 0.1);
 }
 
 .searchInput::placeholder {
@@ -519,9 +523,9 @@
 }
 
 .addButton:hover {
-  background: #eff6ff;
-  border-color: #2563eb;
-  color: #2563eb;
+  background: #FCE4E0;
+  border-color: #C0281B;
+  color: #C0281B;
   transform: translateX(2px);
 }
 
@@ -610,21 +614,21 @@
 }
 
 .selectedButton {
-  background: #dbeafe !important;
-  border-color: #2563eb !important;
-  color: #2563eb !important;
+  background: #FCE4E0 !important;
+  border-color: #C0281B !important;
+  color: #C0281B !important;
   font-weight: 600;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 2px rgba(192, 40, 27, 0.1);
 }
 
 .selectedButton:hover {
-  background: #bfdbfe !important;
+  background: #F5D5CE !important;
 }
 
 .selectedInfo {
   padding: 12px 14px;
-  background: #eff6ff;
-  border-left: 4px solid #2563eb;
+  background: #FCE4E0;
+  border-left: 4px solid #C0281B;
   color: #111827;
   margin: 0;
   font-weight: 500;
@@ -707,6 +711,126 @@ select {
   color: #ffffff;
 }
 
+/* Estilos para Jefes de Proyecto */
+.formSection {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.formSection h3 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  color: #1f2937;
+  font-size: 18px;
+}
+
+.buttonActive {
+  background-color: #C0281B;
+  border-color: #C0281B;
+}
+
+.buttonActive:hover {
+  background-color: #C0281B;
+}
+
+.buttonDanger {
+  background-color: #ef4444 !important;
+  border-color: #ef4444 !important;
+}
+
+.buttonDanger:hover {
+  background-color: #dc2626 !important;
+}
+
+.jefInfo {
+  background: #ecfdf5;
+  border: 1px solid #86efac;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 10px;
+}
+
+.jefInfo p {
+  margin: 6px 0;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.noJefe {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.projectsContainer {
+  display: grid;
+  gap: 16px;
+}
+
+.projectCard {
+  background: #f3f4f6;
+  border-left: 4px solid #C0281B;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 8px;
+}
+
+.projectHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.projectHeader h4 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 16px;
+}
+
+.empresa {
+  background: #FCE4E0;
+  color: #8B1F14;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.projectBody {
+  padding: 8px 0;
+}
+
+.buttonSmall {
+  background-color: #ef4444;
+  border-color: #ef4444;
+  color: #ffffff;
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid #ef4444;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.buttonSmall:hover {
+  background-color: #dc2626;
+  border-color: #dc2626;
+}
+
+.buttonSmall:disabled {
+  background-color: #d1d5db;
+  border-color: #d1d5db;
+  cursor: not-allowed;
+}
+
+.selectedButton {
+  background-color: #d1fae5 !important;
+  border-color: #10b981 !important;
+  color: #047857 !important;
+}
+
 /* Media queries adicionales para mejor distribución en tablets */
 @media (min-width: 768px) and (max-width: 1023px) {
   .row {
@@ -733,4 +857,177 @@ select {
 
 :-ms-input-placeholder {
   color: #9ca3af;
+}
+
+/* ===== DARK MODE ===== */
+@media (prefers-color-scheme: dark) {
+  .container {
+    color: #e0e0e0;
+  }
+  .card {
+    background: #1e1e1e;
+    border-color: #333;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+  .card h3 {
+    color: #f0f0f0;
+  }
+  .title {
+    color: #f0f0f0;
+  }
+  .subtitle {
+    color: #999;
+  }
+  .input,
+  .select {
+    background-color: #2a2a2a;
+    border-color: #444;
+    color: #e0e0e0;
+  }
+  .input:focus,
+  .select:focus {
+    border-color: #C0281B;
+    box-shadow: 0 0 0 3px rgba(192, 40, 27, 0.15);
+  }
+  .info {
+    color: #FCE4E0;
+    background: #1a1a1a;
+    border-left-color: #A52A1B;
+  }
+  .error {
+    color: #f99;
+    background: #2a1515;
+    border-left-color: #e55;
+  }
+  .success {
+    color: #6fc76f;
+    background: #1a2e1a;
+    border-left-color: #4caf50;
+  }
+  .hint {
+    color: #888;
+  }
+  .hintDanger {
+    color: #f88;
+  }
+  .typeButton {
+    background: #1e1e1e;
+    border-color: #444;
+    color: #e0e0e0;
+  }
+  .typeButton:hover {
+    border-color: #C0281B;
+    background: #1a1a1a;
+  }
+  .typeButton.active {
+    background: #C0281B;
+    border-color: #C0281B;
+    color: #fff;
+  }
+  .selectedList {
+    background: #1a1a1a;
+    border-color: #333;
+  }
+  .selectedList label {
+    color: #ccc;
+  }
+  .selectedItem {
+    background: #252525;
+    border-color: #333;
+  }
+  .selectedItem span {
+    color: #e0e0e0;
+  }
+  .searchPanel {
+    background: #1a1a1a;
+    border-color: #333;
+  }
+  .searchHeader h4 {
+    color: #f0f0f0;
+  }
+  .smallNote {
+    color: #888;
+  }
+  .searchInput {
+    background-color: #2a2a2a;
+    border-color: #444;
+    color: #e0e0e0;
+  }
+  .searchInput:focus {
+    border-color: #C0281B;
+    box-shadow: 0 0 0 3px rgba(192, 40, 27, 0.15);
+  }
+  .addButton {
+    background: #252525;
+    border-color: #444;
+    color: #e0e0e0;
+  }
+  .addButton:hover {
+    background: #1a1a1a;
+    border-color: #C0281B;
+    color: #FCE4E0;
+  }
+  .examenList li {
+    border-bottom-color: #333;
+  }
+  .selectedButton {
+    background: #1a1a1a !important;
+    border-color: #C0281B !important;
+    color: #FCE4E0 !important;
+  }
+  .selectedInfo {
+    background: #1a1a1a;
+    border-left-color: #C0281B;
+    color: #e0e0e0;
+  }
+  .previewSection {
+    border-top-color: #333;
+  }
+  .previewSection h4 {
+    color: #f0f0f0;
+  }
+  label {
+    color: #ccc;
+  }
+  h3 {
+    color: #f0f0f0;
+  }
+  h4 {
+    color: #f0f0f0;
+  }
+  select {
+    color: #e0e0e0;
+  }
+  select option {
+    color: #e0e0e0;
+    background: #2a2a2a;
+  }
+  .formSection {
+    background: #1a1a1a;
+    border-color: #333;
+  }
+  .formSection h3 {
+    color: #f0f0f0;
+  }
+  .jefInfo {
+    background: #1a2e1a;
+    border-color: #6B1810;
+  }
+  .jefInfo p {
+    color: #ccc;
+  }
+  .noJefe {
+    color: #777;
+  }
+  .projectCard {
+    background: #252525;
+    border-left-color: #C0281B;
+  }
+  .projectHeader h4 {
+    color: #f0f0f0;
+  }
+  .empresa {
+    background: #1a1a1a;
+    color: #FCE4E0;
+  }
 }

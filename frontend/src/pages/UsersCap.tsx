@@ -29,7 +29,7 @@ export default function UsersCap() {
 
   useEffect(() => {
     fetchUsers();
-  }, [id, page]);
+  }, [id]);
 
   useEffect(() => {
     let result = [...users];
@@ -143,7 +143,8 @@ export default function UsersCap() {
               {filteredUsers.length} resultados
             </span>
           </div>
-          <div className={styles.tableWrapper}>
+          <div style={{ position: 'relative' }}>
+            <div className={styles.tableWrapper}>
             <table className={styles.table}>
               <thead className={styles.thead}>
                 <tr>
@@ -183,7 +184,7 @@ export default function UsersCap() {
               </tbody>
             </table>
           </div>
-          <div className={styles.pagination}>
+          <div className={styles.pagination + ' ' + styles.paginationFixed}>
             <button className={styles.pageBtn} disabled={page === 1} onClick={() => setPage(page - 1)}>
               ← Anterior
             </button>
@@ -193,6 +194,7 @@ export default function UsersCap() {
             <button className={styles.pageBtn} disabled={page >= Math.ceil(filteredUsers.length / pageSize)} onClick={() => setPage(page + 1)}>
               Siguiente →
             </button>
+          </div>
           </div>
         </>
       )}

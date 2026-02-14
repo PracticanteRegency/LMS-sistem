@@ -56,9 +56,9 @@
 }
 
 .tabButton.active {
-  border: 2px solid #3b82f6;
-  background-color: #eff6ff;
-  color: #1e40af;
+  border: 2px solid #C0281B;
+  background-color: #FCE4E0;
+  color: #8B1F14;
   font-weight: 600;
 }
 
@@ -159,8 +159,8 @@
 .field input:focus,
 .field select:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #C0281B;
+  box-shadow: 0 0 0 3px rgba(192, 40, 27, 0.1);
 }
 
 .field input::placeholder {
@@ -200,12 +200,12 @@
 }
 
 .buttonSecondary {
-  background-color: #3b82f6;
+  background-color: #C0281B;
   color: white;
 }
 
 .buttonSecondary:hover:not(:disabled) {
-  background-color: #2563eb;
+  background-color: #C0281B;
 }
 
 .buttonSecondary:disabled {
@@ -279,8 +279,8 @@
 
 .searchInput:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #C0281B;
+  box-shadow: 0 0 0 3px rgba(192, 40, 27, 0.1);
 }
 
 .listItem {
@@ -312,4 +312,98 @@
   align-items: center;
   padding: 40px;
   color: #6b7280;
+}
+
+/* ===== DARK MODE ===== */
+@media (prefers-color-scheme: dark) {
+  .container {
+    color: #e0e0e0;
+  }
+  .headerSection h1 {
+    color: #f0f0f0;
+  }
+  .tabButton {
+    background-color: #1e1e1e;
+    border-color: #444;
+    color: #bbb;
+  }
+  .tabButton:hover {
+    border-color: #666;
+  }
+  .tabButton.active {
+    background-color: #1a1a1a;
+    border-color: #C0281B;
+    color: #FCE4E0;
+  }
+  .alertError {
+    background-color: #2a1515;
+    color: #f99;
+    border-left-color: #e55;
+  }
+  .alertSuccess {
+    background-color: #1a2e1a;
+    color: #6fc76f;
+    border-left-color: #4caf50;
+  }
+  .card {
+    background: #1e1e1e;
+    border-color: #333;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+  .card h2 {
+    color: #f0f0f0;
+  }
+  .field label {
+    color: #ccc;
+  }
+  .field input,
+  .field select {
+    background: #2a2a2a;
+    border-color: #444;
+    color: #e0e0e0;
+  }
+  .field input:focus,
+  .field select:focus {
+    border-color: #C0281B;
+    box-shadow: 0 0 0 3px rgba(192, 40, 27, 0.15);
+  }
+  .field input::placeholder {
+    color: #666;
+  }
+  .searchInput {
+    background: #2a2a2a;
+    border-color: #444;
+    color: #e0e0e0;
+  }
+  .searchInput:focus {
+    border-color: #C0281B;
+    box-shadow: 0 0 0 3px rgba(192, 40, 27, 0.15);
+  }
+  .listItem {
+    background-color: #252525;
+    border-color: #333;
+    color: #e0e0e0;
+  }
+  .listItemText {
+    color: #ccc;
+  }
+  .emptyState {
+    color: #777;
+  }
+  .loadingState {
+    color: #888;
+  }
+  .scrollableListContainer {
+    background-color: #1a1a1a;
+    border-color: #333;
+  }
+  .scrollableListContainer::-webkit-scrollbar-track {
+    background: #1a1a1a;
+  }
+  .scrollableListContainer::-webkit-scrollbar-thumb {
+    background: #444;
+  }
+  .scrollableListContainer::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
 }

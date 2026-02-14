@@ -136,6 +136,9 @@ interface ExamenesService {
   crearExamen(payload: any): Promise<any>;
   FiltrarExamenesPorColaborador(colaboradorId?: number | string, page?: number, pageSize?: number): Promise<any>;
   FiltrarExamenesPorUUID(uuid: string): Promise<any>;
+  ObtenerExamenesCargo(empresaId: number, cargoId?: number, tipo?: string): Promise<any>;
+  AgregarExamenesCargo(payload: { empresa_id: number; cargo_id: number; tipo: string; examenes_ids: number[] }): Promise<any>;
+  EliminarExamenesCargo(payload: { empresa_id: number; cargo_id: number; tipo: string; examenes_ids: number[] }): Promise<any>;
 }
 
 declare const ExamenesService: ExamenesService;

@@ -203,6 +203,17 @@
   flex-shrink: 0;
   padding: 0;
   margin-top: 4px;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.selector:hover {
+  transform: scale(1.15);
+  border-color: #C0281B;
+  background-color: #A52A1B;
+}
+
+.selector:active {
+  transform: scale(0.95);
 }
 
 /* Selector circular para opción única */
@@ -268,8 +279,21 @@
   padding: 8px 14px;
   background-color: #333;
   color: #fff;
-  border: 1px solid #444;
+  border: 2px solid #C0281B;
   border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btnCancel:hover {
+  background-color: #C0281B;
+  color: white;
+  transform: translateY(-2px);
+}
+
+.btnCancel:active {
+  transform: translateY(0);
 }
 
 .btnSubmit {
@@ -278,6 +302,24 @@
   color: white;
   border: none;
   border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.btnSubmit:hover {
+  background-color: #A52A1B;
+  transform: translateY(-2px);
+}
+
+.btnSubmit:active {
+  transform: translateY(0);
+}
+
+.btnSubmit:disabled {
+  background-color: #6B1810;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .loading {
@@ -285,4 +327,61 @@
   color: #a0a0a0;
   padding: 40px 20px;
   font-size: 16px;
+}
+
+/* ===== DARK MODE ===== */
+@media (prefers-color-scheme: dark) {
+  .container {
+    background-color: #121212;
+    color: #e0e0e0;
+  }
+  .header {
+    border-bottom-color: #333;
+  }
+  .headerTitle {
+    color: #f0f0f0;
+  }
+  .description {
+    color: #999;
+  }
+  .formularioContainer {
+    background-color: #1e1e1e;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.8);
+  }
+  .preguntaCard {
+    background-color: #252525;
+  }
+  .questionLabel {
+    color: #bbb;
+  }
+  .questionBox {
+    background: #2a2a2a;
+    color: #e0e0e0;
+  }
+  .respuestaCard {
+    background: #1a1a1a;
+  }
+  .answerLabel {
+    color: #bbb;
+  }
+  .answerField {
+    background: #2a2a2a;
+    color: #e0e0e0;
+  }
+  .selector {
+    background-color: #555;
+    border-color: #666;
+  }
+  .selected {
+    background: #C0281B;
+    border-color: #C0281B;
+  }
+  .formActions {
+    background: rgba(30, 30, 30, 0.96);
+  }
+  .btnCancel {
+    background-color: #2a2a2a;
+    border-color: #444;
+    color: #e0e0e0;
+  }
 }

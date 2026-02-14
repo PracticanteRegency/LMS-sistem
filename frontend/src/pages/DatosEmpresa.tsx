@@ -3,12 +3,19 @@ import { Navigate } from "react-router-dom";
 import styles from "./Styles/DatosEmpresa.module.css";
 import analiticaService from "../services/analitica.js";
 import { getUser, getUserRole } from "../services/auth";
+import Perfil from "../services/perfil";
 
 type Proyecto = {
 	idproyecto: number;
 	nombreproyecto: string;
 	estadoproyecto?: number;
 	centros?: Centro[];
+	idcolaborador?: any;
+	jefe_proyecto?: {
+		nombre: string;
+		apellido: string;
+		correo: string;
+	};
 };
 
 type Centro = {
@@ -96,6 +103,14 @@ export default function DatosEmpresa() {
 	const [editEmpresaSearch, setEditEmpresaSearch] = useState("");
 	const [editUnidadSearch, setEditUnidadSearch] = useState("");
 	const [editProyectoSearch, setEditProyectoSearch] = useState("");
+
+	// Jefes de Proyecto
+	const [jefeProyectoMode, setJefeProyectoMode] = useState<"" | "add" | "edit" | "view">("");
+	const [jefeProyectoSeleccionado, setJefeProyectoSeleccionado] = useState<number | "">("");
+	const [jefeProyectoCedula, setJefeProyectoCedula] = useState("");
+	const [jefeProyectoSearchResults, setJefeProyectoSearchResults] = useState<any[]>([]);
+	const [jefeProyectoActual, setJefeProyectoActual] = useState<any>(null);
+	const [jefeProyectoColaboradorSeleccionado, setJefeProyectoColaboradorSeleccionado] = useState<any>(null);
 
 	const effectiveRole = useMemo(() => {
 		const localRole = getUserRole();
@@ -351,6 +366,112 @@ export default function DatosEmpresa() {
 		const empresa = empresasData.find((e) => e.idempresa === empresaId);
 		const unidad = empresa?.unidades?.find((u) => u.idunidad === unidadId);
 		return unidad?.proyectos?.find((p) => p.idproyecto === proyectoId)?.nombreproyecto || "";
+	};
+
+	// Funciones para Jefes de Proyecto
+	const handleBuscarColaboradorJefe = async (cedula: string) => {
+		if (!cedula.trim()) {
+			setJefeProyectoSearchResults([]);
+			return;
+		}
+		try {
+			const results = await Perfil.getFiltrarUsuarios(cedula, 1, 10);
+			const usuarios = Array.isArray(results) ? results : results?.results || [];
+			setJefeProyectoSearchResults(usuarios);
+		} catch (error) {
+			console.error("Error buscando colaborador:", error);
+			setError("Error al buscar colaborador.");
+		}
+	};
+
+	const handleSeleccionarColaboradorJefe = (colaborador: any) => {
+		setJefeProyectoColaboradorSeleccionado(colaborador);
+		setJefeProyectoCedula("");
+		setJefeProyectoSearchResults([]);
+	};
+
+	const handleAgregarJefe = async () => {
+		clearMessages();
+		if (!jefeProyectoSeleccionado) {
+			setError("Debes seleccionar un proyecto.");
+			return;
+		}
+		if (!jefeProyectoColaboradorSeleccionado) {
+			setError("Debes seleccionar un colaborador.");
+			return;
+		}
+
+		setSaving(true);
+		try {
+			await analiticaService.assignJefeProyecto(
+				jefeProyectoSeleccionado as number,
+				jefeProyectoColaboradorSeleccionado.id_colaborador
+			);
+			setSuccess("Jefe de proyecto asignado correctamente.");
+			setJefeProyectoMode("");
+			setJefeProyectoSeleccionado("");
+			setJefeProyectoColaboradorSeleccionado(null);
+			await loadAll();
+		} catch (error: any) {
+			setError(error?.response?.data?.error || "Error al asignar jefe de proyecto.");
+		} finally {
+			setSaving(false);
+		}
+	};
+
+	const handleActualizarJefe = async () => {
+		clearMessages();
+		if (!jefeProyectoSeleccionado) {
+			setError("Debes seleccionar un proyecto.");
+			return;
+		}
+		if (!jefeProyectoColaboradorSeleccionado) {
+			setError("Debes seleccionar un colaborador.");
+			return;
+		}
+
+		setSaving(true);
+		try {
+			await analiticaService.updateJefeProyecto(
+				jefeProyectoSeleccionado as number,
+				jefeProyectoColaboradorSeleccionado.id_colaborador
+			);
+			setSuccess("Jefe de proyecto actualizado correctamente.");
+			setJefeProyectoMode("");
+			setJefeProyectoSeleccionado("");
+			setJefeProyectoColaboradorSeleccionado(null);
+			await loadAll();
+		} catch (error: any) {
+			setError(error?.response?.data?.error || "Error al actualizar jefe de proyecto.");
+		} finally {
+			setSaving(false);
+		}
+	};
+
+	const handleEliminarJefe = async (proyectoId: number) => {
+		if (!confirm("¿Estás seguro de que deseas remover el jefe de este proyecto?")) {
+			return;
+		}
+
+		setSaving(true);
+		try {
+			await analiticaService.removeJefeProyecto(proyectoId);
+			setSuccess("Jefe del proyecto removido correctamente.");
+			await loadAll();
+		} catch (error: any) {
+			setError(error?.response?.data?.error || "Error al remover jefe de proyecto.");
+		} finally {
+			setSaving(false);
+		}
+	};
+
+	const resetJefeProyectoForm = () => {
+		setJefeProyectoMode("");
+		setJefeProyectoSeleccionado("");
+		setJefeProyectoCedula("");
+		setJefeProyectoSearchResults([]);
+		setJefeProyectoActual(null);
+		setJefeProyectoColaboradorSeleccionado(null);
 	};
 
 	if (!canAccess) {
@@ -1132,6 +1253,330 @@ export default function DatosEmpresa() {
 					Guardar cambios
 				</button>
 			</form>
-		</div>
+
+		{/* ============================
+			 JEFES DE PROYECTO
+		     ============================ */}
+		<div className={styles.card}>
+			<h2 className={styles.title}>Gestión de Jefes de Proyecto</h2>
+			
+			{/* Panel de selección de modo */}
+			<div className={styles.row} style={{ marginBottom: "20px" }}>
+				<button
+					type="button"
+					className={`${styles.button} ${jefeProyectoMode === "add" ? styles.buttonActive : ""}`}
+					onClick={() => {
+						resetJefeProyectoForm();
+						setJefeProyectoMode("add");
+					}}
+				>
+					➕ Agregar Jefe
+				</button>
+				<button
+					type="button"
+					className={`${styles.button} ${jefeProyectoMode === "edit" ? styles.buttonActive : ""}`}
+					onClick={() => {
+						resetJefeProyectoForm();
+						setJefeProyectoMode("edit");
+					}}
+				>
+					✏️ Editar Jefe
+				</button>
+			</div>
+
+			{/* Formulario para Agregar Jefe */}
+			{jefeProyectoMode === "add" && (
+				<div className={styles.formSection}>
+					<h3>Agregar Jefe a Proyecto</h3>
+					
+					<div className={styles.field}>
+						<label>Seleccionar Proyecto</label>
+						<select
+							className={styles.select}
+							value={jefeProyectoSeleccionado}
+							onChange={(e) => {
+								setJefeProyectoSeleccionado(Number(e.target.value) || "");
+								setJefeProyectoColaboradorSeleccionado(null);
+							}}
+						>
+							<option value="">Seleccione un proyecto</option>
+							{empresasData.flatMap((emp) =>
+								emp.unidades?.flatMap((unidad) =>
+									unidad.proyectos?.map((proyecto) => (
+										<option key={proyecto.idproyecto} value={proyecto.idproyecto}>
+											{emp.nombre_empresa} → {unidad.nombreunidad} → {proyecto.nombreproyecto}
+										</option>
+									))
+								)
+							)}
+						</select>
+					</div>
+
+					<div className={styles.field}>
+						<label>Buscar Colaborador por Cédula</label>
+						<div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
+							<input
+								type="text"
+								className={styles.input}
+								placeholder="Ingresa la cédula del colaborador"
+								value={jefeProyectoCedula}
+								onChange={(e) => {
+									setJefeProyectoCedula(e.target.value);
+									handleBuscarColaboradorJefe(e.target.value);
+								}}
+							/>
+						</div>
+
+						{/* Resultados de búsqueda */}
+						{jefeProyectoSearchResults.length > 0 && (
+							<div className={styles.searchResults}>
+								{jefeProyectoSearchResults.map((usuario) => (
+									<button
+										key={usuario.id_colaborador}
+										type="button"
+										className={`${styles.addButton} ${
+											jefeProyectoColaboradorSeleccionado?.id_colaborador === usuario.id_colaborador
+												? styles.selectedButton
+												: ""
+										}`}
+										onClick={() => handleSeleccionarColaboradorJefe(usuario)}
+									>
+										{jefeProyectoColaboradorSeleccionado?.id_colaborador === usuario.id_colaborador
+											? "✓ "
+											: ""}
+										{usuario.cc_colaborador} - {usuario.nombre_colaborador} {usuario.apellido_colaborador}
+									</button>
+								))}
+							</div>
+						)}
+
+						{/* Colaborador seleccionado */}
+						{jefeProyectoColaboradorSeleccionado && (
+							<div className={styles.previewSection}>
+								<h4>Colaborador seleccionado</h4>
+								<ul className={styles.examenList}>
+									<li>
+										<strong>Cédula:</strong> {jefeProyectoColaboradorSeleccionado.cc_colaborador}
+									</li>
+									<li>
+										<strong>Nombre:</strong> {jefeProyectoColaboradorSeleccionado.nombre_colaborador}{" "}
+										{jefeProyectoColaboradorSeleccionado.apellido_colaborador}
+									</li>
+									<li>
+										<strong>Correo:</strong> {jefeProyectoColaboradorSeleccionado.correo_colaborador}
+									</li>
+									<li>
+										<strong>Cargo:</strong> {jefeProyectoColaboradorSeleccionado.nombrecargo || "N/A"}
+									</li>
+								</ul>
+							</div>
+						)}
+					</div>
+
+					<div style={{ display: "flex", gap: "10px", marginTop: "15px" }}>
+						<button
+							className={styles.button}
+							type="button"
+							onClick={handleAgregarJefe}
+							disabled={!jefeProyectoSeleccionado || !jefeProyectoColaboradorSeleccionado || saving}
+						>
+							Asignar Jefe
+						</button>
+						<button
+							className={`${styles.button} ${styles.buttonSecondary}`}
+							type="button"
+							onClick={resetJefeProyectoForm}
+						>
+							Cancelar
+						</button>
+					</div>
+				</div>
+			)}
+
+			{/* Formulario para Editar Jefe */}
+			{jefeProyectoMode === "edit" && (
+				<div className={styles.formSection}>
+					<h3>Editar Jefe de Proyecto</h3>
+					
+					<div className={styles.field}>
+						<label>Seleccionar Proyecto</label>
+						<select
+							className={styles.select}
+							value={jefeProyectoSeleccionado}
+							onChange={(e) => {
+								setJefeProyectoSeleccionado(Number(e.target.value) || "");
+								setJefeProyectoColaboradorSeleccionado(null);
+								setJefeProyectoActual(null);
+							}}
+						>
+							<option value="">Seleccione un proyecto</option>
+							{empresasData.flatMap((emp) =>
+								emp.unidades?.flatMap((unidad) =>
+									unidad.proyectos?.map((proyecto) => (
+										<option key={proyecto.idproyecto} value={proyecto.idproyecto}>
+											{emp.nombre_empresa} → {unidad.nombreunidad} → {proyecto.nombreproyecto}
+										</option>
+									))
+								)
+							)}
+						</select>
+					</div>
+
+					{jefeProyectoSeleccionado && jefeProyectoActual && (
+						<div className={styles.previewSection}>
+							<h4>Jefe actual</h4>
+							<ul className={styles.examenList}>
+								<li>
+									<strong>Cédula:</strong> {jefeProyectoActual.cedula}
+								</li>
+								<li>
+									<strong>Nombre:</strong> {jefeProyectoActual.nombre} {jefeProyectoActual.apellido}
+								</li>
+								<li>
+									<strong>Correo:</strong> {jefeProyectoActual.correo}
+								</li>
+							</ul>
+						</div>
+					)}
+
+					<div className={styles.field}>
+						<label>Buscar Nuevo Colaborador por Cédula</label>
+						<div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
+							<input
+								type="text"
+								className={styles.input}
+								placeholder="Ingresa la cédula del colaborador"
+								value={jefeProyectoCedula}
+								onChange={(e) => {
+									setJefeProyectoCedula(e.target.value);
+									handleBuscarColaboradorJefe(e.target.value);
+								}}
+							/>
+						</div>
+
+						{jefeProyectoSearchResults.length > 0 && (
+							<div className={styles.searchResults}>
+								{jefeProyectoSearchResults.map((usuario) => (
+									<button
+										key={usuario.id_colaborador}
+										type="button"
+										className={`${styles.addButton} ${
+											jefeProyectoColaboradorSeleccionado?.id_colaborador === usuario.id_colaborador
+												? styles.selectedButton
+												: ""
+										}`}
+										onClick={() => handleSeleccionarColaboradorJefe(usuario)}
+									>
+										{jefeProyectoColaboradorSeleccionado?.id_colaborador === usuario.id_colaborador
+											? "✓ "
+											: ""}
+										{usuario.cc_colaborador} - {usuario.nombre_colaborador} {usuario.apellido_colaborador}
+									</button>
+								))}
+							</div>
+						)}
+
+						{jefeProyectoColaboradorSeleccionado && (
+							<div className={styles.previewSection}>
+								<h4>Nuevo colaborador seleccionado</h4>
+								<ul className={styles.examenList}>
+									<li>
+										<strong>Cédula:</strong> {jefeProyectoColaboradorSeleccionado.cc_colaborador}
+									</li>
+									<li>
+										<strong>Nombre:</strong> {jefeProyectoColaboradorSeleccionado.nombre_colaborador}{" "}
+										{jefeProyectoColaboradorSeleccionado.apellido_colaborador}
+									</li>
+									<li>
+										<strong>Correo:</strong> {jefeProyectoColaboradorSeleccionado.correo_colaborador}
+									</li>
+								</ul>
+							</div>
+						)}
+					</div>
+
+					<div style={{ display: "flex", gap: "10px", marginTop: "15px" }}>
+						<button
+							className={styles.button}
+							type="button"
+							onClick={handleActualizarJefe}
+							disabled={!jefeProyectoSeleccionado || !jefeProyectoColaboradorSeleccionado || saving}
+						>
+							Actualizar Jefe
+						</button>
+						{jefeProyectoSeleccionado && (
+							<button
+								className={`${styles.button} ${styles.buttonDanger}`}
+								type="button"
+								onClick={() => {
+									if (jefeProyectoSeleccionado) {
+										handleEliminarJefe(jefeProyectoSeleccionado as number);
+										resetJefeProyectoForm();
+									}
+								}}
+								disabled={saving}
+							>
+								Remover Jefe
+							</button>
+						)}
+						<button
+							className={`${styles.button} ${styles.buttonSecondary}`}
+							type="button"
+							onClick={resetJefeProyectoForm}
+						>
+							Cancelar
+						</button>
+					</div>
+				</div>
+			)}
+
+			{/* Visualización de Jefes por Proyecto */}
+			<div style={{ marginTop: "30px" }}>
+				<h3>Jefes de Proyectos Actuales</h3>
+				<div className={styles.projectsContainer}>
+					{empresasData.map((empresa) => (
+						<div key={empresa.idempresa}>
+							{empresa.unidades?.map((unidad) => (
+								<div key={unidad.idunidad}>
+									{unidad.proyectos?.map((proyecto) => (
+										<div key={proyecto.idproyecto} className={styles.projectCard}>
+											<div className={styles.projectHeader}>
+												<h4>{proyecto.nombreproyecto}</h4>
+												<span className={styles.empresa}>
+													{empresa.nombre_empresa} / {unidad.nombreunidad}
+												</span>
+											</div>
+											<div className={styles.projectBody}>
+												{proyecto.jefe_proyecto ? (
+													<div className={styles.jefInfo}>
+														<p>
+															<strong>Jefe:</strong> {proyecto.jefe_proyecto?.nombre}{" "}
+															{proyecto.jefe_proyecto?.apellido}
+														</p>
+														<p>
+															<strong>Correo:</strong> {proyecto.jefe_proyecto?.correo}
+														</p>
+														<button
+															className={styles.buttonSmall}
+															onClick={() => handleEliminarJefe(proyecto.idproyecto)}
+														>
+															Remover
+														</button>
+													</div>
+												) : (
+													<p className={styles.noJefe}>
+														Sin jefe asignado
+													</p>
+												)}
+											</div>
+										</div>
+									))}
+								</div>
+							))}
+						</div>
+					))}
+				</div>
+			</div>
+		</div>	</div>
 	);
 }
