@@ -133,6 +133,26 @@ const FiltrarExamenesPorColaborador = async (colaboradorId, page = 1, pageSize =
   });
 };
 
+// GET: Obtener exámenes asignados a un cargo en una empresa
+const ObtenerExamenesCargo = async (empresaId, cargoId, tipo = '') => {
+  let url = `examenes/gestionar-examenes-cargo/?empresa_id=${empresaId}&cargo_id=${cargoId}`;
+  if (tipo) url += `&tipo=${tipo}`;
+  const response = await api.get(url);
+  return response.data;
+};
+
+// POST: Agregar exámenes a un cargo en una empresa
+const AgregarExamenesCargo = async (payload) => {
+  const response = await api.post("examenes/gestionar-examenes-cargo/", payload);
+  return response.data;
+};
+
+// DELETE: Eliminar exámenes de un cargo en una empresa
+const EliminarExamenesCargo = async (payload) => {
+  const response = await api.delete("examenes/gestionar-examenes-cargo/", { data: payload });
+  return response.data;
+};
+
 const FiltrarExamenesPorUUID = async (uuid) => {
   return dedupe(`examenes:FiltrarExamenesPorUUID:${uuid}`, uuid, async () => {
     try {
@@ -162,6 +182,9 @@ const ExamenesService = {
   crearExamen,
   FiltrarExamenesPorColaborador,
   FiltrarExamenesPorUUID,
+  ObtenerExamenesCargo,
+  AgregarExamenesCargo,
+  EliminarExamenesCargo,
 };
 
 export default ExamenesService;

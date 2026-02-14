@@ -69,6 +69,7 @@ declare const Perfil: {
   BuscarCorreoPorUUID(uuid: string): Promise<any>;
   cambiarEstadoUsuario(idcolaborador: number, payload: CambiarEstadoPayload): Promise<any>;
   actualizarRolUsuario(idcolaborador: number, payload: ActualizarRolPayload): Promise<any>;
+  registrarUsuariosMasivo(file: File): Promise<any>;
 };
 
 export default Perfil;

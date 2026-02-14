@@ -398,3 +398,45 @@
     padding: 10px 16px;
   }
 }
+
+/* ===== DARK MODE ===== */
+@media (prefers-color-scheme: dark) {
+  .container {
+    background-color: #000;
+  }
+  .playerContainer {
+    background-color: #0d0d0d;
+    color: #e0e0e0;
+  }
+  .header {
+    background-color: #1a1a1a;
+    border-bottom-color: #333;
+  }
+  .title {
+    color: #f0f0f0;
+  }
+  .descriptionBox {
+    background-color: #1a1a1a;
+    border-top-color: #333;
+  }
+  .descriptionTitle {
+    color: #f0f0f0;
+  }
+  .description {
+    color: #bbb;
+  }
+  .completedBox {
+    background-color: #1a1a1a;
+    border-top-color: #333;
+  }
+  .warningBox {
+    background-color: #2a1515;
+  }
+  .errorBox {
+    background-color: #1e1e1e;
+  }
+  .pdfViewer {
+    background: #1e1e1e;
+    border-color: #333;
+  }
+}

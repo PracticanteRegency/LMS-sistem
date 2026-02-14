@@ -1,7 +1,7 @@
 from django.utils import timezone
 from rest_framework import serializers
 from django.db import transaction
-from .utils import enviar_correo_capacitacion_creada
+from .utils import enviar_correo_capacitacion_creada_batch
 from .models import Capacitaciones, Modulos, progresoCapacitaciones, Lecciones, PreguntasLecciones, Respuestas, progresolecciones, progresoModulo
 from usuarios.models import Colaboradores
 
@@ -235,7 +235,7 @@ class CrearCapacitacionSerializer(serializers.ModelSerializer):
         hoy = timezone.now().date()
 
         if capacitacion.fecha_inicio.date() == hoy:
-            enviar_correo_capacitacion_creada(capacitacion)
+            enviar_correo_capacitacion_creada_batch(capacitacion)
 
         return capacitacion
 
@@ -334,7 +334,7 @@ class CrearCapacitacionSerializer(serializers.ModelSerializer):
             # Enviar notificación solo a los nuevos agregados una vez la transacción se confirme
             if added:
                 try:
-                    transaction.on_commit(lambda: enviar_correo_capacitacion_creada(instance, colaboradores_ids=added))
+                    transaction.on_commit(lambda: enviar_correo_capacitacion_creada_batch(instance, colaboradores_ids=added))
                 except Exception:
                     # No queremos que el envio de correos impida la actualización
                     pass

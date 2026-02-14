@@ -56,7 +56,7 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.3s ease;
+  transition: background 0.3s ease, transform 0.1s ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -66,7 +66,12 @@
 }
 
 .btnGuardar:hover:not(:disabled) {
-  background: #8B1F14;
+  background: #A52A1B;
+  transform: translateY(-2px);
+}
+
+.btnGuardar:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .btnGuardar:disabled {
@@ -279,7 +284,7 @@
 }
 
 .btnCargar {
-  background: #333;
+  background: #413a3a;
   color: white;
   border: none;
   padding: 10px 14px;
@@ -344,6 +349,7 @@
   font-size: 16px;
   font-weight: 600;
   flex: 1;
+  color: white;
 }
 
 .btnAgregarLeccion {
@@ -443,7 +449,7 @@
 
 .questionCard {
   background: transparent;
-  padding: 12px 0;
+  padding: 12px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
   margin-bottom: 12px;
   width: 100%;
@@ -545,6 +551,16 @@
   cursor: pointer;
   flex-shrink: 0;
   padding: 0;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.selector:hover {
+  transform: scale(1.15);
+  border-color: #C0281B;
+}
+
+.selector:active {
+  transform: scale(0.95);
 }
 
 /* Selector circular para opción única */
@@ -1393,7 +1409,7 @@ button:disabled,
   }
 
   .questionCard {
-    padding: 8px 0;
+    padding: 8px;
     margin-bottom: 8px;
     width: 100%;
     max-width: 100%;
@@ -1498,4 +1514,400 @@ button:disabled,
   border-radius: 8px;
   margin-top: 8px;
   border: 1px solid #ccc;
+}
+
+/* ===== DesactivarUsuarios Styles ===== */
+.csvSection {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.csvLink {
+  display: inline-flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f0f0f0;
+  color: #333;
+  text-decoration: none;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: background 0.2s, color 0.2s;
+  border: 1px solid #e0e0e0;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.csvLink:hover {
+  background: #e0e0e0;
+  color: #000;
+}
+
+.btnSubirCsv {
+  display: inline-flex;
+  align-items: center;
+  padding: 12px 16px;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-size: 14px;
+}
+
+
+.btnSubirCsv:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.colaboradoresTable {
+  margin-top: 20px;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.colaboradoresHeader {
+  padding: 16px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.colaboradoresHeader h4 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.colaboradoresHeader small {
+  color: #666;
+  font-size: 12px;
+}
+
+.section {
+  margin-bottom: 30px;
+}
+
+.section h2 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+}
+
+.sectionDescription {
+  margin: 0 0 16px 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.btnDesactivar {
+  background: #d32f2f;
+  color: white;
+  border: none;
+}
+
+.btnDesactivar:hover {
+  background: #c62828;
+}
+
+.btnReactivar {
+  background: #388e3c;
+  color: white;
+  border: none;
+}
+
+.btnReactivar:hover {
+  background: #2e7d32;
+}
+
+.emptyState {
+  margin-top: 40px;
+  padding: 20px;
+  text-align: center;
+  color: #999;
+  font-size: 14px;
+}
+
+.summaryBox {
+  margin-top: 20px;
+  padding: 16px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.summaryBox h4 {
+  margin: 0 0 12px 0;
+  color: #333;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.summaryBox ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #666;
+  font-size: 13px;
+}
+
+.summaryBox ul li {
+  margin: 6px 0;
+}
+
+.successMessage {
+  color: #2e7d32;
+  padding: 12px;
+  background: #e8f5e9;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.actionButtons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.paginationFixed {
+  position: relative;
+  left: 0;
+  right: 0;
+  width: 100%;
+  min-width: 0;
+  margin-top: 0;
+  background: #fafafa;
+  z-index: 0;
+  box-sizing: border-box;
+}
+
+/* ===== DARK MODE ===== */
+@media (prefers-color-scheme: dark) {
+  .container {
+    background: #121212;
+    color: #e0e0e0;
+  }
+  .header {
+    border-bottom-color: #333;
+  }
+  .header h1 {
+    color: #f0f0f0;
+  }
+  .backButton {
+    color: #ccc;
+  }
+  .backButton:hover {
+    color: #f0f0f0;
+  }
+  .section {
+    background: #1e1e1e;
+    border-color: #444;
+  }
+  .section h2 {
+    color: #f0f0f0;
+  }
+  .sectionDescription {
+    color: #999;
+  }
+  .label {
+    color: #ccc;
+  }
+  .input,
+  .textarea {
+    background: #2a2a2a;
+    border-color: #444;
+    color: #e0e0e0;
+  }
+  .input:focus,
+  .textarea:focus {
+    border-color: #C0281B;
+    box-shadow: 0 0 0 2px rgba(192, 40, 27, 0.3);
+  }
+  .helpText {
+    color: #777;
+  }
+  .smallSelect {
+    background: #2a2a2a;
+    border-color: #444;
+    color: #e0e0e0;
+  }
+  .error {
+    background: #2a1515;
+    color: #e57373;
+    border-left-color: #e57373;
+  }
+  .sectionformupload {
+    background-color: #2a2a2a;
+    border-color: #555;
+  }
+  .dropzoneText {
+    color: #ccc;
+  }
+  .dropzoneSubtext {
+    color: #999;
+  }
+  .dropzoneIcon {
+    color: #ccc;
+  }
+  .modulo {
+    background: #1e1e1e;
+    border-color: #444;
+  }
+  .moduloHeader {
+    background: #252525;
+  }
+  .moduloHeader:hover {
+    background: #2a2a2a;
+  }
+  .moduloContent {
+    background: #1e1e1e;
+  }
+  .leccion {
+    background: #252525;
+  }
+  .leccion p {
+    color: #ccc;
+  }
+  .leccionTitulo {
+    color: #ccc;
+  }
+  .formPlaceholder {
+    border-color: #444;
+    background: #1a1a1a;
+    color: #888;
+  }
+  .formCard {
+    background: #252525;
+    color: #e0e0e0;
+  }
+  .questionCard {
+    border-bottom-color: rgba(255,255,255,0.1);
+  }
+  .selector {
+    background-color: #555;
+    border-color: #666;
+  }
+  .selected {
+    background: #C0281B;
+    border-color: #C0281B;
+  }
+  .modalCard {
+    background: #1e1e1e;
+  }
+  .modalHeader {
+    background: #252525;
+    border-bottom-color: #444;
+  }
+  .modalHeader h2,
+  .modalHeader h3 {
+    color: #f0f0f0;
+  }
+  .modalBody {
+    background: #1e1e1e;
+    color: #e0e0e0;
+  }
+  .modalFooter {
+    background: #252525;
+    border-top-color: #444;
+  }
+  .colaboradoresTable {
+    background: #1e1e1e;
+    border-color: #444;
+  }
+  .colaboradoresHeader {
+    border-bottom-color: #444;
+  }
+  .colaboradoresHeader h4 {
+    color: #f0f0f0;
+  }
+  .searchInput {
+    background: #2a2a2a;
+    border-color: #444;
+    color: #e0e0e0;
+  }
+  .searchInput:focus {
+    border-color: #C0281B;
+    box-shadow: 0 0 0 3px rgba(74, 127, 199, 0.2);
+  }
+  .noResults {
+    color: #777;
+  }
+  .table thead {
+    background: #1a1a1a;
+    border-bottom-color: #444;
+  }
+  .table th {
+    color: #e0e0e0;
+  }
+  .table td {
+    border-bottom-color: #333;
+    color: #e0e0e0;
+  }
+  .table tbody tr:hover {
+    background: #252525;
+  }
+  .usuarioCell strong {
+    color: #f0f0f0;
+  }
+  .usuarioCell small {
+    color: #888;
+  }
+  .btnEllipsis {
+    color: #999;
+  }
+  .btnEllipsis:hover {
+    color: #f0f0f0;
+  }
+  .btnEliminar {
+    color: #ef5350;
+    border-color: #ef5350;
+  }
+  .btnEliminar:hover {
+    background: #2a1515;
+    border-color: #e53935;
+    color: #e53935;
+  }
+  .previewImage {
+    border-color: #444;
+  }
+
+  /* ===== DesactivarUsuarios Dark Mode ===== */
+  .csvLink {
+    background: #2a2a2a;
+    color: #e0e0e0;
+    border-color: #444;
+  }
+  .csvLink:hover {
+    background: #333;
+    color: #f0f0f0;
+  }
+  .section h2 {
+    color: #f0f0f0;
+  }
+  .sectionDescription {
+    color: #aaa;
+  }
+  .summaryBox {
+    background: #2a2a2a;
+  }
+  .summaryBox h4 {
+    color: #e0e0e0;
+  }
+  .summaryBox ul {
+    color: #aaa;
+  }
+  .successMessage {
+    color: #6fc76f;
+    background: #1a2e1a;
+  }
+  .emptyState {
+    color: #777;
+  }
+  .paginationFixed {
+    background: #1e1e1e;
+  }
 }

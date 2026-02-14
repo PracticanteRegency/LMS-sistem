@@ -100,22 +100,28 @@ def enviar_correo_capacitaciones_activas_y_activar():
     Activa capacitaciones que inician hoy Y envía correos a colaboradores.
     Combina dos tareas: activación + notificación con batching automático.
     Se ejecuta cada día a las 12:00.
+    
+    IMPORTANTE: Filtra colaboradores DESACTIVADOS (estadocolaborador != 1)
     """
     hoy = timezone.now().date()
     
-    # Paso 1: Activar capacitaciones que inician hoy
     capacitaciones_a_activar = Capacitaciones.objects.filter(
         fecha_inicio__date=hoy,
         estado=0
     )
 
     for cap in capacitaciones_a_activar:
+        if getattr(cap, 'estado', None) != 0:
+            continue
         cap.estado = 1
         cap.save()
         
-        # Paso 2: Enviar correos a colaboradores de esta capacitación
+        # FILTRO: Solo colaboradores ACTIVOS (estadocolaborador=1)
         correos = list(
-            progresoCapacitaciones.objects.filter(capacitacion=cap)
+            progresoCapacitaciones.objects.filter(
+                capacitacion=cap,
+                colaborador__estadocolaborador=1  # FILTRO: Solo activos
+            )
             .values_list("colaborador__correocolaborador", flat=True)
             .exclude(colaborador__correocolaborador__isnull=True)
             .exclude(colaborador__correocolaborador__exact="")
@@ -179,8 +185,8 @@ def enviar_correo_capacitaciones_activas_y_activar():
             delay=2
         )
         
-        # Esperar 1 segundo entre capacitaciones
-        time.sleep(1)
+        # Esperar 2 segundo entre capacitaciones
+        time.sleep(2)
 
 
 @shared_task
@@ -189,6 +195,8 @@ def notificar_capacitacion_por_vencer_7_dias():
     Notifica sobre capacitaciones que vencen en 7 días. 
     Usa batching automático para soportar 1500+ colaboradores.
     Se ejecuta cada día a las 07:00.
+    
+    IMPORTANTE: Filtra colaboradores DESACTIVADOS (estadocolaborador != 1)
     """
     hoy = timezone.now().date()
     fecha_objetivo = hoy + timedelta(days=7)
@@ -199,9 +207,11 @@ def notificar_capacitacion_por_vencer_7_dias():
 
     for cap in capacitaciones:
 
+        # FILTRO: Solo colaboradores ACTIVOS (estadocolaborador=1)
         pendientes = progresoCapacitaciones.objects.filter(
             capacitacion=cap,
-            completada=False
+            completada=False,
+            colaborador__estadocolaborador=1  # FILTRO: Solo activos
         ).select_related("colaborador")
 
         correos = [
@@ -289,6 +299,8 @@ def notificar_capacitacion_por_vencer_1_dia():
     Último aviso para capacitaciones que vencen mañana. 
     Usa batching automático para soportar 1500+ colaboradores.
     Se ejecuta cada día a las 07:30.
+    
+    IMPORTANTE: Filtra colaboradores DESACTIVADOS (estadocolaborador != 1)
     """
     hoy = timezone.now().date()
     fecha_objetivo = hoy + timedelta(days=1)
@@ -299,9 +311,11 @@ def notificar_capacitacion_por_vencer_1_dia():
 
     for cap in capacitaciones:
 
+        # FILTRO: Solo colaboradores ACTIVOS (estadocolaborador=1)
         pendientes = progresoCapacitaciones.objects.filter(
             capacitacion=cap,
-            completada=False
+            completada=False,
+            colaborador__estadocolaborador=1  # FILTRO: Solo activos
         ).select_related("colaborador")
 
         correos = [
@@ -372,7 +386,10 @@ def notificar_jefes_por_colaboradores_sin_progreso():
     Notifica a los jefes de proyecto sobre colaboradores sin avance en capacitaciones.
     Se ejecuta cada lunes a las 09:00.
     Usa batching automático para soportar múltiples notificaciones.
+    
+    IMPORTANTE: Filtra colaboradores DESACTIVADOS (estadocolaborador != 1)
     """
+    # FILTRO: Solo colaboradores ACTIVOS (estadocolaborador=1)
     registros = (
         progresoCapacitaciones.objects
         .select_related(
@@ -383,7 +400,8 @@ def notificar_jefes_por_colaboradores_sin_progreso():
         .filter(
             capacitacion__estado=1,
             completada=False,
-            progreso=0
+            progreso=0,
+            colaborador__estadocolaborador=1  # FILTRO: Solo activos
         )
     )
 

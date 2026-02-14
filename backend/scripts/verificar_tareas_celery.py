@@ -14,16 +14,11 @@ django.setup()
 
 from celery import current_app
 from notificaciones.tasks import (
-    enviar_correo_capacitaciones_activas,
+    enviar_correo_capacitaciones_activas_y_activar,
     notificar_capacitacion_por_vencer_7_dias,
     notificar_capacitacion_por_vencer_1_dia,
-    activar_capacitaciones,
     desactivar_capacitaciones,
     notificar_jefes_por_colaboradores_sin_progreso
-)
-from analitica.tasks import (
-    calcular_progreso_empresarial_diario,
-    calcular_progreso_empresarial_mensual
 )
 
 def verificar_tareas():
@@ -58,33 +53,18 @@ def verificar_tareas():
     print("-" * 80)
     
     tareas_notificaciones = [
-        ('notificaciones.tasks.enviar_correo_capacitaciones_activas', 'Enviar correos de capacitaciones activas'),
+        ('notificaciones.tasks.enviar_correo_capacitaciones_activas_y_activar', 'Enviar correos y activar capacitaciones'),
         ('notificaciones.tasks.notificar_capacitacion_por_vencer_7_dias', 'Notificar capacitaciones por vencer (7 días)'),
         ('notificaciones.tasks.notificar_capacitacion_por_vencer_1_dia', 'Notificar capacitaciones por vencer (1 día)'),
-        ('notificaciones.tasks.activar_capacitaciones', 'Activar capacitaciones'),
         ('notificaciones.tasks.desactivar_capacitaciones', 'Desactivar capacitaciones'),
         ('notificaciones.tasks.notificar_jefes_por_colaboradores_sin_progreso', 'Notificar a jefes sobre sin progreso'),
     ]
     
-    tareas_analitica = [
-        ('analitica.tasks.calcular_progreso_empresarial_diario', 'Calcular progreso empresarial (diario)'),
-        ('analitica.tasks.calcular_progreso_empresarial_mensual', 'Calcular progreso empresarial (mensual)'),
-    ]
-    
-    todas_tareas = tareas_notificaciones + tareas_analitica
+    todas_tareas = tareas_notificaciones
     registradas = current_app.tasks
     
     print("\n📩 TAREAS DE NOTIFICACIONES:")
     for nombre_tarea, descripcion in tareas_notificaciones:
-        if nombre_tarea in registradas:
-            print(f"   ✅ {nombre_tarea}")
-            print(f"      └─ {descripcion}")
-        else:
-            print(f"   ❌ {nombre_tarea}")
-            print(f"      └─ FALTA REGISTRAR - {descripcion}")
-    
-    print("\n📊 TAREAS DE ANALÍTICA:")
-    for nombre_tarea, descripcion in tareas_analitica:
         if nombre_tarea in registradas:
             print(f"   ✅ {nombre_tarea}")
             print(f"      └─ {descripcion}")
@@ -103,7 +83,8 @@ def verificar_tareas():
     extra_in_beat = []
     
     # Verificar que todas las tareas de los que se esperan están en beat_schedule
-    for task_name, _ in tareas_notificaciones + tareas_analitica:
+    todas_tareas_esperadas = tareas_notificaciones
+    for task_name, _ in todas_tareas_esperadas:
         if task_name not in beat_tasks:
             missing_in_beat.append(task_name)
     

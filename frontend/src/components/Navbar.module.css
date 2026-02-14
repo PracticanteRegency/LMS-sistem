@@ -69,12 +69,23 @@
 .menuButton {
   background: transparent;
   border: none;
+  outline: none;
   color: #C0281B;
   font-size: 24px;
   cursor: pointer;
   padding: 8px 12px;
   border-radius: 4px;
   transition: background-color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+  pointer-events: auto;
+}
+
+.menuButton:focus {
+  outline: none;
+}
+
+.menuButton:focus-visible {
+  outline: none;
 }
 
 .menuButton:hover {
@@ -648,4 +659,35 @@
   object-position: center;
   display: block;
   flex-shrink: 0;
+}
+
+/* ===== DARK MODE ===== */
+@media (prefers-color-scheme: dark) {
+  .navbar {
+    background: linear-gradient(to right, #1a1a1a, #111);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  }
+  .sidebar {
+    background: linear-gradient(to bottom, #1a1a1d, #141416);
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.5);
+  }
+  .sidebar::-webkit-scrollbar {
+    background: #141416;
+  }
+  .sidebar::-webkit-scrollbar-thumb {
+    background: #333;
+  }
+  .sidebar::-webkit-scrollbar-track {
+    background: #141416;
+  }
+  .dropdown {
+    background: #1e1e1e;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+  }
+  .submenuItem {
+    color: #999;
+  }
+  .submenuItem:hover {
+    color: #f0f0f0;
+  }
 }

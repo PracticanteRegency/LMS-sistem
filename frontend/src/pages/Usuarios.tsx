@@ -3,6 +3,7 @@ import styles from "./Styles/Usuarios.module.css";
 import Perfil from "../services/perfil";
 import { useNavigate } from "react-router-dom";
 import { getUserRole } from "../services/auth";
+import axios from "axios";
 
 interface Usuario {
   id_colaborador: number;
@@ -35,6 +36,12 @@ export default function Usuarios() {
   const [menuCoords, setMenuCoords] = useState<{ [key: number]: { top: number; left: number } }>({});
   const navigate = useNavigate();
   const userRole = Number(getUserRole());
+  
+  // Estados para el modal de carga masiva
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [uploadResult, setUploadResult] = useState<any>(null);
 
 
   useEffect(() => {
@@ -211,6 +218,43 @@ export default function Usuarios() {
     }
   };
 
+  const handleUploadMasivo = async () => {
+    if (!uploadFile) {
+      setError("Por favor selecciona un archivo CSV");
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    setUploadLoading(true);
+    const formData = new FormData();
+    formData.append("archivo", uploadFile);
+
+    try {
+      const response = await (Perfil as any).registrarUsuariosMasivo(uploadFile);
+
+      setUploadResult(response);
+      setSuccess(`Se registraron ${response.total_creados} usuarios correctamente`);
+      setUploadFile(null);
+      
+      // Recargar usuarios después de 2 segundos
+      setTimeout(() => {
+        loadUsuarios(1);
+        setShowUploadModal(false);
+        setUploadResult(null);
+      }, 2000);
+    } catch (err: any) {
+      const errorMsg = err?.response?.data?.error || "Error al cargar usuarios";
+      const detalles = err?.response?.data?.detalles_errores || err?.response?.data?.detalles;
+      setError(errorMsg);
+      setUploadResult({
+        error: errorMsg,
+        detalles_errores: detalles,
+      });
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className={styles.container}>
@@ -235,6 +279,24 @@ export default function Usuarios() {
           <div>
             <h1>Usuarios</h1>
             <p className={styles.subtitle}>Gestión de colaboradores</p>
+          </div>
+          <div className={styles.headerButtons}>
+            <button
+              className={styles.btnReport}
+              onClick={() => setShowUploadModal(true)}
+              title="Registrar múltiples usuarios desde CSV"
+              style={{ backgroundColor: "#4CAF50", marginRight: "8px" }}
+            >
+              📤 Registrar Masivo
+            </button>
+            <button
+              className={styles.btnReport}
+              onClick={() => navigate("/desactivar-usuarios")}
+              title="Desactivar múltiples usuarios"
+              style={{ backgroundColor: "#d32f2f" }}
+            >
+              🚫 Desactivar Usuarios
+            </button>
           </div>
         </div>
       </div>
@@ -327,20 +389,20 @@ export default function Usuarios() {
                             }}
                           >
                             <button
-                              className={`${styles.btn} ${styles.btnView}`}
+                              className={`${styles.btn} ${styles.btn}`}
                               onClick={() => handleAction("Ver", u)}
                             >
                               Ver
                             </button>
                             <button
-                              className={`${styles.btn} ${styles.btnEdit}`}
+                              className={`${styles.btn} ${styles.btn}`}
                               onClick={() => navigate(`/user/editar/${u.id_colaborador}`)}
                             >
                               Editar
                             </button>
                             {(userRole === 1 || userRole === 4) && (
                               <button
-                                className={`${styles.btn} ${styles.btnEdit}`}
+                                className={`${styles.btn} ${styles.btn}`}
                                 onClick={() => handleAction("Cambiar Estado", u)}
                                 title="Cambiar estado del usuario"
                               >
@@ -349,7 +411,7 @@ export default function Usuarios() {
                             )}
                             {userRole === 4 && (
                               <button
-                                className={`${styles.btn} ${styles.btnEdit}`}
+                                className={`${styles.btn} ${styles.btn}`}
                                 onClick={() => handleAction("Cambiar Rol", u)}
                                 title="Cambiar rol del usuario"
                               >
@@ -391,6 +453,158 @@ export default function Usuarios() {
           </button>
         </div>
       </div>
+
+      {/* Modal de Registro Masivo */}
+      {showUploadModal && (
+        <div className={styles.modalOverlay} onClick={() => {
+          setShowUploadModal(false);
+          setUploadResult(null);
+          setUploadFile(null);
+        }}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>📤 Registrar Usuarios Masivamente</h2>
+              <button
+                onClick={() => {
+                  setShowUploadModal(false);
+                  setUploadResult(null);
+                  setUploadFile(null);
+                }}
+                className={styles.modalCloseBtn}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Instrucciones */}
+            <div className={styles.instructionsBox}>
+              <h3 className={styles.instructionsTitle}>📋 Formato esperado del CSV (UTF-8):</h3>
+              <p className={styles.instructionsFormat}>
+                cédula;Nombre;Correo;Número;Región;Nivel;Empresa;Unidad;Proyecto;Centro;Cargo
+              </p>
+              <ul className={styles.instructionsList}>
+                <li><strong>cédula:</strong> Identificación única (se usa como usuario y contraseña)</li>
+                <li><strong>Nombre:</strong> 2 primeras palabras = apellidos, resto = nombres</li>
+                <li><strong>Correo:</strong> Email del usuario (opcional)</li>
+                <li><strong>Número:</strong> Teléfono (opcional)</li>
+                <li><strong>Región, Nivel:</strong> Deben existir en la base de datos</li>
+                <li><strong>Empresa, Unidad, Proyecto, Centro:</strong> Se usan para filtrar el Centro de Operación</li>
+                <li><strong>Cargo:</strong> Debe existir en la base de datos</li>
+              </ul>
+              <p className={styles.warningText}>
+                ⚠️ Si hay cualquier error, se cancela el registro completo (sin crear ningún usuario)
+              </p>
+            </div>
+
+            {/* Área de carga */}
+            {!uploadResult && (
+              <div className={styles.uploadArea}>
+                <input
+                  type="file"
+                  accept=".csv"
+                  onChange={(e) => setUploadFile(e.target.files?.[0] || null)}
+                  className={styles.uploadFileInput}
+                  id="csvFileInput"
+                />
+                <label htmlFor="csvFileInput" className={styles.uploadLabel}>
+                  Seleccionar archivo CSV
+                </label>
+                {uploadFile && (
+                  <div className={styles.fileSelected}>
+                    <strong>Archivo seleccionado:</strong> {uploadFile.name}
+                  </div>
+                )}
+                
+              </div>
+              
+            )}
+
+            {/* Resultados */}
+            {uploadResult && (
+              <div className={`${styles.resultsBox} ${uploadResult.error ? styles.resultsBoxError : styles.resultsBoxSuccess}`}>
+                {uploadResult.error ? (
+                  <>
+                    <p className={styles.resultErrorMsg}>
+                      ❌ {uploadResult.error}
+                    </p>
+                    {uploadResult.detalles_errores && (
+                      <div className={styles.resultDetailsList}>
+                        <strong>Errores encontrados:</strong>
+                        <ul>
+                          {uploadResult.detalles_errores.slice(0, 10).map((err: any, idx: number) => (
+                            <li key={idx}>
+                              Fila {err.fila}: {err.error}
+                            </li>
+                          ))}
+                        </ul>
+                        {uploadResult.detalles_errores.length > 10 && (
+                          <p className={styles.resultDetailsMore}>
+                            ... y {uploadResult.detalles_errores.length - 10} errores más
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className={styles.resultSuccessMsg}>
+                      ✅ {uploadResult.mensaje}
+                    </p>
+                    {uploadResult.detalles && (
+                      <div className={styles.resultDetailsList}>
+                        <strong>Usuarios registrados:</strong>
+                        <ul>
+                          {uploadResult.detalles.slice(0, 5).map((user: any, idx: number) => (
+                            <li key={idx}>
+                              {user.cedula} - {user.nombre} {user.apellido}
+                            </li>
+                          ))}
+                        </ul>
+                        {uploadResult.detalles.length > 5 && (
+                          <p className={styles.resultDetailsMore}>
+                            ... y {uploadResult.detalles.length - 5} usuarios más
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Botones */}
+            <div className={styles.modalFooter}>
+              <a 
+                  href="/templates/Registrar-usuarios-ejemplo.csv"
+                  download
+                  className={styles.downloadButton}
+                  style={{ marginRight: 12 }}
+                >
+                  📥 Descargar Formato Ejemplo (CSV)
+                </a>
+              <button
+                onClick={() => {
+                  setShowUploadModal(false);
+                  setUploadResult(null);
+                  setUploadFile(null);
+                }}
+                className={styles.modalBtnClose}
+              >
+                Cerrar
+              </button>
+              {!uploadResult && (
+                <button
+                  onClick={handleUploadMasivo}
+                  disabled={!uploadFile || uploadLoading}
+                  className={styles.modalBtnSubmit}
+                >
+                  {uploadLoading ? "Cargando..." : "Cargar Usuarios"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

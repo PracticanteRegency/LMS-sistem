@@ -339,9 +339,14 @@ export default function ReporteCorreos() {
             <h1>Reporte de Correos</h1>
             <p className={styles.subtitle}>Historial de exámenes enviados a trabajadores</p>
           </div>
-          <button className={styles.excelButton} onClick={handleOpenExcelModal}>
-            📊 Generar Excel
-          </button>
+          <div className={styles.headerButtons}>
+            <button className={styles.backButton} onClick={() => navigate('/examenes')}>
+              ← Volver a Exámenes
+            </button>
+            <button className={styles.excelButton} onClick={handleOpenExcelModal}>
+              📊 Generar Excel
+            </button>
+          </div>
         </div>
       </div>
 

@@ -84,7 +84,7 @@ export default function CrearUsuario() {
         {(role === 3 || role === 4) && (
           <button
             className={selectedForm === 1 ? styles.btnPrimary : ''}
-            style={{ border: '1px solid #2563eb', background: selectedForm === 1 ? '#2563eb' : 'white', color: selectedForm === 1 ? 'white' : '#2563eb', borderRadius: 4, padding: '8px 16px', cursor: 'pointer' }}
+            style={{ border: '1px solid #C0281B', background: selectedForm === 1 ? '#C0281B' : 'white', color: selectedForm === 1 ? 'white' : '#C0281B', borderRadius: 4, padding: '8px 16px', cursor: 'pointer' }}
             onClick={() => setSelectedForm(1)}
           >
             Crear Usuario Temporal
@@ -93,7 +93,7 @@ export default function CrearUsuario() {
         {(role === 1 || role === 4) && (
           <button
             className={selectedForm === 2 ? styles.btnPrimary : ''}
-            style={{ border: '1px solid #2563eb', background: selectedForm === 2 ? '#2563eb' : 'white', color: selectedForm === 2 ? 'white' : '#2563eb', borderRadius: 4, padding: '8px 16px', cursor: 'pointer' }}
+            style={{ border: '1px solid #C0281B', background: selectedForm === 2 ? '#C0281B' : 'white', color: selectedForm === 2 ? 'white' : '#C0281B', borderRadius: 4, padding: '8px 16px', cursor: 'pointer' }}
             onClick={() => setSelectedForm(2)}
           >
             Crear Usuario Completo

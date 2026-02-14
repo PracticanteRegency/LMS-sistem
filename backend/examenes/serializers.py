@@ -240,12 +240,24 @@ class ListarTrabajadoresCorreoSerializer(serializers.ModelSerializer):
 
 
 class EnviarCorreoMasivoSerializer(serializers.Serializer):
-    """Serializer para enviar correos masivos con CSV de trabajadores"""
+    """
+    Serializer para enviar correos masivos con CSV de trabajadores.
+    
+    Soporta dos formatos de CSV:
+    
+    FORMATO 1 (Original):
+    Empresa,Unidad,Proyecto,Centro,Nombre,CC,Ciudad,Cargo,TipoExamen,Examenes
+    
+    FORMATO 2 (Nuevo - Exámenes como columnas con 1/0):
+    Nombre de empresa;unidad de negocio;PROYECTO;Desc. C.O.;Cedula;Nombre Empleado;
+    Cargo;Fecha de Ingreso;TIPO DE EXAMEN;OPTOMETRIA;AUDIOMETRIA;...
+    (Los exámenes marcados con "1" se asignan al trabajador)
+    """
     archivo_csv = serializers.FileField(
         help_text=(
-            "Archivo CSV con columnas: "
-            "Empresa,Unidad,Proyecto,Centro,Nombre,CC,Ciudad,"
-            "Cargo,TipoExamen,Examenes"
+            "Archivo CSV con columnas de trabajadores y exámenes. "
+            "Puede usar formato con columna 'Examenes' separados por coma, "
+            "o formato con columnas de exámenes marcadas con '1'."
         )
     )
     asunto = serializers.CharField(

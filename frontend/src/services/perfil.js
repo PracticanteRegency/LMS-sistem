@@ -192,6 +192,36 @@ const actualizarRolUsuario = async (idcolaborador, payload) => {
   }
 };
 
+const desactivarMultiplesUsuarios = async (payload) => {
+  try {
+    const response = await api.post(`user/cambiar-estado-usuario/`, payload, {
+      headers: getAuthHeader(),
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error desactivating multiple users:', error);
+    throw error;
+  }
+};
+
+const registrarUsuariosMasivo = async (file) => {
+  try {
+    const formData = new FormData();
+    formData.append("archivo", file);
+    
+    const response = await api.post(`user/registrar-masivo/`, formData, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error registering users in bulk:', error);
+    throw error;
+  }
+};
+
 const Perfil = {
   getPerfil,
   getListUsers,
@@ -206,6 +236,8 @@ const Perfil = {
   BuscarCorreoPorUUID,
   cambiarEstadoUsuario,
   actualizarRolUsuario,
+  desactivarMultiplesUsuarios,
+  registrarUsuariosMasivo,
 };
 
 export default Perfil

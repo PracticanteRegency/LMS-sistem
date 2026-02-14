@@ -225,8 +225,8 @@ class EnviarCorreoView(APIView):
         # Forzar destinatarios fijos para este endpoint
         correos_destino_fixed = (
             "coordinador.seleccion@regency.com.co,"
-            "operativo@servicompetentes.com,"
-            "administrativo@servicompetentes.com"
+            #"operativo@servicompetentes.com,"
+            #"administrativo@servicompetentes.com"
         )
         correos_list_fixed = [e.strip() for e in correos_destino_fixed.split(',') if e.strip()]
         # Sobrescribir el campo de destino para que quede registrado en BD
@@ -278,6 +278,24 @@ class EnviarCorreoView(APIView):
         if colaborador is None:
             colaborador = getattr(request.user, 'id_colaboradoru', None)
         return colaborador
+
+    def _clear_cache(self):
+        """Limpia el cache de reportes de correos y datos de empresas con exámenes."""
+        logger = logging.getLogger(__name__)
+        try:
+            # Limpiar todos los caches de reportes de correos paginados
+            # Eliminamos el patrón completo del cache
+            cache.delete_pattern("reporte_correos_page=*")
+            
+            # Limpiar todos los caches de detalles de correo
+            cache.delete_pattern("detalle_correo=*")
+            
+            # Limpiar cache de datos de empresas con exámenes
+            cache.delete('cargo_empresa_examenes_data')
+            
+            logger.info("Cache limpiado: reportes de correos y datos de empresas")
+        except Exception as e:
+            logger.warning(f"Error al limpiar cache: {str(e)}")
 
     def _get_examenes_por_ids(self, examenes_ids):
         """Obtiene exámenes activos por lista de IDs."""
@@ -440,6 +458,9 @@ class EnviarCorreoView(APIView):
 
             # Contar exámenes asignados
             total_examenes = registro_trabajador.examenes.count()
+
+            # Limpiar cache de reportes de correos y datos de empresas
+            self._clear_cache()
 
             return Response(
                 {
@@ -1002,8 +1023,168 @@ class EnviarCorreoMasivoView(APIView):
     """
     Envía un correo masivo a múltiples trabajadores desde un CSV.
     Crea un registro CorreoExamenEnviado y N registros RegistroExamenes.
+    
+    Soporta dos formatos de CSV:
+    
+    FORMATO 1 (Original):
+    Empresa,Unidad,Proyecto,Centro,Nombre,CC,Ciudad,Cargo,TipoExamen,Examenes
+    
+    FORMATO 2 (Nuevo - Exámenes como columnas con 1/0):
+    Nombre de empresa;unidad de negocio;PROYECTO;Desc. C.O.;Cedula;Nombre Empleado;
+    Cargo;Fecha de Ingreso;TIPO DE EXAMEN;OPTOMETRIA;AUDIOMETRIA;...
+    (Los exámenes marcados con "1" se asignan al trabajador)
     """
     permission_classes = [IsAuthenticated, IsUsuarioEspecial | IsSuperAdmin]
+
+    # Mapeo de columnas del CSV formato 2 a nombres internos
+    COLUMN_MAPPING = {
+        'nombre de empresa': 'empresa',
+        'unidad de negocio': 'unidad',
+        'proyecto': 'proyecto',
+        'desc. c.o.': 'centro',
+        'cedula': 'cc',
+        'nombre empleado': 'nombre',
+        'cargo': 'cargo',
+        'ciudad': 'ciudad',
+        'fecha de ingreso': 'fecha_ingreso',
+        'tipo de examen': 'tipoexamen',
+    }
+
+    def _detect_csv_format(self, fieldnames):
+        """
+        Detecta el formato del CSV basándose en las columnas.
+        
+        Returns:
+            tuple: (formato: str, columnas_examenes: list)
+            - formato: 'original' o 'columnas_examenes'
+            - columnas_examenes: lista de nombres de columnas que son exámenes (solo para formato 2)
+        """
+        fieldnames_lower = [f.lower().strip() for f in fieldnames]
+        
+        logger = logging.getLogger(__name__)
+        logger.info(f"Detectando formato con fieldnames_lower: {fieldnames_lower}")
+        
+        # Verificar si tiene la columna 'examenes' (formato original)
+        if 'examenes' in fieldnames_lower:
+            logger.info("Formato detectado: ORIGINAL (columna 'examenes')")
+            return 'original', []
+        
+        # Verificar si tiene 'tipo de examen' o 'tipo examen' (formato nuevo)
+        tipo_examen_idx = None
+        for idx, col in enumerate(fieldnames_lower):
+            # Buscar variantes de "tipo de examen"
+            if col == 'tipo de examen' or col == 'tipo examen' or col == 'tipoexamen':
+                tipo_examen_idx = idx
+                logger.info(f"Columna 'tipo de examen' encontrada en índice {idx}")
+                break
+        
+        if tipo_examen_idx is not None:
+            # Las columnas después de 'tipo de examen' son los exámenes
+            columnas_examenes = fieldnames[tipo_examen_idx + 1:]
+            # Filtrar columnas vacías
+            columnas_examenes = [c for c in columnas_examenes if c and c.strip()]
+            logger.info(f"Formato detectado: COLUMNAS_EXAMENES con {len(columnas_examenes)} columnas")
+            logger.info(f"Columnas de exámenes: {columnas_examenes}")
+            return 'columnas_examenes', columnas_examenes
+        
+        # Si tiene 'tipoexamen' es el formato original
+        if 'tipoexamen' in fieldnames_lower:
+            logger.info("Formato detectado: ORIGINAL (columna 'tipoexamen')")
+            return 'original', []
+        
+        logger.info(f"Formato NO RECONOCIDO. Fieldnames: {fieldnames}")
+        return 'unknown', []
+
+    def _normalize_row_format2(self, row):
+        """
+        Normaliza una fila del formato 2 (columnas de exámenes) al formato interno.
+        """
+        normalized = {}
+        for key, value in row.items():
+            key_lower = key.lower().strip()
+            # Mapear columnas conocidas
+            if key_lower in self.COLUMN_MAPPING:
+                normalized[self.COLUMN_MAPPING[key_lower]] = value.strip() if isinstance(value, str) else value
+            else:
+                # Mantener otras columnas (posiblemente exámenes)
+                normalized[key] = value
+        return normalized
+
+    def _get_examenes_from_columns(self, row, columnas_examenes, examenes_map):
+        """
+        Obtiene los exámenes marcados con '1' o 'X' en las columnas del CSV.
+        Los valores vacíos o sin marcar se ignoran sin generar errores.
+        
+        Args:
+            row: Fila del CSV (dict)
+            columnas_examenes: Lista de nombres de columnas que son exámenes
+            examenes_map: Diccionario nombre_lower -> objeto Examen
+            
+        Returns:
+            tuple: (examenes_nombres: list, examenes_bd: list, errores: list)
+        """
+        examenes_nombres = []
+        examenes_bd = []
+        errores = []
+        
+        for col_name in columnas_examenes:
+            if not col_name or not col_name.strip():
+                continue
+                
+            # Obtener el valor de la columna
+            valor = row.get(col_name, '').strip() if isinstance(row.get(col_name), str) else str(row.get(col_name, '')).strip()
+            
+            # Si el valor es '1' o 'X' (en cualquier caso), el examen está marcado
+            if valor.upper() in ['1', 'X']:
+                # Buscar el examen en la BD (nombre exacto o similar)
+                col_name_clean = col_name.strip()
+                examen = examenes_map.get(col_name_clean.lower())
+                
+                if examen:
+                    examenes_nombres.append(examen.nombre)
+                    examenes_bd.append(examen)
+                else:
+                    # Intentar buscar con coincidencia parcial
+                    encontrado = False
+                    for nombre_bd, examen_obj in examenes_map.items():
+                        # Comparar sin acentos y mayúsculas
+                        if self._normalize_text(col_name_clean) == self._normalize_text(nombre_bd):
+                            examenes_nombres.append(examen_obj.nombre)
+                            examenes_bd.append(examen_obj)
+                            encontrado = True
+                            break
+                    
+                    if not encontrado:
+                        errores.append(f"Examen '{col_name_clean}' no encontrado en la BD")
+        
+        return examenes_nombres, examenes_bd, errores
+
+    def _normalize_text(self, text):
+        """Normaliza texto removiendo acentos y convirtiendo a minúsculas."""
+        import unicodedata
+        if not text:
+            return ''
+        # Remover acentos
+        nfkd = unicodedata.normalize('NFKD', text)
+        text_sin_acentos = ''.join([c for c in nfkd if not unicodedata.combining(c)])
+        return text_sin_acentos.lower().strip()
+
+    def _clear_cache(self):
+        """Limpia el cache de reportes de correos y datos de empresas con exámenes."""
+        logger = logging.getLogger(__name__)
+        try:
+            # Limpiar todos los caches de reportes de correos paginados
+            cache.delete_pattern("reporte_correos_page=*")
+            
+            # Limpiar todos los caches de detalles de correo
+            cache.delete_pattern("detalle_correo=*")
+            
+            # Limpiar cache de datos de empresas con exámenes
+            cache.delete('cargo_empresa_examenes_data')
+            
+            logger.info("Cache limpiado: reportes de correos y datos de empresas (EnviarCorreoMasivoView)")
+        except Exception as e:
+            logger.warning(f"Error al limpiar cache: {str(e)}")
 
     def post(self, request):
         """
@@ -1070,18 +1251,38 @@ class EnviarCorreoMasivoView(APIView):
                 )
 
             # Detectar delimitador (coma o punto y coma)
-            sniffer = csv.Sniffer()
+            # Estrategia: contar ocurrencias de delimitadores en la primera línea
+            delimiter = ','
             try:
-                # Muestra de los primeros 1024 caracteres
-                sample = contenido_csv[:1024]
-                dialect = sniffer.sniff(sample, delimiters=',;')
-                delimiter = dialect.delimiter
-                logger.info(f"Delimitador detectado: '{delimiter}'")
-            except Exception:
-                # Si falla la detección, usar coma por defecto
+                # Obtener la primera línea del CSV
+                primera_linea = contenido_csv.split('\n')[0]
+                
+                # Contar ocurrencias de posibles delimitadores
+                contar_comas = primera_linea.count(',')
+                contar_puntoycoma = primera_linea.count(';')
+                
+                logger.info(f"Primera línea tiene {contar_comas} comas y {contar_puntoycoma} puntos y comas")
+                
+                # Si hay más puntos y comas que comas, usar punto y coma
+                if contar_puntoycoma > contar_comas and contar_puntoycoma > 0:
+                    delimiter = ';'
+                    logger.info("Delimitador detectado por conteo: ';'")
+                else:
+                    # Intentar con el sniffer como alternativa
+                    sniffer = csv.Sniffer()
+                    sample = contenido_csv[:1024]
+                    try:
+                        dialect = sniffer.sniff(sample, delimiters=',;')
+                        delimiter = dialect.delimiter
+                        logger.info(f"Delimitador detectado por sniffer: '{delimiter}'")
+                    except Exception:
+                        logger.info("Sniffer no pudo detectar, usando coma por defecto")
+                        delimiter = ','
+            except Exception as e:
+                logger.warning(f"Error en detección de delimitador: {str(e)}. Usando coma por defecto")
                 delimiter = ','
-                logger.warning(
-                    "No se pudo detectar delimitador, usando coma por defecto")
+            
+            logger.info(f"Delimitador final: '{delimiter}'")
 
             # Leer CSV con el delimitador detectado
             stream = io.StringIO(contenido_csv)
@@ -1095,34 +1296,76 @@ class EnviarCorreoMasivoView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Normalizar nombres de columnas a minúsculas
-            fieldnames = [f.strip().lower() for f in reader.fieldnames]
+            # Mantener nombres originales para detectar formato
+            fieldnames_original = [f.strip() for f in reader.fieldnames]
+            # Normalizar nombres de columnas a minúsculas para comparación
+            fieldnames = [f.lower() for f in fieldnames_original]
             logger.info(f"CSV fieldnames detectados: {fieldnames}")
 
-            # Aceptamos encabezados en español: Empresa, Unidad, Proyecto,
-            # Centro, Nombre, CC, Ciudad, cargo, TipoExamen, Examenes
-            expected = {
-                'empresa',
-                'unidad',
-                'proyecto',
-                'centro',
-                'nombre',
-                'cc',
-                'ciudad',
-                'cargo',
-                'tipoexamen',
-                'examenes'}
-
-            if not expected.issubset(set(fieldnames)):
-                logger.error(
-                    f"Columnas faltantes. Expected: {expected}, Got: {
-                        set(fieldnames)}")
+            # ===================================================================
+            # DETECCIÓN AUTOMÁTICA DEL FORMATO DEL CSV
+            # ===================================================================
+            formato_csv, columnas_examenes = self._detect_csv_format(fieldnames_original)
+            logger.info(f"Formato CSV detectado: {formato_csv}")
+            logger.info(f"Delimitador usado: '{delimiter}'")
+            logger.info(f"Fieldnames originales: {fieldnames_original}")
+            logger.info(f"Fieldnames normalizados: {fieldnames}")
+            
+            if formato_csv == 'columnas_examenes':
+                logger.info(f"Columnas de exámenes detectadas: {columnas_examenes}")
+                # Formato 2: Columnas de exámenes con 1/0
+                # Validar columnas requeridas para formato 2
+                expected_format2 = {
+                    'nombre de empresa', 'unidad de negocio', 'proyecto', 
+                    'desc. c.o.', 'cedula', 'nombre empleado', 'cargo', 
+                    'tipo de examen'
+                }
+                missing = expected_format2 - set(fieldnames)
+                if missing:
+                    # Intentar con variantes comunes
+                    # En caso de que las columnas estén escritas de otra forma
+                    logger.warning(f"Columnas esperadas faltantes: {missing}")
+                    # Mostrar sugerencia pero no fallar si la mayoría están presentes
+                    if len(missing) > 2:  # Si faltan más de 2 columnas críticas
+                        logger.error(f"Columnas críticas faltantes para formato 2: {missing}")
+                        return Response(
+                            {
+                                "error": f"El CSV (formato exámenes como columnas) debe contener las columnas: "
+                                         f"{', '.join(sorted(expected_format2))}. "
+                                         f"Columnas recibidas: {', '.join(fieldnames)}. "
+                                         f"Columnas faltantes: {', '.join(missing)}"
+                            },
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+            elif formato_csv == 'original':
+                logger.info("Formato detectado: ORIGINAL (columna Examenes)")
+                # Formato 1: Columna 'Examenes' separados por coma
+                expected = {
+                    'empresa', 'unidad', 'proyecto', 'centro', 'nombre',
+                    'cc', 'ciudad', 'cargo', 'tipoexamen', 'examenes'
+                }
+                missing = expected - set(fieldnames)
+                if missing:
+                    logger.error(f"Columnas faltantes. Expected: {expected}, Got: {set(fieldnames)}")
+                    return Response(
+                        {
+                            "error": f"El CSV debe contener las columnas: "
+                                     f"{', '.join(sorted(expected))} (insensible a mayúsculas). "
+                                     f"Columnas recibidas: {', '.join(fieldnames)}"
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            else:
+                logger.error(f"Formato de CSV no reconocido. Fieldnames: {fieldnames}")
                 return Response(
                     {
-                        "error": f"El CSV debe contener las columnas: {
-                            ', '.join(
-                                sorted(expected))} (insensible a mayúsculas). Columnas recibidas: {
-                            ', '.join(fieldnames)}"},
+                        "error": "Formato de CSV no reconocido. El CSV debe tener: "
+                                 "1) Columna 'Examenes' con nombres separados por coma, O "
+                                 "2) Columna 'TIPO DE EXAMEN' seguida de columnas de exámenes con valores 1/0. "
+                                 f"Columnas recibidas: {', '.join(fieldnames[:20])}..." 
+                                 if len(fieldnames) > 20 
+                                 else f"Columnas recibidas: {', '.join(fieldnames)}"
+                    },
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -1186,35 +1429,78 @@ class EnviarCorreoMasivoView(APIView):
             # empresa -> unidad -> proyecto -> centro)
             trabajadores_validos = []
             errores_validacion = []
+            
+            # Lista de exámenes disponibles en BD para mostrar en mensajes de error
+            examenes_disponibles = list(examenes_map.keys())
 
             for idx, trab in enumerate(trabajadores_data, start=2):
                 try:
-                    # Normalizar lectura por columna (soportar
-                    # mayúsculas/espacios)
-                    row = {
-                        k.strip().lower(): (
-                            v.strip() if isinstance(
-                                v,
-                                str) else v) for k,
-                        v in trab.items()}
+                    # =========================================================
+                    # PROCESAR SEGÚN FORMATO DETECTADO
+                    # =========================================================
+                    if formato_csv == 'columnas_examenes':
+                        # FORMATO 2: Columnas de exámenes con valores 1/0
+                        # Normalizar fila usando el mapeo de columnas
+                        row = self._normalize_row_format2(trab)
+                        
+                        empresa_name = (row.get('empresa') or '').strip()
+                        unidad_name = (row.get('unidad') or '').strip()
+                        proyecto_name = (row.get('proyecto') or '').strip()
+                        centro_name = (row.get('centro') or '').strip()
+                        nombre = (row.get('nombre') or '').strip()
+                        documento = (row.get('cc') or '').strip()
+                        cargo_name = (row.get('cargo') or '').strip()
+                        ciudad = (row.get('ciudad') or '').strip()
+                        tipo_examen = (row.get('tipoexamen') or '').upper().strip()
+                        
+                        # Obtener exámenes de las columnas marcadas con '1'
+                        examenes_nombres, examenes_bd, errores_examenes = self._get_examenes_from_columns(
+                            trab, columnas_examenes, examenes_map
+                        )
+                        
+                        # Agregar errores de exámenes no encontrados
+                        for error in errores_examenes:
+                            errores_validacion.append(f"Línea {idx}: {error}")
+                        
+                    else:
+                        # FORMATO 1 (Original): Columna 'Examenes' separados por coma
+                        row = {
+                            k.strip().lower(): (
+                                v.strip() if isinstance(v, str) else v
+                            ) for k, v in trab.items()
+                        }
 
-                    empresa_name = (row.get('empresa') or '').strip()
-                    unidad_name = (row.get('unidad') or '').strip()
-                    proyecto_name = (row.get('proyecto') or '').strip()
-                    nombre = (row.get('nombre') or '').strip()
-                    documento = (row.get('cc') or '').strip()
-                    cargo_name = (row.get('cargo') or '').strip()
-                    centro_name = (row.get('centro') or '').strip()
-                    ciudad = (row.get('ciudad') or '').strip()  # Capturar ciudad
-                    tipo_examen = (
-                        # INGRESO o PERIODICO
-                        row.get('tipoexamen') or ''
-                    ).upper().strip()
-                    examenes_str = (row.get('examenes') or '').strip()
-
+                        empresa_name = (row.get('empresa') or '').strip()
+                        unidad_name = (row.get('unidad') or '').strip()
+                        proyecto_name = (row.get('proyecto') or '').strip()
+                        nombre = (row.get('nombre') or '').strip()
+                        documento = (row.get('cc') or '').strip()
+                        cargo_name = (row.get('cargo') or '').strip()
+                        centro_name = (row.get('centro') or '').strip()
+                        ciudad = (row.get('ciudad') or '').strip()
+                        tipo_examen = (row.get('tipoexamen') or '').upper().strip()
+                        examenes_str = (row.get('examenes') or '').strip()
+                        
+                        # Parsear exámenes para formato original
+                        examenes_nombres = []
+                        examenes_bd = []
+                        
+                        if examenes_str:
+                            examenes_nombres = [
+                                e.strip() for e in examenes_str.split(',') if e.strip()
+                            ]
+                    
+                    # =========================================================
+                    # VALIDACIONES COMUNES PARA AMBOS FORMATOS
+                    # =========================================================
+                    
+                    # Saltar filas vacías (sin nombre ni documento)
+                    if not nombre and not documento:
+                        continue
+                    
                     if not nombre or not documento:
                         errores_validacion.append(
-                            f"Línea {idx}: Nombre y/o CC vacío")
+                            f"Línea {idx}: Nombre y/o CC vacío (nombre='{nombre}', cc='{documento}')")
                         continue
 
                     # Validar tipo de examen
@@ -1228,70 +1514,111 @@ class EnviarCorreoMasivoView(APIView):
                         continue
 
                     # Validar que hay exámenes especificados
-                    if not examenes_str:
-                        errores_validacion.append(
-                            f"Línea {idx}: Campo 'Examenes' vacío")
-                        continue
-
-                    # Parsear exámenes (separados por coma)
-                    examenes_nombres = [
-                        e.strip() for e in examenes_str.split(',') if e.strip()]
                     if not examenes_nombres:
-                        errores_validacion.append(
-                            f"Línea {idx}: No hay exámenes válidos en el campo 'Examenes'")
+                        if formato_csv == 'columnas_examenes':
+                            errores_validacion.append(
+                                f"Línea {idx}: No hay exámenes marcados con '1' en las columnas de exámenes")
+                        else:
+                            errores_validacion.append(
+                                f"Línea {idx}: Campo 'Examenes' vacío")
                         continue
 
                     # OPTIMIZADO: Buscar empresa usando mapa precargado (O(1) en lugar de query)
                     empresa = empresas_map.get(empresa_name.lower())
                     if not empresa:
-                        errores_validacion.append(
-                            f"Línea {idx}: Empresa '{empresa_name}' no encontrada")
-                        continue
+                        # Intentar búsqueda normalizada (sin acentos)
+                        empresa = None
+                        for nombre_bd, emp_obj in empresas_map.items():
+                            if self._normalize_text(empresa_name) == self._normalize_text(nombre_bd):
+                                empresa = emp_obj
+                                break
+                        if not empresa:
+                            errores_validacion.append(
+                                f"Línea {idx}: Empresa '{empresa_name}' no encontrada en la BD")
+                            continue
 
                     # OPTIMIZADO: Buscar unidad usando mapa precargado
                     unidad = unidades_map.get((unidad_name.lower(), empresa.idempresa))
                     if not unidad:
-                        errores_validacion.append(
-                            f"Línea {idx}: Unidad '{unidad_name}' no encontrada para empresa '{empresa.nombre_empresa}'")
-                        continue
+                        # Intentar búsqueda normalizada
+                        for (nombre_bd, emp_id), uni_obj in unidades_map.items():
+                            if emp_id == empresa.idempresa and self._normalize_text(unidad_name) == self._normalize_text(nombre_bd):
+                                unidad = uni_obj
+                                break
+                        if not unidad:
+                            errores_validacion.append(
+                                f"Línea {idx}: Unidad '{unidad_name}' no encontrada para empresa '{empresa.nombre_empresa}'")
+                            continue
 
                     # OPTIMIZADO: Buscar proyecto usando mapa precargado
                     proyecto = proyectos_map.get((proyecto_name.lower(), unidad.idunidad))
                     if not proyecto:
-                        errores_validacion.append(
-                            f"Línea {idx}: Proyecto '{proyecto_name}' no encontrado para unidad '{unidad.nombreunidad}'")
-                        continue
+                        # Intentar búsqueda normalizada
+                        for (nombre_bd, uni_id), proy_obj in proyectos_map.items():
+                            if uni_id == unidad.idunidad and self._normalize_text(proyecto_name) == self._normalize_text(nombre_bd):
+                                proyecto = proy_obj
+                                break
+                        if not proyecto:
+                            errores_validacion.append(
+                                f"Línea {idx}: Proyecto '{proyecto_name}' no encontrado para unidad '{unidad.nombreunidad}'")
+                            continue
 
                     # OPTIMIZADO: Buscar centro usando mapa precargado
                     centro = centros_map.get((centro_name.lower(), proyecto.idproyecto))
                     if not centro:
-                        errores_validacion.append(
-                            f"Línea {idx}: Centro '{centro_name}' no encontrado para proyecto '{proyecto.nombreproyecto}'"
-                        )
-                        continue
+                        # Intentar búsqueda normalizada
+                        for (nombre_bd, proy_id), cent_obj in centros_map.items():
+                            if proy_id == proyecto.idproyecto and self._normalize_text(centro_name) == self._normalize_text(nombre_bd):
+                                centro = cent_obj
+                                break
+                        if not centro:
+                            errores_validacion.append(
+                                f"Línea {idx}: Centro '{centro_name}' no encontrado para proyecto '{proyecto.nombreproyecto}'"
+                            )
+                            continue
 
                     # OPTIMIZADO: Buscar cargo usando mapa precargado
                     cargo = cargos_map.get(cargo_name.lower())
                     if not cargo:
-                        errores_validacion.append(
-                            f"Línea {idx}: Cargo '{cargo_name}' no encontrado")
-                        continue
-
-                    # OPTIMIZADO: Validar exámenes usando mapa precargado
-                    examenes_bd = []
-                    examen_invalido = False
-                    for examen_nombre in examenes_nombres:
-                        examen = examenes_map.get(examen_nombre.lower())
-                        if not examen:
+                        # Intentar búsqueda normalizada
+                        for nombre_bd, cargo_obj in cargos_map.items():
+                            if self._normalize_text(cargo_name) == self._normalize_text(nombre_bd):
+                                cargo = cargo_obj
+                                break
+                        if not cargo:
                             errores_validacion.append(
-                                f"Línea {idx}: Examen '{examen_nombre}' "
-                                f"no encontrado o no está activo"
-                            )
-                            examen_invalido = True
-                            break
-                        examenes_bd.append(examen)
+                                f"Línea {idx}: Cargo '{cargo_name}' no encontrado en la BD")
+                            continue
+
+                    # Validar exámenes (solo para formato original, ya que formato 2 lo hizo antes)
+                    if formato_csv == 'original':
+                        examenes_bd = []
+                        examen_invalido = False
+                        for examen_nombre in examenes_nombres:
+                            examen = examenes_map.get(examen_nombre.lower())
+                            if not examen:
+                                # Intentar búsqueda normalizada
+                                for nombre_bd, ex_obj in examenes_map.items():
+                                    if self._normalize_text(examen_nombre) == self._normalize_text(nombre_bd):
+                                        examen = ex_obj
+                                        break
+                                if not examen:
+                                    errores_validacion.append(
+                                        f"Línea {idx}: Examen '{examen_nombre}' "
+                                        f"no encontrado o no está activo. "
+                                        f"Exámenes disponibles: {', '.join(sorted(examenes_disponibles)[:10])}..."
+                                    )
+                                    examen_invalido = True
+                                    break
+                            examenes_bd.append(examen)
+                        
+                        if examen_invalido:
+                            continue
                     
-                    if examen_invalido:
+                    # Validar que examenes_bd tiene objetos válidos
+                    if not examenes_bd:
+                        errores_validacion.append(
+                            f"Línea {idx}: No se encontraron exámenes válidos")
                         continue
                     
                     # Todos los datos son válidos
@@ -1302,15 +1629,17 @@ class EnviarCorreoMasivoView(APIView):
                         'unidad': unidad,
                         'proyecto': proyecto,
                         'centro': centro,
-                        'ciudad': ciudad,  # Agregar ciudad
+                        'ciudad': ciudad,
                         'cargo': cargo,
                         'tipo_examen': tipo_examen,
-                        'examenes_nombres': examenes_nombres,  # Nombres como strings
-                        'examenes_bd': examenes_bd,  # Objetos de BD
+                        'examenes_nombres': [e.nombre for e in examenes_bd],  # Usar nombres de BD
+                        'examenes_bd': examenes_bd,
                     })
 
                 except Exception as e:
-                    errores_validacion.append(f"Línea {idx}: {str(e)}")
+                    import traceback
+                    errores_validacion.append(f"Línea {idx}: Error inesperado - {str(e)}")
+                    logger.error(f"Error procesando línea {idx}: {traceback.format_exc()}")
 
             # ===================================================================
             # VALIDACIÓN COMPLETADA - VERIFICAR ERRORES ANTES DE CONTINUAR
@@ -1403,8 +1732,8 @@ para los trabajadores en el excel adjunto.</p>
 
             correos_destino = (
                 "practicante.desarrollogh@regency.com.co,"
-                "operativo@servicompetentes.com,"
-                "administrativo@servicompetentes.com,"
+                #"operativo@servicompetentes.com,"
+                #"administrativo@servicompetentes.com,"
             )
             # Split and filter out any empty items (avoid trailing-comma empties)
             correos_list = [email.strip() for email in correos_destino.split(',') if email.strip()]
@@ -1531,6 +1860,9 @@ para los trabajadores en el excel adjunto.</p>
                 )
 
             # Respuesta exitosa
+            # Limpiar cache de reportes y datos de empresas
+            self._clear_cache()
+
             return Response(
                 {
                     "uuid_correo": uuid_correo,
@@ -2296,3 +2628,411 @@ class FiltrarExamenesView(APIView):
                 {"error": f"Error buscando correo: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class ListarExamenesDisponiblesView(APIView):
+    """
+    Lista todos los exámenes activos disponibles en la base de datos.
+    Útil para verificar qué nombres de exámenes usar en el CSV.
+    
+    GET: Retorna lista de exámenes con id y nombre.
+    """
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial | IsSuperAdmin]
+
+    def get(self, request):
+        """Lista exámenes activos para validar columnas del CSV."""
+        examenes = Examen.objects.filter(activo=True).order_by('nombre')
+        
+        data = {
+            "total": examenes.count(),
+            "examenes": [
+                {
+                    "id": e.id_examen,
+                    "nombre": e.nombre,
+                    "nombre_normalizado": e.nombre.lower().strip()
+                }
+                for e in examenes
+            ],
+            "nota": "Los nombres de columnas en el CSV deben coincidir exactamente con 'nombre' o 'nombre_normalizado'"
+        }
+        
+        return Response(data, status=status.HTTP_200_OK)
+
+
+class ValidarCSVExamenesView(APIView):
+    """
+    Valida un archivo CSV de exámenes SIN enviar correo.
+    Útil para verificar que el CSV está bien formateado antes de enviarlo.
+    
+    POST: Recibe archivo CSV y retorna validación detallada.
+    """
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial | IsSuperAdmin]
+
+    def post(self, request):
+        """
+        Valida CSV sin enviar correo.
+        
+        Request:
+        {
+            "archivo_csv": <file>
+        }
+        
+        Response:
+        {
+            "formato_detectado": "columnas_examenes" | "original",
+            "columnas_examenes_csv": ["OPTOMETRIA", "AUDIOMETRIA", ...],
+            "examenes_encontrados_bd": [...],
+            "examenes_no_encontrados": [...],
+            "trabajadores_validos": 24,
+            "trabajadores_con_errores": 2,
+            "errores": [...],
+            "validacion_exitosa": true/false
+        }
+        """
+        import io
+        import csv
+        logger = logging.getLogger(__name__)
+        
+        # Validar archivo
+        archivo_csv = request.FILES.get('archivo_csv')
+        if not archivo_csv:
+            return Response(
+                {"error": "Se requiere archivo_csv"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not archivo_csv.name.endswith('.csv'):
+            return Response(
+                {"error": "El archivo debe ser CSV (.csv)"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Decodificar archivo
+            archivo_csv.seek(0)
+            contenido_csv = None
+            encoding_usado = None
+            
+            for encoding in ['utf-8-sig', 'utf-8', 'latin-1', 'iso-8859-1', 'cp1252']:
+                try:
+                    archivo_csv.seek(0)
+                    contenido_csv = archivo_csv.read().decode(encoding)
+                    encoding_usado = encoding
+                    break
+                except (UnicodeDecodeError, AttributeError):
+                    continue
+            
+            if contenido_csv is None:
+                return Response(
+                    {"error": "No se pudo decodificar el CSV"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Detectar delimitador
+            delimiter = ','
+            try:
+                # Obtener la primera línea del CSV
+                primera_linea = contenido_csv.split('\n')[0]
+                
+                # Contar ocurrencias de posibles delimitadores
+                contar_comas = primera_linea.count(',')
+                contar_puntoycoma = primera_linea.count(';')
+                
+                # Si hay más puntos y comas que comas, usar punto y coma
+                if contar_puntoycoma > contar_comas and contar_puntoycoma > 0:
+                    delimiter = ';'
+                else:
+                    # Intentar con el sniffer como alternativa
+                    sniffer = csv.Sniffer()
+                    try:
+                        sample = contenido_csv[:1024]
+                        dialect = sniffer.sniff(sample, delimiters=',;')
+                        delimiter = dialect.delimiter
+                    except Exception:
+                        delimiter = ','
+            except Exception as e:
+                logger.warning(f"Error en detección de delimitador: {str(e)}")
+                delimiter = ','
+            
+            # Leer CSV
+            stream = io.StringIO(contenido_csv)
+            reader = csv.DictReader(stream, delimiter=delimiter)
+            
+            if not reader.fieldnames:
+                return Response(
+                    {"error": "CSV sin encabezados"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            fieldnames_original = [f.strip() for f in reader.fieldnames]
+            fieldnames_lower = [f.lower() for f in fieldnames_original]
+            
+            # Detectar formato
+            formato_csv = 'unknown'
+            columnas_examenes = []
+            
+            if 'examenes' in fieldnames_lower:
+                formato_csv = 'original'
+            elif 'tipo de examen' in fieldnames_lower:
+                formato_csv = 'columnas_examenes'
+                tipo_idx = fieldnames_lower.index('tipo de examen')
+                columnas_examenes = [c for c in fieldnames_original[tipo_idx + 1:] if c and c.strip()]
+            elif 'tipoexamen' in fieldnames_lower:
+                formato_csv = 'original'
+            
+            # Cargar exámenes de BD
+            examenes_bd = {
+                e.nombre.lower().strip(): e.nombre
+                for e in Examen.objects.filter(activo=True)
+            }
+            
+            # Validar columnas de exámenes
+            examenes_encontrados = []
+            examenes_no_encontrados = []
+            
+            if formato_csv == 'columnas_examenes':
+                for col in columnas_examenes:
+                    col_lower = col.lower().strip()
+                    if col_lower in examenes_bd:
+                        examenes_encontrados.append({
+                            "columna_csv": col,
+                            "nombre_bd": examenes_bd[col_lower]
+                        })
+                    else:
+                        examenes_no_encontrados.append(col)
+            
+            # Contar trabajadores
+            trabajadores_data = list(reader)
+            filas_no_vacias = [
+                t for t in trabajadores_data
+                if any(v and v.strip() for v in t.values())
+            ]
+            
+            # Construir respuesta
+            response_data = {
+                "formato_detectado": formato_csv,
+                "encoding_usado": encoding_usado,
+                "delimitador": delimiter,
+                "columnas_csv": fieldnames_original,
+                "total_filas": len(trabajadores_data),
+                "filas_no_vacias": len(filas_no_vacias),
+            }
+            
+            if formato_csv == 'columnas_examenes':
+                response_data.update({
+                    "columnas_examenes_csv": columnas_examenes,
+                    "examenes_encontrados_bd": examenes_encontrados,
+                    "examenes_no_encontrados": examenes_no_encontrados,
+                    "total_examenes_csv": len(columnas_examenes),
+                    "examenes_validos": len(examenes_encontrados),
+                })
+            
+            response_data["validacion_exitosa"] = (
+                formato_csv != 'unknown' and 
+                (formato_csv == 'original' or len(examenes_no_encontrados) == 0)
+            )
+            
+            if not response_data["validacion_exitosa"]:
+                response_data["sugerencia"] = (
+                    "Verifique que los nombres de columnas de exámenes coincidan "
+                    "exactamente con los nombres en la base de datos. "
+                    "Use el endpoint /api/examenes/listar-examenes/ para ver los nombres correctos."
+                )
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            import traceback
+            logger.error(f"Error validando CSV: {traceback.format_exc()}")
+            return Response(
+                {"error": f"Error procesando CSV: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
+
+class GestionarExamenesCargoView(APIView):
+    """
+    Endpoint para gestionar (ver, agregar, eliminar) exámenes asignados a un cargo
+    en una empresa específica, filtrados por tipo de examen.
+
+    GET: Retorna exámenes asignados a un cargo en una empresa, filtrados por tipo.
+         Params: empresa_id, cargo_id, tipo (opcional)
+    POST: Agrega exámenes a un cargo en una empresa para un tipo.
+         Body: { empresa_id, cargo_id, tipo, examenes_ids: [1,2,3] }
+    DELETE: Elimina exámenes de un cargo en una empresa para un tipo.
+         Body: { empresa_id, cargo_id, tipo, examenes_ids: [1,2,3] }
+    """
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial | IsSuperAdmin]
+
+    def get(self, request):
+        empresa_id = request.query_params.get('empresa_id')
+        cargo_id = request.query_params.get('cargo_id')
+        tipo = request.query_params.get('tipo', '').upper()
+
+        if not empresa_id:
+            return Response(
+                {"error": "Se requiere empresa_id"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            empresa = Epresa.objects.get(idempresa=empresa_id)
+        except Epresa.DoesNotExist:
+            return Response({"error": "Empresa no encontrada"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Si no se proporciona cargo_id, devolver solo los cargos asignados a esa empresa
+        if not cargo_id:
+            # Obtener cargos únicos que tienen asignaciones en esa empresa
+            cargos_asignados = Cargo.objects.filter(
+                examenescargo__empresa=empresa
+            ).distinct().values('idcargo', 'nombrecargo').order_by('nombrecargo')
+            
+            return Response({
+                'empresa': {'id': empresa.idempresa, 'nombre': empresa.nombre_empresa},
+                'cargos_disponibles': list(cargos_asignados),
+            }, status=status.HTTP_200_OK)
+
+        try:
+            cargo = Cargo.objects.get(idcargo=cargo_id)
+        except Cargo.DoesNotExist:
+            return Response({"error": "Cargo no encontrado"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Filtrar asignaciones
+        queryset = ExamenesCargo.objects.filter(
+            empresa=empresa,
+            cargo=cargo,
+            examen__activo=True
+        ).select_related('examen')
+
+        if tipo and tipo in TIPOS_EXAMEN_VALIDOS:
+            queryset = queryset.filter(tipo=tipo)
+
+        # Agrupar por tipo
+        asignaciones_por_tipo = {}
+        for ec in queryset.order_by('tipo', 'examen__nombre'):
+            if ec.tipo not in asignaciones_por_tipo:
+                asignaciones_por_tipo[ec.tipo] = []
+            asignaciones_por_tipo[ec.tipo].append({
+                'id_asignacion': ec.id,
+                'id_examen': ec.examen.id_examen,
+                'nombre_examen': ec.examen.nombre,
+            })
+
+        # Todos los exámenes activos disponibles (para el selector)
+        todos_examenes = list(
+            Examen.objects.filter(activo=True)
+            .order_by('nombre')
+            .values('id_examen', 'nombre')
+        )
+
+        return Response({
+            'empresa': {'id': empresa.idempresa, 'nombre': empresa.nombre_empresa},
+            'cargo': {'id': cargo.idcargo, 'nombre': cargo.nombrecargo},
+            'asignaciones_por_tipo': asignaciones_por_tipo,
+            'todos_examenes': todos_examenes,
+            'tipos_validos': TIPOS_EXAMEN_VALIDOS,
+        }, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        """Agregar exámenes a un cargo en una empresa para un tipo."""
+        empresa_id = request.data.get('empresa_id')
+        cargo_id = request.data.get('cargo_id')
+        tipo = (request.data.get('tipo') or '').upper()
+        examenes_ids = request.data.get('examenes_ids', [])
+
+        if not empresa_id or not cargo_id or not tipo or not examenes_ids:
+            return Response(
+                {"error": "Se requieren empresa_id, cargo_id, tipo y examenes_ids"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if tipo not in TIPOS_EXAMEN_VALIDOS:
+            return Response(
+                {"error": f"Tipo inválido. Debe ser: {', '.join(TIPOS_EXAMEN_VALIDOS)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            empresa = Epresa.objects.get(idempresa=empresa_id)
+            cargo = Cargo.objects.get(idcargo=cargo_id)
+        except Epresa.DoesNotExist:
+            return Response({"error": "Empresa no encontrada"}, status=status.HTTP_404_NOT_FOUND)
+        except Cargo.DoesNotExist:
+            return Response({"error": "Cargo no encontrado"}, status=status.HTTP_404_NOT_FOUND)
+
+        examenes = Examen.objects.filter(id_examen__in=examenes_ids, activo=True)
+        if not examenes.exists():
+            return Response(
+                {"error": "No se encontraron exámenes válidos con los IDs proporcionados"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        creados = []
+        ya_existentes = []
+        for examen in examenes:
+            obj, created = ExamenesCargo.objects.get_or_create(
+                empresa=empresa,
+                cargo=cargo,
+                examen=examen,
+                tipo=tipo
+            )
+            if created:
+                creados.append(examen.nombre)
+            else:
+                ya_existentes.append(examen.nombre)
+
+        # Invalidar cache
+        cache.delete('cargo_empresa_examenes_data')
+
+        return Response({
+            'mensaje': f"Se agregaron {len(creados)} exámenes al cargo '{cargo.nombrecargo}' "
+                       f"en empresa '{empresa.nombre_empresa}' para tipo '{tipo}'",
+            'creados': creados,
+            'ya_existentes': ya_existentes,
+        }, status=status.HTTP_201_CREATED)
+
+    def delete(self, request):
+        """Eliminar exámenes de un cargo en una empresa para un tipo."""
+        empresa_id = request.data.get('empresa_id')
+        cargo_id = request.data.get('cargo_id')
+        tipo = (request.data.get('tipo') or '').upper()
+        examenes_ids = request.data.get('examenes_ids', [])
+
+        if not empresa_id or not cargo_id or not tipo or not examenes_ids:
+            return Response(
+                {"error": "Se requieren empresa_id, cargo_id, tipo y examenes_ids"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if tipo not in TIPOS_EXAMEN_VALIDOS:
+            return Response(
+                {"error": f"Tipo inválido. Debe ser: {', '.join(TIPOS_EXAMEN_VALIDOS)}"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            empresa = Epresa.objects.get(idempresa=empresa_id)
+            cargo = Cargo.objects.get(idcargo=cargo_id)
+        except Epresa.DoesNotExist:
+            return Response({"error": "Empresa no encontrada"}, status=status.HTTP_404_NOT_FOUND)
+        except Cargo.DoesNotExist:
+            return Response({"error": "Cargo no encontrado"}, status=status.HTTP_404_NOT_FOUND)
+
+        eliminados = ExamenesCargo.objects.filter(
+            empresa=empresa,
+            cargo=cargo,
+            tipo=tipo,
+            examen_id__in=examenes_ids
+        )
+        count = eliminados.count()
+        nombres_eliminados = list(eliminados.values_list('examen__nombre', flat=True))
+        eliminados.delete()
+
+        # Invalidar cache
+        cache.delete('cargo_empresa_examenes_data')
+
+        return Response({
+            'mensaje': f"Se eliminaron {count} exámenes del cargo '{cargo.nombrecargo}' "
+                       f"en empresa '{empresa.nombre_empresa}' para tipo '{tipo}'",
+            'eliminados': nombres_eliminados,
+        }, status=status.HTTP_200_OK)

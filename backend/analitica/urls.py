@@ -15,10 +15,12 @@ urlpatterns = [
     path('crear-unidad-negocio/', views.UnidadNegocioCreateView.as_view(), name='crear_unidad_negocio'),
     path('ver-unidad-negocio/<int:pk>/', views.VerUnidadNegocioView.as_view(), name='ver_unidad_negocio'),
     path('lista-unidades-negocio/', views.ListaUnidadesNegocioView.as_view(), name='lista_unidades_negocio'),
+    
     # Proyectos 
     path('crear-proyecto/', views.ProyectoCreateView.as_view(), name='crear_proyecto'),
     path('ver-proyecto/<int:pk>/', views.VerProyectoView.as_view(), name='ver_proyecto'),
     path('proyectos/', views.ListaProyectosView.as_view(), name='lista_proyectos'),
+    path('jefes-proyecto/<int:proyecto_id>/', views.JefesProyectoView.as_view(), name='jefes_proyecto'),
     
     # Centros operativos 
     path('crear-centro-operativo/', views.CentroOperativoCreateView.as_view(), name='crear_centro_operativo'),
@@ -27,4 +29,5 @@ urlpatterns = [
 
     # Carga masiva
     path('cargarDatosEmpresa/', views.CargarEstructuraView.as_view(), name='cargar-datos-empresa'),
+    
 ]

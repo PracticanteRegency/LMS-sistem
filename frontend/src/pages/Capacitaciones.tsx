@@ -21,15 +21,12 @@ interface MenuState {
   [key: number]: boolean;
 }
 
-const CAP_TYPES = ["Todos", "Curso", "Taller", "Seminario", "Evento"];
-
 export default function Capacitaciones() {
   const [capacitaciones, setCapacitaciones] = useState<Capacitacion[]>([]);
   const [filtradas, setFiltradas] = useState<Capacitacion[]>([]);
   const [page, setPage] = useState(1);
   const pageSize = 5;
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedTipo, setSelectedTipo] = useState(CAP_TYPES[0]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openMenus, setOpenMenus] = useState<MenuState>({});
@@ -87,15 +84,11 @@ export default function Capacitaciones() {
 
   const handleSearch = (term: string) => {
     setSearchTerm(term);
-    applyFilters(term, selectedTipo);
+    applyFilters(term);
   };
 
-  const applyFilters = (term: string, tipo: string) => {
+  const applyFilters = (term: string) => {
     let result = [...capacitaciones];
-
-    if (tipo && tipo !== "Todos") {
-      result = result.filter((c) => (c.tipo || "").toLowerCase() === tipo.toLowerCase());
-    }
 
     if (term && term.trim()) {
       result = result.filter((cap) => (cap.titulo || "").toLowerCase().includes(term.toLowerCase()));
@@ -302,28 +295,15 @@ export default function Capacitaciones() {
           value={searchTerm}
           onChange={(e) => handleSearch(e.target.value)}
         />
-        <select
-          className={styles.smallSelect}
-          value={selectedTipo}
-          onChange={(e) => {
-            setSelectedTipo(e.target.value);
-            applyFilters(searchTerm, e.target.value);
-          }}
-          style={{ marginLeft: 12 }}
-        >
-          {CAP_TYPES.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
-        </select>
         <span className={styles.resultCount}>
           {filtradas.length} de {capacitaciones.length} resultados
         </span>
       </div>
 
       {/* Table */}
-      <div className={styles.tableWrapper}>
-        {filtradas.length > 0 ? (
-          <>
+      <div style={{ position: 'relative' }}>
+        <div className={styles.tableWrapper}>
+          {filtradas.length > 0 ? (
             <table className={styles.table}>
               <thead className={styles.thead}>
                 <tr>
@@ -385,34 +365,34 @@ export default function Capacitaciones() {
                               }}
                             >
                               <button
-                                className={`${styles.btn} ${styles.btnView}`}
+                                className={`${styles.btn} ${styles.btn}`}
                                 onClick={() => handleAction("Ver", cap)}
                               >
                                 Ver
                               </button>
                               <button
-                                className={`${styles.btn} ${styles.btnEdit}`}
+                                className={`${styles.btn} ${styles.btn}`}
                                 onClick={() => handleAction("Editar", cap)}
                               >
                                 Editar
                               </button>
 
                               <button
-                                className={`${styles.btn} ${styles.btnManage}`}
+                                className={`${styles.btn} ${styles.btn}`}
                                 onClick={() => handleAction("EditarColaboradores", cap)}
                               >
                                 Editar colaboradores
                               </button>
 
                                 <button
-                                  className={`${styles.btn} ${styles.btnDisable}`}
+                                  className={`${styles.btn} ${styles.btn}`}
                                   onClick={() => handleAction("ToggleEstado", cap)}
                                 >
                                   {cap.estado === 0 ? 'Activar' : 'Desactivar'}
                                 </button>
 
                               <button
-                                className={`${styles.btn} ${styles.btnDelete}`}
+                                className={`${styles.btn} ${styles.btn}`}
                                 onClick={() => handleAction("Eliminar", cap)}
                               >
                                 Eliminar
@@ -426,7 +406,14 @@ export default function Capacitaciones() {
                   ))}
               </tbody>
             </table>
-            <div className={styles.pagination}>
+          ) : (
+            <div className={styles.emptyState}>
+              <p>No se encontraron capacitaciones.</p>
+            </div>
+          )}
+        </div>
+        {filtradas.length > 0 && (
+          <div className={styles.pagination + ' ' + styles.paginationFixed}>
               <button
                 className={styles.pageBtn}
                 disabled={page === 1}
@@ -445,11 +432,6 @@ export default function Capacitaciones() {
                 Siguiente →
               </button>
             </div>
-          </>
-        ) : (
-          <div className={styles.emptyState}>
-            <p>No se encontraron capacitaciones con ese nombre</p>
-          </div>
         )}
       </div>
 

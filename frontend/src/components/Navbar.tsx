@@ -24,8 +24,8 @@ export default function Navbar({ username: propUsername, onMenuToggle }: NavbarP
       if (!propUsername) {
         try {
           const perfil = await perfilService.getPerfil();
-          if (perfil?.nombre_colaborador && perfil?.apellido_colaborador) {
-            setUsername(`${perfil.nombre_colaborador} ${perfil.apellido_colaborador}`);
+          if (perfil?.nombrecolaborador && perfil?.apellidocolaborador) {
+            setUsername(`${perfil.nombrecolaborador} ${perfil.apellidocolaborador}`);
           } else {
             // Fallback to localStorage
             const user = localStorage.getItem('user');
@@ -79,7 +79,8 @@ export default function Navbar({ username: propUsername, onMenuToggle }: NavbarP
     setUserDropdownOpen(false);
   };
 
-  const handleMenuToggle = () => {
+  const handleMenuToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
     const newState = !open;
     setOpen(newState);
     if (onMenuToggle) onMenuToggle(newState);
@@ -91,7 +92,7 @@ export default function Navbar({ username: propUsername, onMenuToggle }: NavbarP
 
   return (
     <header className={styles.navbar}>
-      <div className={styles.left}>
+      <div>
         <button
           className={styles.menuButton}
           onClick={handleMenuToggle}

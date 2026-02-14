@@ -74,10 +74,11 @@ class UnidadNegocioSerializer(serializers.ModelSerializer):
 class ProyectoSerializer(serializers.ModelSerializer):
     id_unidad = serializers.IntegerField(write_only=True, required=False)
     centros = serializers.SerializerMethodField()
+    jefe_proyecto = serializers.SerializerMethodField()
 
     class Meta:
         model = Proyecto
-        fields = ['idproyecto', 'nombreproyecto', 'estadoproyecto', 'id_unidad', 'idcolaborador', 'centros']
+        fields = ['idproyecto', 'nombreproyecto', 'estadoproyecto', 'id_unidad', 'idcolaborador', 'centros', 'jefe_proyecto']
 
     def create(self, validated_data):
         unidad_id = validated_data.pop('id_unidad', None)
@@ -108,6 +109,16 @@ class ProyectoSerializer(serializers.ModelSerializer):
     def get_centros(self, obj):
         centros = obj.centroop_set.all()
         return CentroOpSimpleSerializer(centros, many=True).data
+
+    def get_jefe_proyecto(self, obj):
+        if obj.idcolaborador:
+            return {
+                "idcolaborador": obj.idcolaborador.idcolaborador,
+                "nombre": obj.idcolaborador.nombrecolaborador,
+                "apellido": obj.idcolaborador.apellidocolaborador,
+                "correo": obj.idcolaborador.correocolaborador
+            }
+        return None
 
 
 
@@ -180,6 +191,30 @@ class CentroOpSimpleSerializer(serializers.ModelSerializer):
 
 
 # --- carga masiva estructura ---
+
+class JefesProyectoSerializer(serializers.Serializer):
+    """Serializer para gestionar jefes de proyecto"""
+    idcolaborador = serializers.IntegerField()
+    idproyecto = serializers.IntegerField()
+
+    def validate(self, data):
+        from usuarios.models import Colaboradores
+        
+        colaborador_id = data.get('idcolaborador')
+        proyecto_id = data.get('idproyecto')
+        
+        # Validar que el colaborador existe
+        colaborador = Colaboradores.objects.filter(idcolaborador=colaborador_id).first()
+        if not colaborador:
+            raise serializers.ValidationError("El colaborador no existe.")
+        
+        # Validar que el proyecto existe
+        proyecto = Proyecto.objects.filter(idproyecto=proyecto_id).first()
+        if not proyecto:
+            raise serializers.ValidationError("El proyecto no existe.")
+        
+        return data
+
 
 class CargarEstructuraSerializer(serializers.Serializer):
     empresa = serializers.CharField()

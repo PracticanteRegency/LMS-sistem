@@ -147,4 +147,4 @@ class IsSuperAdmin(BasePermission):
             return False
         tipousuario = getattr(request.user, 'tipousuario', None)
         # Permitir tanto admin (1) como super admin (4)
-        return tipousuario in [1, 4]
+        return tipousuario in [1, 2, 3, 4]

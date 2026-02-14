@@ -13,4 +13,10 @@ urlpatterns = [
     path('actualizar-estado/', views.ActualizarEstadoExamenesMasivoView.as_view(), name='actualizar-estado-examenes-masivo'),
     path('crear-examen/', views.CrearExamenView.as_view(), name='crear-examen'),
     path('filtrar-examenes/', views.FiltrarExamenesView.as_view(), name='filtrar-examenes'),
+    # Nuevos endpoints para validación de CSV
+    path('listar-examenes/', views.ListarExamenesDisponiblesView.as_view(), name='listar-examenes'),
+    path('validar-csv/', views.ValidarCSVExamenesView.as_view(), name='validar-csv'),
+    # Endpoint para gestionar exámenes asignados a cargo/empresa
+    path('gestionar-examenes-cargo/', views.GestionarExamenesCargoView.as_view(), name='gestionar-examenes-cargo'),
+    
 ]
