@@ -323,7 +323,6 @@ export default function Usuarios() {
           value={pendingSearch}
           onChange={(e) => handleInputChange(e.target.value)}
           onKeyDown={handleInputKeyDown}
-          style={{ color: 'black' }}
         />
         <button
           className={styles.searchButton}
