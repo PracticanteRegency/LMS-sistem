@@ -225,8 +225,8 @@ class EnviarCorreoView(APIView):
         # Forzar destinatarios fijos para este endpoint
         correos_destino_fixed = (
             "coordinador.seleccion@regency.com.co,"
-            #"operativo@servicompetentes.com,"
-            #"administrativo@servicompetentes.com"
+            "operativo@servicompetentes.com,"
+            "administrativo@servicompetentes.com"
         )
         correos_list_fixed = [e.strip() for e in correos_destino_fixed.split(',') if e.strip()]
         # Sobrescribir el campo de destino para que quede registrado en BD
