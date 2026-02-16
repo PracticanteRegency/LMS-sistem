@@ -1733,7 +1733,7 @@ para los trabajadores en el excel adjunto.</p>
             correos_destino = (
                 "practicante.desarrollogh@regency.com.co,"
                 "operativo@servicompetentes.com,"
-                "administrativo@servicompetentes.com,"
+                "administrativo@servicompetentes.com"
             )
             # Split and filter out any empty items (avoid trailing-comma empties)
             correos_list = [email.strip() for email in correos_destino.split(',') if email.strip()]
