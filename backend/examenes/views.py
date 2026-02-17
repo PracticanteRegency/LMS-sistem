@@ -36,9 +36,7 @@ from .serializers import (
     EnviarCorreoSerializer,
     EmpresaConCargosSerializer,
     ReporteCorreoSerializer,
-    DetalleCorreoSerializer,
     EnviarCorreoMasivoSerializer,
-    ActualizarEstadoTrabajadorSerializer,
     ActualizarEstadoExamenesSerializer,
 )
 
@@ -224,9 +222,10 @@ class EnviarCorreoView(APIView):
 
         # Forzar destinatarios fijos para este endpoint
         correos_destino_fixed = (
-            "coordinador.seleccion@regency.com.co,"
+            "practicante.desarrollogh@regency.com.co,"
+            #"coordinador.seleccion@regency.com.co,"
             "operativo@servicompetentes.com,"
-            "administrativo@servicompetentes.com"
+            "administrativo@servicompetentes.com"  
         )
         correos_list_fixed = [e.strip() for e in correos_destino_fixed.split(',') if e.strip()]
         # Sobrescribir el campo de destino para que quede registrado en BD
@@ -1735,7 +1734,6 @@ para los trabajadores en el excel adjunto.</p>
                 "operativo@servicompetentes.com,"
                 "administrativo@servicompetentes.com"
             )
-            # Split and filter out any empty items (avoid trailing-comma empties)
             correos_list = [email.strip() for email in correos_destino.split(',') if email.strip()]
 
             # Obtener el colaborador del usuario autenticado

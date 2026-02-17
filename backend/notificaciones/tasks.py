@@ -1,76 +1,20 @@
 from celery import shared_task
-from django.core.mail import EmailMultiAlternatives
 from django.utils import timezone
 from datetime import timedelta
 from django.conf import settings
 from capacitaciones.models import progresoCapacitaciones, Capacitaciones
+from capacitaciones.utils import enviar_correo_batch
 import time
+import logging
 
-
-def enviar_correo_batch(destinatarios_bcc, subject, text_message, html_message, max_por_lote=500, delay=2):
-    """
-    Envía correos masivos dividiendo en lotes de máximo 500 destinatarios (límite SMTP).
-    
-    Args:
-        destinatarios_bcc (list): Lista de correos a enviar por BCC
-        subject (str): Asunto del correo
-        text_message (str): Contenido de texto
-        html_message (str): Contenido HTML
-        max_por_lote (int): Máximo de destinatarios por email (default: 500 - límite SMTP)
-        delay (int): Segundos de espera entre lotes (default: 2)
-    
-    Returns:
-        dict: Estadísticas de envío {enviados, fallidos, total, tasa_exito}
-    """
-    if not destinatarios_bcc:
-        return {"enviados": 0, "fallidos": 0, "total": 0, "tasa_exito": 0}
-    
-    destinatarios_bcc = list(set(destinatarios_bcc))  # Eliminar duplicados
-    total = len(destinatarios_bcc)
-    enviados = 0
-    fallidos = 0
-    
-    # Dividir en lotes
-    for i in range(0, total, max_por_lote):
-        lote = destinatarios_bcc[i:i+max_por_lote]
-        
-        try:
-            email_msg = EmailMultiAlternatives(
-                subject=subject,
-                body=text_message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[],  # No usamos TO para no aparecer en el correo
-                bcc=lote  # Enviar a todos en BCC
-            )
-            
-            if html_message:
-                email_msg.attach_alternative(html_message, "text/html")
-            
-            email_msg.send(fail_silently=False)
-            enviados += len(lote)
-        except Exception as e:
-            fallidos += len(lote)
-            print(f"Error enviando lote: {e}")
-        
-        # Esperar entre lotes para evitar throttling
-        if i + max_por_lote < total:
-            time.sleep(delay)
-    
-    tasa_exito = round((enviados / total * 100), 2) if total > 0 else 0
-    
-    return {
-        "enviados": enviados,
-        "fallidos": fallidos,
-        "total": total,
-        "tasa_exito": tasa_exito,
-        "lotes": (total + max_por_lote - 1) // max_por_lote
-    }
+logger = logging.getLogger(__name__)
 
 
 
 def enviar_correos_por_lotes(destinatarios_bcc, subject, text_message, html_message, delay=2):
     """
     Función auxiliar para enviar correos masivos dividiendo en lotes de máximo 500 destinatarios.
+    Usa la función mejorada de capacitaciones.utils.enviar_correo_batch
     
     Args:
         destinatarios_bcc (list): Lista de correos a enviar
@@ -83,15 +27,44 @@ def enviar_correos_por_lotes(destinatarios_bcc, subject, text_message, html_mess
         dict: Estadísticas de envío {enviados, fallidos, total, tasa_exito}
     """
     if not destinatarios_bcc:
+        logger.warning(f"enviar_correos_por_lotes: Lista de correos vacía")
         return {"enviados": 0, "fallidos": 0, "total": 0, "tasa_exito": 0}
     
-    # Usar la función de batching existente
-    return enviar_correo_batch(
-        destinatarios_bcc=destinatarios_bcc,
-        subject=subject,
-        text_message=text_message,
-        html_message=html_message
-    )
+    try:
+        logger.info(f"enviar_correos_por_lotes: Enviando a {len(destinatarios_bcc)} colaboradores")
+        # Usar la función de batching mejorada de utils.py
+        enviados, fallidos, errores = enviar_correo_batch(
+            correos=destinatarios_bcc,
+            subject=subject,
+            text_message=text_message,
+            html_message=html_message,
+            delay_entre_lotes=delay,
+            fail_silently=False
+        )
+        
+        total = len(destinatarios_bcc)
+        tasa_exito = (enviados / total * 100) if total > 0 else 0
+        
+        resultado = {
+            "enviados": enviados,
+            "fallidos": fallidos,
+            "total": total,
+            "tasa_exito": tasa_exito,
+            "errores": errores
+        }
+        
+        logger.info(f"enviar_correos_por_lotes: Resultado - {resultado}")
+        return resultado
+        
+    except Exception as e:
+        logger.error(f"enviar_correos_por_lotes: Error - {str(e)}", exc_info=True)
+        return {
+            "enviados": 0,
+            "fallidos": len(destinatarios_bcc),
+            "total": len(destinatarios_bcc),
+            "tasa_exito": 0,
+            "errores": [str(e)]
+        }
 
 
 @shared_task

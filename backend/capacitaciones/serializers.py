@@ -4,6 +4,9 @@ from django.db import transaction
 from .utils import enviar_correo_capacitacion_creada_batch
 from .models import Capacitaciones, Modulos, progresoCapacitaciones, Lecciones, PreguntasLecciones, Respuestas, progresolecciones, progresoModulo
 from usuarios.models import Colaboradores
+import logging
+
+logger = logging.getLogger(__name__)
 
 class capacitacionSerializer(serializers.ModelSerializer):
     total_colaboradores = serializers.SerializerMethodField()
@@ -232,11 +235,6 @@ class CrearCapacitacionSerializer(serializers.ModelSerializer):
                     progreso=0
                 )
 
-        hoy = timezone.now().date()
-
-        if capacitacion.fecha_inicio.date() == hoy:
-            enviar_correo_capacitacion_creada_batch(capacitacion)
-
         return capacitacion
 
     def update(self, instance, validated_data):
@@ -329,15 +327,8 @@ class CrearCapacitacionSerializer(serializers.ModelSerializer):
                         removed.append(cid)
 
                 # Note: cache invalidation of collaborators is handled at view layer
-
-            # Enviar notificación solo a los nuevos agregados
-            # Enviar notificación solo a los nuevos agregados una vez la transacción se confirme
-            if added:
-                try:
-                    transaction.on_commit(lambda: enviar_correo_capacitacion_creada_batch(instance, colaboradores_ids=added))
-                except Exception:
-                    # No queremos que el envio de correos impida la actualización
-                    pass
+                # NOTE: El envío de correos para nuevos colaboradores ocurre en EditarColaboradorCapacitacionView.put()
+                # NO aquí en el PATCH, ya que ese endpoint maneja colaboradores de forma independiente
 
             return instance
     
