@@ -121,10 +121,8 @@ def enviar_correo_batch(
         - Agrega pausa entre lotes para evitar rate limiting
         - Registra cada intento en logs
         - Retorna estadísticas detalladas
-        - Filtra usuarios desactivados antes de enviar
+        - Filtra colaboradores desactivados antes de enviar
     """
-    from usuarios.models import Usuarios
-    
     if not correos:
         logger.warning("enviar_correo_batch: Lista de correos vacía")
         return 0, 0, []
@@ -132,7 +130,7 @@ def enviar_correo_batch(
     if from_email is None:
         from_email = settings.DEFAULT_FROM_EMAIL
     
-    # Validar emails válidos Y que el usuario esté activo
+    # Validar emails válidos Y que el colaborador esté activo
     correos_validos = []
     usuarios_desactivados = 0
     
@@ -140,15 +138,15 @@ def enviar_correo_batch(
         if not email or '@' not in email:
             continue
         
-        # Verificar que el usuario esté activo (estadousuario = 1)
-        usuario_activo = Usuarios.objects.filter(
-            idcolaboradoru__correocolaborador=email,
-            estadousuario=1
+        # Verificar que el colaborador esté activo (estadocolaborador = 1)
+        colaborador_activo = Colaboradores.objects.filter(
+            correocolaborador=email,
+            estadocolaborador=1
         ).exists()
         
-        if not usuario_activo:
+        if not colaborador_activo:
             usuarios_desactivados += 1
-            logger.debug(f"enviar_correo_batch: Email {email} omitido (usuario desactivado o no encontrado)")
+            logger.debug(f"enviar_correo_batch: Email {email} omitido (colaborador desactivado o no encontrado)")
             continue
         
         correos_validos.append(email)
@@ -443,16 +441,17 @@ def enviar_correo_cap_activada_batch(capacitacion, colaboradores_ids=None):
                 'tasa_exito': 0.0
             }
         
-        # Preparar contenido
-        subject = f"🚀 Capacitación Activada: {capacitacion.titulo}"
+        # Preparar contenido (mismo que enviar_correo_capacitacion_creada_batch)
+        subject = f"🎓 Capacitación: {capacitacion.titulo}"
         
         text_message = (
             f"Estimado colaborador,\n\n"
             f"Reciba un cordial saludo.\n"
-            f"Le informamos que la capacitación '{capacitacion.titulo}' está ahora disponible.\n\n"
+            f"Nos complace informarle que ha sido matriculado en la formación '{capacitacion.titulo}'.\n\n"
             f"Fecha de inicio: {capacitacion.fecha_inicio.date()}\n"
             f"Fecha de finalización: {capacitacion.fecha_fin.date()}\n\n"
-            f"Puede acceder en: https://formacion.cloudregencyapps.com/login\n\n"
+            f"Podrá acceder a la plataforma en: https://formacion.cloudregencyapps.com/login\n\n"
+            f"Agradecemos su disposición e interés en fortalecer sus competencias.\n"
             f"Atentamente,\n\n"
             f"Área de Formación Empresarial"
         )
@@ -460,19 +459,26 @@ def enviar_correo_cap_activada_batch(capacitacion, colaboradores_ids=None):
         html_message = f"""
         <html>
         <body style="font-family: Arial, sans-serif; color: #333;">
-            <h2>Capacitación Activada</h2>
             <p>Estimado colaborador,</p>
-            <p>Le informamos que la capacitación <strong>{capacitacion.titulo}</strong> está ahora disponible.</p>
+            <p>Reciba un cordial saludo.</p>
+            <p>
+                Nos complace informarle que ha sido matriculado en la formación
+                <strong>{capacitacion.titulo}</strong>. A continuación, encontrará los detalles:
+            </p>
             <ul>
                 <li><strong>Fecha de inicio:</strong> {capacitacion.fecha_inicio.date()}</li>
                 <li><strong>Fecha de finalización:</strong> {capacitacion.fecha_fin.date()}</li>
             </ul>
             <p>
-                <a href="https://formacion.cloudregencyapps.com/login" target="_blank">
-                    <button style="background-color: #1F4788; color: white; padding: 10px 20px; text-decoration: none; border: none; border-radius: 5px; cursor: pointer;">
-                        Acceder a la plataforma
-                    </button>
-                </a>
+                Podrá acceder a la plataforma de formación a través del siguiente enlace:<br>
+                <a href="https://formacion.cloudregencyapps.com/login" target="_blank">Acceder a la plataforma</a>
+            </p>
+            <p>
+                Si olvidó su contraseña, puede restablecerla desde la plataforma.
+            </p>
+            <p>
+                Agradecemos su disposición e interés en fortalecer sus competencias.<br>
+                Le deseamos una experiencia de aprendizaje provechosa.
             </p>
             <p><strong>Atentamente,</strong><br>
             Área de Formación Empresarial</p>
@@ -516,6 +522,140 @@ def enviar_correo_cap_activada_batch(capacitacion, colaboradores_ids=None):
             'errores': [str(e)],
             'tasa_exito': 0.0
         }
+
+
+def enviar_correo_nuevos_colaboradores(capacitacion_id, colaboradores_ids):
+    """
+    Envía correos SOLO a los nuevos colaboradores agregados a una capacitación activa.
+    Función síncrona (NO es una task de Celery).
+    Se ejecuta dentro de transaction.on_commit() para garantizar datos guardados.
+    
+    Args:
+        capacitacion_id: ID de la capacitación
+        colaboradores_ids: Lista de IDs de los colaboradores recién agregados
+    
+    Returns:
+        Diccionario con estadísticas de envío
+    """
+    from capacitaciones.models import Capacitaciones
+    from usuarios.models import Colaboradores
+    
+    logger_local = logging.getLogger(__name__)
+    
+    try:
+        cap = Capacitaciones.objects.get(pk=capacitacion_id)
+    except Capacitaciones.DoesNotExist:
+        logger_local.error(f"enviar_correo_nuevos_colaboradores: Capacitación {capacitacion_id} no existe")
+        return {
+            'enviados': 0,
+            'fallidos': 0,
+            'total': 0,
+            'errores': ['Capacitación no encontrada'],
+            'tasa_exito': 0.0
+        }
+    
+    if cap.estado != 1:
+        logger_local.warning(f"enviar_correo_nuevos_colaboradores: Capacitación {capacitacion_id} no está activa")
+        return {
+            'enviados': 0,
+            'fallidos': 0,
+            'total': 0,
+            'errores': ['Capacitación no está activa'],
+            'tasa_exito': 0.0
+        }
+    
+    correos = list(
+        Colaboradores.objects.filter(
+            idcolaborador__in=colaboradores_ids,
+            estadocolaborador=1
+        )
+        .exclude(correocolaborador__isnull=True)
+        .exclude(correocolaborador__exact="")
+        .values_list("correocolaborador", flat=True)
+        .distinct()
+    )
+
+    if not correos:
+        logger_local.warning(f"enviar_correo_nuevos_colaboradores: No hay correos para colaboradores {colaboradores_ids}")
+        return {
+            'enviados': 0,
+            'fallidos': 0,
+            'total': 0,
+            'errores': ['No hay correos válidos'],
+            'tasa_exito': 0.0
+        }
+
+    logger_local.info(f"enviar_correo_nuevos_colaboradores: Enviando a {len(correos)} nuevos colaboradores para cap {capacitacion_id}")
+
+    subject = f"🎓 Has sido asignado a: {cap.titulo}"
+
+    text_message = (
+        f"Estimado colaborador,\n\n"
+        f"Reciba un cordial saludo.\n"
+        f"Nos complace informarle que ha sido matriculado en la formación '{cap.titulo}'.\n\n"
+        f"Fecha de inicio: {cap.fecha_inicio.date()}\n"
+        f"Fecha de finalización: {cap.fecha_fin.date()}\n\n"
+        f"Podrá acceder a la plataforma en: https://formacion.cloudregencyapps.com/login\n\n"
+        f"Agradecemos su disposición e interés en fortalecer sus competencias.\n"
+        f"Atentamente,\n\n"
+        f"Área de Formación Empresarial"
+    )
+
+    html_message = f"""
+    <html>
+    <body style="font-family: Arial, sans-serif; color: #333;">
+        <p>Estimado colaborador,</p>
+        <p>Reciba un cordial saludo.</p>
+        <p>
+            Nos complace informarle que ha sido matriculado en la formación
+            <strong>{cap.titulo}</strong>. A continuación, encontrará los detalles:
+        </p>
+        <ul>
+            <li><strong>Fecha de inicio:</strong> {cap.fecha_inicio.date()}</li>
+            <li><strong>Fecha de finalización:</strong> {cap.fecha_fin.date()}</li>
+        </ul>
+        <p>
+            Podrá acceder a la plataforma de formación a través del siguiente enlace:<br>
+            <a href="https://formacion.cloudregencyapps.com/login" target="_blank">Acceder a la plataforma</a>
+        </p>
+        <p>
+            Si olvidó su contraseña, puede restablecerla desde la plataforma.
+        </p>
+        <p>
+            Agradecemos su disposición e interés en fortalecer sus competencias.<br>
+            Le deseamos una experiencia de aprendizaje provechosa.
+        </p>
+        <p><strong>Atentamente,</strong><br>
+        Área de Formación Empresarial</p>
+    </body>
+    </html>
+    """
+
+    # Enviar usando batch
+    enviados, fallidos, errores = enviar_correo_batch(
+        correos=correos,
+        subject=subject,
+        text_message=text_message,
+        html_message=html_message,
+        delay_entre_lotes=2
+    )
+    
+    total = len(correos)
+    tasa_exito = (enviados / total * 100) if total > 0 else 0
+    
+    logger_local.info(
+        f"Nuevos colaboradores {capacitacion_id}: "
+        f"Enviados={enviados}, Fallidos={fallidos}, Total={total}, "
+        f"Tasa={tasa_exito:.1f}%"
+    )
+    
+    return {
+        'enviados': enviados,
+        'fallidos': fallidos,
+        'total': total,
+        'errores': errores,
+        'tasa_exito': tasa_exito
+    }
 
 
 

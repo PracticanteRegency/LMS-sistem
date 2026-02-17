@@ -21,7 +21,7 @@ def debug_task(self):
 app.conf.beat_schedule = {
     'enviar-correo-y-activar-capacitaciones-cada-dia': {
         'task': 'notificaciones.tasks.enviar_correo_capacitaciones_activas_y_activar',
-        'schedule': crontab(hour=8, minute=0),  # Cada día a las 08:00 - Activa + envía correo
+        'schedule': crontab(hour=9, minute=0),  # Cada día a las 09:00 - Activa + envía correo
     },
     'notificar-capacitaciones-7-dias': {
         'task': 'notificaciones.tasks.notificar_capacitacion_por_vencer_7_dias',

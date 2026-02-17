@@ -43,6 +43,9 @@ from datetime import datetime
 import pypandoc
 import pypandoc as _pypandoc
 
+# Logger para registrar eventos
+logger = logging.getLogger(__name__)
+
 # ==================== LOCAL ====================
 from .models import (
     Capacitaciones,
@@ -197,6 +200,17 @@ class CrearCapacitacionView(APIView):
                     ]
                     
                     progresoCapacitaciones.objects.bulk_create(progreso_records, ignore_conflicts=True)
+                
+                # Enviar correos DESPUÉS de crear colaboradores
+                # Siempre enviar correo de bienvenida al crear (no solo si está activa)
+                if colaboradores_ids:
+                    try:
+                        from capacitaciones.utils import enviar_correo_capacitacion_creada_batch
+                        # Ejecutar de forma síncrona después de que la transacción se confirme
+                        transaction.on_commit(lambda: enviar_correo_capacitacion_creada_batch(capacitacion))
+                        logger.info(f"Correos programados para capacitación {capacitacion.id}")
+                    except Exception as e:
+                        logger.error(f"Error al programar envío de correos: {str(e)}", exc_info=True)
                 
                 # Invalidar cache de lista de capacitaciones
                 cache.delete('capacitaciones_list_admin')
@@ -1415,11 +1429,10 @@ class DesactivarCapacitacionesView(APIView):
             # If the capacitacion was activated, trigger the notification task after commit
             if capacitacion.estado == 1:
                 try:
-                    # Enqueue email notification via Celery after DB commit
-                    from notificaciones.tasks import enviar_correo_capacitaciones_activas_y_activar
-                    transaction.on_commit(lambda: enviar_correo_capacitaciones_activas_y_activar.delay())
+                    from capacitaciones.utils import enviar_correo_cap_activada_batch
+                    # Ejecutar de forma síncrona después de que la transacción se confirme
+                    transaction.on_commit(lambda: enviar_correo_cap_activada_batch(capacitacion))
                 except Exception:
-                    # don't let scheduling/errors break the response
                     pass
             # Invalidate caches
             invalidate_capacitacion_cache(capacitacion_id=capacitacion.id)
@@ -1554,13 +1567,13 @@ class EditarColaboradorCapacitacionView(APIView):
 
                 # Enviar notificación solo a los agregados una vez la transacción se confirme
                 # Solo enviar si la capacitación está activa (estado = 1)
-                # NOTA: Usar batching para soportar 1500+ colaboradores
                 if added and capacitacion.estado == 1:
                     try:
-                        from notificaciones.tasks import enviar_correo_capacitaciones_activas_y_activar
-                        transaction.on_commit(lambda: enviar_correo_capacitaciones_activas_y_activar.delay())
+                        from capacitaciones.utils import enviar_correo_nuevos_colaboradores
+                        ids_added = list(added)
+                        # Ejecutar de forma síncrona después de que la transacción se confirme
+                        transaction.on_commit(lambda: enviar_correo_nuevos_colaboradores(capacitacion.id, ids_added))
                     except Exception:
-                        # No queremos que el envio de correos impida la operación
                         pass
 
                 # Eliminar solicitados
