@@ -1,7 +1,9 @@
 import json
 import csv
 import io
-from django.http import JsonResponse
+import os
+from io import BytesIO
+from django.http import JsonResponse, FileResponse
 from django.db import transaction
 from rest_framework.response import Response
 from django.views import View
@@ -18,6 +20,9 @@ from capacitaciones.serializers import CapacitacionProgresoSerializer
 from usuarios.serializers import ColaboradorListadoSerializer, cargosSerializer, nivelesSerializer, regionalesSerializer
 from django.db.models import Count, Q, Prefetch, OuterRef, Subquery, IntegerField, Case, When
 from django.db.models.functions import Coalesce
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.worksheet.table import Table, TableStyleInfo
 
 
 class Perfil(APIView):
@@ -1643,3 +1648,156 @@ class RegistrarMasivoView(APIView):
             {"error": "Plantilla no encontrada"},
             status=404
         )
+
+
+class ReporteUsuariosView(APIView):
+    """
+    Vista para generar reportes de usuarios en formato Excel con tabla dinámica.
+    
+    GET: Genera un archivo Excel con todos los colaboradores (activos e inactivos)
+    Excluye colaboradores con estado 3 (eliminados/suspendidos)
+    La tabla incluye filtros automáticos en los encabezados.
+    
+    Columnas: cédula, empresa, unidad, proyecto, centro op, nombre, apellido,
+    correo, celular, región, nivel, cargo y estado del usuario.
+    """
+    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdminUser]
+
+    def get(self, request):
+        """
+        GET /usuarios/reporte/ - Genera y descarga un archivo Excel con tabla dinámica
+        """
+        try:
+            # Obtener todos los colaboradores EXCEPTO los que están en estado 3
+            colaboradores = (
+                Colaboradores.objects
+                .select_related(
+                    'centroop__id_proyecto__id_unidad__id_empresa',
+                    'cargocolaborador',
+                    'nivelcolaborador',
+                    'regionalcolab'
+                )
+                .prefetch_related(
+                    Prefetch(
+                        'usuarios_set',
+                        queryset=Usuarios.objects.all(),
+                        to_attr='usuarios_list'
+                    )
+                )
+                .exclude(estadocolaborador=3)  # Excluir estado 3
+                .order_by('idcolaborador')
+            )
+
+            # Crear workbook y worksheet
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Colaboradores"
+
+            # Definir estilos
+            header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+            header_font = Font(bold=True, color="FFFFFF", size=11)
+            header_alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            border = Border(
+                left=Side(style='thin'),
+                right=Side(style='thin'),
+                top=Side(style='thin'),
+                bottom=Side(style='thin')
+            )
+            center_alignment = Alignment(horizontal="left", vertical="center", wrap_text=True)
+
+            # Definir columnas
+            columnas = [
+                'Cédula',
+                'Empresa',
+                'Unidad',
+                'Proyecto',
+                'Centro OP',
+                'Nombre',
+                'Apellido',
+                'Correo',
+                'Celular',
+                'Región',
+                'Nivel',
+                'Cargo',
+                'Estado Usuario'
+            ]
+
+            # Agregar headers
+            for col_num, col_titulo in enumerate(columnas, start=1):
+                celda = ws.cell(row=1, column=col_num)
+                celda.value = col_titulo
+                celda.fill = header_fill
+                celda.font = header_font
+                celda.alignment = header_alignment
+                celda.border = border
+
+            # Agregar datos
+            for row_num, colaborador in enumerate(colaboradores, start=2):
+                # Obtener relaciones
+                centro = colaborador.centroop
+                proyecto = centro.id_proyecto if centro else None
+                unidad = proyecto.id_unidad if proyecto else None
+                empresa = unidad.id_empresa if unidad else None
+
+                # Obtener estado del usuario
+                usuarios_list = getattr(colaborador, 'usuarios_list', [])
+                estado_usuario = usuarios_list[0].estadousuario if usuarios_list else None
+
+                # Datos a insertar
+                datos = [
+                    colaborador.cccolaborador or '',
+                    empresa.nombre_empresa if empresa else '',
+                    unidad.nombreunidad if unidad else '',
+                    proyecto.nombreproyecto if proyecto else '',
+                    centro.nombrecentrop if centro else '',
+                    colaborador.nombrecolaborador or '',
+                    colaborador.apellidocolaborador or '',
+                    colaborador.correocolaborador or '',
+                    colaborador.telefocolaborador or '',
+                    colaborador.regionalcolab.nombreregional if colaborador.regionalcolab else '',
+                    colaborador.nivelcolaborador.nombrenivel if colaborador.nivelcolaborador else '',
+                    colaborador.cargocolaborador.nombrecargo if colaborador.cargocolaborador else '',
+                    'Activado' if estado_usuario == 1 else ('Desactivado' if estado_usuario == 0 else 'N/A')
+                ]
+
+                # Insertar datos en la fila
+                for col_num, valor in enumerate(datos, start=1):
+                    celda = ws.cell(row=row_num, column=col_num)
+                    celda.value = valor
+                    celda.alignment = center_alignment
+                    celda.border = border
+
+            # Ajustar ancho de columnas
+            anchos = [15, 20, 20, 20, 20, 20, 20, 25, 15, 20, 20, 20, 15]
+            for col_num, ancho in enumerate(anchos, start=1):
+                ws.column_dimensions[chr(64 + col_num)].width = ancho
+
+            # Crear tabla dinámica con filtros automáticos
+            # La tabla comienza en A1 y termina en la última columna y fila con datos
+            tab = Table(displayName="TablaColaboradores", ref=f"A1:M{max(2, ws.max_row)}")
+            
+            # Aplicar estilo predefinido a la tabla
+            style = TableStyleInfo(name="TableStyleMedium2", showFirstColumn=False,
+                                   showLastColumn=False, showRowStripes=True, showColumnStripes=False)
+            tab.tableStyleInfo = style
+            ws.add_table(tab)
+
+            # Guardar en BytesIO
+            archivo_excel = BytesIO()
+            wb.save(archivo_excel)
+            archivo_excel.seek(0)
+
+            # Retornar como descarga
+            response = FileResponse(
+                archivo_excel,
+                as_attachment=True,
+                filename='Reporte_Usuarios.xlsx',
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            return response
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error al generar el reporte: {str(e)}"},
+                status=500
+            )

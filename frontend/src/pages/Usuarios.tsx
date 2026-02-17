@@ -114,6 +114,20 @@ export default function Usuarios() {
     }
   };
 
+  const handleDescargarReporte = async () => {
+    try {
+      setLoading(true);
+      await (Perfil as any).descargarReporteUsuarios();
+      setSuccess("Reporte descargado correctamente");
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || "Error al descargar el reporte");
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const usuariosMostrados = usuarios;
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
@@ -288,6 +302,14 @@ export default function Usuarios() {
               style={{ backgroundColor: "#4CAF50", marginRight: "8px" }}
             >
               📤 Registrar Masivo
+            </button>
+            <button
+              className={styles.btnReport}
+              onClick={handleDescargarReporte}
+              title="Descargar reporte de todos los usuarios en Excel"
+              style={{ backgroundColor: "#2196F3", marginRight: "8px" }}
+            >
+              📊 Descargar Reporte
             </button>
             <button
               className={styles.btnReport}

@@ -70,6 +70,7 @@ declare const Perfil: {
   cambiarEstadoUsuario(idcolaborador: number, payload: CambiarEstadoPayload): Promise<any>;
   actualizarRolUsuario(idcolaborador: number, payload: ActualizarRolPayload): Promise<any>;
   registrarUsuariosMasivo(file: File): Promise<any>;
+  descargarReporteUsuarios(): Promise<any>;
 };
 
 export default Perfil;
