@@ -655,7 +655,7 @@ class PrevisualizarColaboradoresView(APIView):
             
             # Leer el archivo CSV
             try:
-                decoded_file = archivo.read().decode('utf-8')
+                decoded_file = archivo.read().decode('utf-8-sig')
                 io_string = io.StringIO(decoded_file)
                 
                 # Detectar el delimitador
@@ -668,18 +668,23 @@ class PrevisualizarColaboradoresView(APIView):
                     delimiter = ','
                 
                 csv_reader = csv.DictReader(io_string, delimiter=delimiter)
-                
+
+                fieldnames = csv_reader.fieldnames or []
+                normalized_fieldnames = [fn.strip().lower() for fn in fieldnames if fn]
+
                 # Validar que tenga la columna 'cedula'
-                if not csv_reader.fieldnames or 'cedula' not in csv_reader.fieldnames:
+                if 'cedula' not in normalized_fieldnames:
                     return Response(
                         {'error': 'El archivo CSV debe contener la columna "cedula"'},
                         status=status.HTTP_400_BAD_REQUEST
                     )
+                # Mapear nombre real del campo para obtener los valores
+                cedula_field = fieldnames[normalized_fieldnames.index('cedula')]
                 
                 # Recolectar todas las cédulas primero
                 cedulas = []
                 for row in csv_reader:
-                    cedula = row.get('cedula', '').strip()
+                    cedula = row.get(cedula_field, '').strip()
                     if cedula:
                         cedulas.append(cedula)
                 
