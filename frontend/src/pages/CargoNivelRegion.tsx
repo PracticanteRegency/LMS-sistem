@@ -56,7 +56,7 @@ export default function CargoNivelRegion() {
 		return Number.isNaN(role) ? 0 : role;
 	}, []);
 
-	const canAccess = useMemo(() => [3, 4].includes(effectiveRole), [effectiveRole]);
+	const canAccess = useMemo(() => [1, 3, 4].includes(effectiveRole), [effectiveRole]);
 
 	if (!canAccess) {
 		return <Navigate to="/" />;

@@ -74,15 +74,17 @@
                     <li><Link to="/reportes-correos" className={styles.submenuItem}>Reporte de Correos</Link></li>
                   </ul>
                 </li>
-
-                <li className={styles.menuSection}>
-                  <span className={styles.sectionTitle}>Gestión Empresarial</span>
-                  <ul className={styles.submenu}>
-                    <li><Link to="/datos-empresa" className={styles.submenuItem}>Datos de Empresa</Link></li>
-                    <li><Link to="/cargo-nivel-region" className={styles.submenuItem}>Cargo, Nivel y Regional</Link></li>
-                  </ul>
-                </li>
               </>
+            )}
+
+            {(userType === 1 || userType === 2 || userType === 3 || userType === 4) && (
+              <li className={styles.menuSection}>
+                <span className={styles.sectionTitle}>Gestión Empresarial</span>
+                <ul className={styles.submenu}>
+                  <li><Link to="/datos-empresa" className={styles.submenuItem}>Datos de Empresa</Link></li>
+                  <li><Link to="/cargo-nivel-region" className={styles.submenuItem}>Cargo, Nivel y Regional</Link></li>
+                </ul>
+              </li>
             )}
           </ul>
         </nav>

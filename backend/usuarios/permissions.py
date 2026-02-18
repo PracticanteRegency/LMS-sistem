@@ -148,3 +148,19 @@ class IsSuperAdmin(BasePermission):
         tipousuario = getattr(request.user, 'tipousuario', None)
         # Permitir tanto admin (1) como super admin (4)
         return tipousuario in [1, 2, 3, 4]
+
+
+class IsGestionEmpresarial(BasePermission):
+    """
+    Permite acceso a Gestión Empresarial solo a usuarios tipo 1, 3 y 4.
+    - 1: Administrador
+    - 3: Usuario Especial
+    - 4: Super Admin
+    """
+    message = "No tiene permisos para acceder a Gestión Empresarial."
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        tipousuario = getattr(request.user, 'tipousuario', None)
+        return tipousuario in [1, 3, 4]

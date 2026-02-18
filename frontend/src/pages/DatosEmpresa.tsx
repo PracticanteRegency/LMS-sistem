@@ -124,7 +124,7 @@ export default function DatosEmpresa() {
 		return Number.isNaN(role) ? 0 : role;
 	}, []);
 
-	const canAccess = useMemo(() => [3, 4].includes(effectiveRole), [effectiveRole]);
+	const canAccess = useMemo(() => [1, 3, 4].includes(effectiveRole), [effectiveRole]);
 
 	const loadAll = async () => {
 		setLoading(true);
