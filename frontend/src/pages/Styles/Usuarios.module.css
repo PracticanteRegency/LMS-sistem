@@ -728,6 +728,195 @@
   font-size: 11px;
 }
 
+/* ===== Error display improvements ===== */
+.errorHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.errorIcon {
+  font-size: 28px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.errorCount {
+  margin: 4px 0 0 0;
+  font-size: 13px;
+  color: #c62828;
+}
+
+.successCount {
+  margin: -8px 0 12px 0;
+  font-size: 13px;
+  color: #2e7d32;
+}
+
+.errorSummary {
+  background-color: rgba(198, 40, 40, 0.08);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+
+.errorSummaryTitle {
+  font-size: 12px;
+  color: #b71c1c;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.errorTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.errorTag {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  background-color: #ffcdd2;
+  color: #b71c1c;
+  white-space: nowrap;
+}
+
+.errorTableWrapper {
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid #ef9a9a;
+  border-radius: 6px;
+  margin-bottom: 14px;
+}
+
+.errorTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.errorTable thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.errorTable th {
+  background-color: #d32f2f;
+  color: white;
+  padding: 8px 10px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.errorTable th:first-child {
+  width: 60px;
+}
+
+.errorTable th:nth-child(2) {
+  width: 120px;
+}
+
+.errorTable td {
+  padding: 7px 10px;
+  border-bottom: 1px solid #ffcdd2;
+  vertical-align: top;
+}
+
+.errorTable tbody tr:nth-child(even) {
+  background-color: rgba(239, 154, 154, 0.1);
+}
+
+.errorTable tbody tr:hover {
+  background-color: rgba(239, 154, 154, 0.2);
+}
+
+.errorRowNum {
+  font-weight: 700;
+  color: #c62828;
+  text-align: center;
+}
+
+.errorCedula {
+  font-family: monospace;
+  color: #555;
+  font-weight: 500;
+}
+
+.errorMessage {
+  color: #b71c1c;
+  word-break: break-word;
+}
+
+.retryBtn {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  margin-top: 4px;
+  background-color: #fff3e0;
+  border: 1px solid #ffb74d;
+  border-radius: 6px;
+  color: #e65100;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.retryBtn:hover {
+  background-color: #ffe0b2;
+  transform: translateY(-1px);
+}
+
+.retryBtn:active {
+  transform: translateY(0);
+}
+
+/* Mode toggle buttons */
+.uploadModeToggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  justify-content: center;
+}
+
+.modeBtn {
+  flex: 1;
+  padding: 10px 16px;
+  border: 2px solid #ddd;
+  background-color: #f5f5f5;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #666;
+}
+
+.modeBtn:hover {
+  border-color: #bbb;
+  background-color: #e8e8e8;
+}
+
+.modeBtnActive {
+  border-color: #4CAF50;
+  background-color: #4CAF50;
+  color: white;
+  box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3);
+}
+
+.modeBtnActive:hover {
+  background-color: #45a049;
+  border-color: #45a049;
+}
+
 .modalFooter {
   display: flex;
   gap: 12px;
@@ -1040,6 +1229,94 @@
 
   .resultDetailsMore {
     color: #666;
+  }
+
+  /* Dark mode: error display improvements */
+  .errorCount {
+    color: #f99;
+  }
+
+  .successCount {
+    color: #6fc76f;
+  }
+
+  .errorSummary {
+    background-color: rgba(239, 83, 80, 0.12);
+  }
+
+  .errorSummaryTitle {
+    color: #f99;
+  }
+
+  .errorTag {
+    background-color: #3d1515;
+    color: #f99;
+  }
+
+  .errorTableWrapper {
+    border-color: #5a2020;
+  }
+
+  .errorTable th {
+    background-color: #8b1a1a;
+    color: #ffcdd2;
+  }
+
+  .errorTable td {
+    border-bottom-color: #3d1515;
+  }
+
+  .errorTable tbody tr:nth-child(even) {
+    background-color: rgba(239, 83, 80, 0.06);
+  }
+
+  .errorTable tbody tr:hover {
+    background-color: rgba(239, 83, 80, 0.12);
+  }
+
+  .errorRowNum {
+    color: #f99;
+  }
+
+  .errorCedula {
+    color: #bbb;
+  }
+
+  .errorMessage {
+    color: #ef9a9a;
+  }
+
+  .retryBtn {
+    background-color: #332200;
+    border-color: #995500;
+    color: #ffb74d;
+  }
+
+  .retryBtn:hover {
+    background-color: #443300;
+  }
+
+  /* Dark mode: Mode toggle buttons */
+  .modeBtn {
+    background-color: #2a2a2a;
+    border-color: #444;
+    color: #aaa;
+  }
+
+  .modeBtn:hover {
+    background-color: #333;
+    border-color: #555;
+  }
+
+  .modeBtnActive {
+    background-color: #4CAF50;
+    border-color: #4CAF50;
+    color: white;
+  }
+
+  .modeBtnActive:hover {
+    background-color: #45a049;
+    border-color: #45a049;
   }
 
   .modalBtnClose {

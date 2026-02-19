@@ -564,8 +564,15 @@ class CargoEmpresaConExamenesView(APIView):
 
     def _build_estructura_geografica(self):
         """
-        Construye jerarquía geográfica de empresas activas:
-        Empresa → Unidades → Proyectos → Centros (solo nombre, sin porcentajes, con claves personalizadas)
+        Construye jerarquía geográfica de empresas activas DEDUPLICADA:
+        Empresa → Unidades → Proyectos → Centros
+
+        Deduplicación por nombre (case-insensitive):
+        - Si hay varias unidades con el mismo nombre en una empresa,
+          se conserva la de menor idunidad y se fusionan sus proyectos/centros.
+        - Si hay varios proyectos con el mismo nombre en una unidad,
+          se conserva el de menor idproyecto y se fusionan sus centros.
+        - Los centros se deduplicanpor idcentrop.
         """
         from analitica.models import Unidadnegocio, Proyecto
 
@@ -588,57 +595,101 @@ class CargoEmpresaConExamenesView(APIView):
             if not empresa or not empresa.estadoempresa:
                 continue
 
-            # Inicializar empresa si no existe
+            # ── Empresa ──
             if empresa.idempresa not in empresas_dict:
                 empresas_dict[empresa.idempresa] = {
                     'idempresa': empresa.idempresa,
                     'empresa': empresa.nombre_empresa.strip(),
                     'tipo': 'empresa',
-                    'unidades': {}
+                    'unidades': {},       # clave: nombre_normalizado
+                    '_unidad_ids': {}     # nombre_normalizado → menor idunidad visto
                 }
             emp_dict = empresas_dict[empresa.idempresa]
 
-            # Inicializar unidad si no existe
-            if unidad.idunidad not in emp_dict['unidades']:
-                emp_dict['unidades'][unidad.idunidad] = {
+            # ── Unidad (deduplicar por nombre, conservar menor ID) ──
+            nombre_unidad_key = unidad.nombreunidad.strip().upper()
+
+            if nombre_unidad_key not in emp_dict['_unidad_ids']:
+                # Primera vez que vemos este nombre de unidad
+                emp_dict['_unidad_ids'][nombre_unidad_key] = unidad.idunidad
+                emp_dict['unidades'][nombre_unidad_key] = {
                     'idunidad': unidad.idunidad,
                     'unidad': unidad.nombreunidad.strip(),
                     'tipo': 'unidad',
-                    'proyectos': {}
+                    'proyectos': {},      # clave: nombre_normalizado
+                    '_proy_ids': {}       # nombre_normalizado → menor idproyecto visto
                 }
-            uni_dict = emp_dict['unidades'][unidad.idunidad]
+            elif unidad.idunidad < emp_dict['_unidad_ids'][nombre_unidad_key]:
+                # Encontramos una con ID menor → actualizar ID representativo
+                emp_dict['_unidad_ids'][nombre_unidad_key] = unidad.idunidad
+                emp_dict['unidades'][nombre_unidad_key]['idunidad'] = unidad.idunidad
+                emp_dict['unidades'][nombre_unidad_key]['unidad'] = unidad.nombreunidad.strip()
 
-            # Inicializar proyecto si no existe
-            if proyecto.idproyecto not in uni_dict['proyectos']:
-                uni_dict['proyectos'][proyecto.idproyecto] = {
+            uni_dict = emp_dict['unidades'][nombre_unidad_key]
+
+            # ── Proyecto (deduplicar por nombre, conservar menor ID) ──
+            nombre_proy_key = proyecto.nombreproyecto.strip().upper()
+
+            if nombre_proy_key not in uni_dict['_proy_ids']:
+                uni_dict['_proy_ids'][nombre_proy_key] = proyecto.idproyecto
+                uni_dict['proyectos'][nombre_proy_key] = {
                     'idproyecto': proyecto.idproyecto,
                     'proyecto': proyecto.nombreproyecto.strip(),
                     'tipo': 'proyecto',
                     'centrosop': []
                 }
-            proy_dict = uni_dict['proyectos'][proyecto.idproyecto]
+            elif proyecto.idproyecto < uni_dict['_proy_ids'][nombre_proy_key]:
+                uni_dict['_proy_ids'][nombre_proy_key] = proyecto.idproyecto
+                uni_dict['proyectos'][nombre_proy_key]['idproyecto'] = proyecto.idproyecto
+                uni_dict['proyectos'][nombre_proy_key]['proyecto'] = proyecto.nombreproyecto.strip()
 
-            # Agregar centro (evitar duplicados)
-            centro_data = {
-                'idcentrop': centro.idcentrop,
-                'centro_op': centro.nombrecentrop.strip(),
-                'tipo': 'centro_op'
-            }
-            if centro_data not in proy_dict['centrosop']:
-                proy_dict['centrosop'].append(centro_data)
+            proy_dict = uni_dict['proyectos'][nombre_proy_key]
 
-        # Convertir dicts a listas ordenadas y limpiar ids
+            # ── Centro (deduplicar por nombre, conservar menor ID) ──
+            nombre_centro_key = centro.nombrecentrop.strip().upper()
+            
+            # Inicializar dict de centros si no existe
+            if '_centro_ids' not in proy_dict:
+                proy_dict['_centro_ids'] = {}  # nombre_normalizado → menor idcentrop visto
+            
+            if nombre_centro_key not in proy_dict['_centro_ids']:
+                # Primera vez que vemos este nombre de centro
+                proy_dict['_centro_ids'][nombre_centro_key] = centro.idcentrop
+                proy_dict['centrosop'].append({
+                    'idcentrop': centro.idcentrop,
+                    'centro_op': centro.nombrecentrop.strip(),
+                    'tipo': 'centro_op'
+                })
+            elif centro.idcentrop < proy_dict['_centro_ids'][nombre_centro_key]:
+                # Encontramos uno con ID menor → reemplazar el anterior
+                proy_dict['_centro_ids'][nombre_centro_key] = centro.idcentrop
+                # Encontrar y actualizar el centro en la lista
+                for c in proy_dict['centrosop']:
+                    if c['centro_op'].upper() == nombre_centro_key:
+                        c['idcentrop'] = centro.idcentrop
+                        c['centro_op'] = centro.nombrecentrop.strip()
+                        break
+
+        # ── Convertir dicts a listas ordenadas y limpiar claves internas ──
         resultado = []
         for emp_dict in sorted(empresas_dict.values(), key=lambda x: x['empresa']):
-            emp_dict['unidades'] = sorted(
+            emp_dict.pop('_unidad_ids', None)
+
+            unidades_list = sorted(
                 emp_dict['unidades'].values(),
                 key=lambda x: x['unidad']
             )
-            for uni_dict in emp_dict['unidades']:
-                uni_dict['proyectos'] = sorted(
+            for uni_dict in unidades_list:
+                uni_dict.pop('_proy_ids', None)
+                proyectos_list = sorted(
                     uni_dict['proyectos'].values(),
                     key=lambda x: x['proyecto']
                 )
+                # Limpiar claves internas de centros en cada proyecto
+                for proy_dict in proyectos_list:
+                    proy_dict.pop('_centro_ids', None)
+                uni_dict['proyectos'] = proyectos_list
+            emp_dict['unidades'] = unidades_list
             resultado.append(emp_dict)
 
         return resultado
@@ -1389,11 +1440,13 @@ class EnviarCorreoMasivoView(APIView):
                 for e in Epresa.objects.all()
             }
             
-            # Precargar unidades con su empresa (nombre_lower, empresa_id) -> objeto
-            unidades_map = {
-                (u.nombreunidad.lower().strip(), u.id_empresa_id): u
-                for u in Unidadnegocio.objects.select_related('id_empresa').all()
-            }
+            # Precargar unidades con su empresa (nombre_lower, empresa_id) -> lista de objetos
+            # Puede haber varias unidades con el mismo nombre bajo la misma empresa
+            # Se ordenan por ID ascendente para que el de menor ID sea el primero
+            from collections import defaultdict
+            unidades_map = defaultdict(list)
+            for u in Unidadnegocio.objects.select_related('id_empresa').order_by('idunidad').all():
+                unidades_map[(u.nombreunidad.lower().strip(), u.id_empresa_id)].append(u)
             
             # Precargar proyectos con su unidad (nombre_lower, unidad_id) -> objeto
             proyectos_map = {
@@ -1419,8 +1472,9 @@ class EnviarCorreoMasivoView(APIView):
                 for e in Examen.objects.filter(activo=True)
             }
             
+            total_unidades = sum(len(v) for v in unidades_map.values())
             logger.info(f"Catálogos precargados: {len(empresas_map)} empresas, "
-                       f"{len(unidades_map)} unidades, {len(proyectos_map)} proyectos, "
+                       f"{total_unidades} unidades ({len(unidades_map)} nombres únicos), {len(proyectos_map)} proyectos, "
                        f"{len(centros_map)} centros, {len(cargos_map)} cargos, "
                        f"{len(examenes_map)} exámenes")
             
@@ -1536,31 +1590,49 @@ class EnviarCorreoMasivoView(APIView):
                                 f"Línea {idx}: Empresa '{empresa_name}' no encontrada en la BD")
                             continue
 
-                    # OPTIMIZADO: Buscar unidad usando mapa precargado
-                    unidad = unidades_map.get((unidad_name.lower(), empresa.idempresa))
-                    if not unidad:
-                        # Intentar búsqueda normalizada
-                        for (nombre_bd, emp_id), uni_obj in unidades_map.items():
+                    # OPTIMIZADO: Buscar unidades candidatas usando mapa precargado
+                    # Puede haber varias unidades con el mismo nombre bajo la misma empresa
+                    # (diferentes descripciones pero mismo nombre). Se prueban todas.
+                    unidades_candidatas = unidades_map.get((unidad_name.lower(), empresa.idempresa), [])
+                    if not unidades_candidatas:
+                        # Intentar búsqueda normalizada (sin acentos)
+                        for (nombre_bd, emp_id), uni_list in unidades_map.items():
                             if emp_id == empresa.idempresa and self._normalize_text(unidad_name) == self._normalize_text(nombre_bd):
-                                unidad = uni_obj
+                                unidades_candidatas = uni_list
                                 break
-                        if not unidad:
+                        if not unidades_candidatas:
                             errores_validacion.append(
                                 f"Línea {idx}: Unidad '{unidad_name}' no encontrada para empresa '{empresa.nombre_empresa}'")
                             continue
 
-                    # OPTIMIZADO: Buscar proyecto usando mapa precargado
-                    proyecto = proyectos_map.get((proyecto_name.lower(), unidad.idunidad))
-                    if not proyecto:
-                        # Intentar búsqueda normalizada
+                    # Buscar proyecto probando TODAS las unidades candidatas
+                    # Sin importar cuál unidad duplicada contenga el proyecto,
+                    # lo que importa es que empresa + proyecto + centro coincidan.
+                    proyecto = None
+                    unidad = None
+                    for unidad_candidata in unidades_candidatas:
+                        # Búsqueda exacta
+                        proyecto = proyectos_map.get((proyecto_name.lower(), unidad_candidata.idunidad))
+                        if proyecto:
+                            unidad = unidad_candidata
+                            break
+                        # Búsqueda normalizada (sin acentos)
                         for (nombre_bd, uni_id), proy_obj in proyectos_map.items():
-                            if uni_id == unidad.idunidad and self._normalize_text(proyecto_name) == self._normalize_text(nombre_bd):
+                            if uni_id == unidad_candidata.idunidad and self._normalize_text(proyecto_name) == self._normalize_text(nombre_bd):
                                 proyecto = proy_obj
+                                unidad = unidad_candidata
                                 break
-                        if not proyecto:
-                            errores_validacion.append(
-                                f"Línea {idx}: Proyecto '{proyecto_name}' no encontrado para unidad '{unidad.nombreunidad}'")
-                            continue
+                        if proyecto:
+                            break
+
+                    if not unidad:
+                        # Usar la primera unidad (menor ID) como fallback para el registro
+                        unidad = unidades_candidatas[0]
+
+                    if not proyecto:
+                        errores_validacion.append(
+                            f"Línea {idx}: Proyecto '{proyecto_name}' no encontrado para empresa '{empresa.nombre_empresa}' bajo unidad '{unidad_name}'")
+                        continue
 
                     # OPTIMIZADO: Buscar centro usando mapa precargado
                     centro = centros_map.get((centro_name.lower(), proyecto.idproyecto))

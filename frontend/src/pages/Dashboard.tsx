@@ -22,13 +22,6 @@ interface Unidad {
   proyectos: Proyecto[];
 }
 
-interface Empresa {
-  empresa: string;
-  tipo: "empresa";
-  porcentaje: number;
-  unidades: Unidad[];
-}
-
 interface OrgItem {
   id: string;
   name: string;

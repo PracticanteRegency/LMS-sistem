@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import styles from "./Styles/DatosEmpresa.module.css";
 import analiticaService from "../services/analitica.js";
-import { getUser, getUserRole } from "../services/auth";
+import { getUser, getUserRole } from "../services/auth.ts";
 import Perfil from "../services/perfil";
 
 type Proyecto = {
@@ -32,6 +32,11 @@ type Unidad = {
 	proyectos?: Proyecto[];
 };
 
+type UnidadSelectionWithDesc = UnidadSelection & {
+	nombreunidad?: string;
+	descripcionunidad?: string;
+};
+
 type Empresa = {
 	idempresa: number;
 	nombre_empresa: string;
@@ -52,6 +57,9 @@ type ProyectoSelection = {
 	empresaId: number;
 	unidadId: number;
 	proyectoId: number;
+	nombreproyecto?: string;
+	nombreunidad?: string;
+	descripcionunidad?: string;
 };
 
 export default function DatosEmpresa() {
@@ -78,7 +86,7 @@ export default function DatosEmpresa() {
 	// Proyecto
 	const [proyectoNombre, setProyectoNombre] = useState("");
 	const [proyectoUnidadesSeleccionadas, setProyectoUnidadesSeleccionadas] = useState<
-		UnidadSelection[]
+		UnidadSelectionWithDesc[]
 	>([]);
 	const [proyectoEmpresaTemp, setProyectoEmpresaTemp] = useState<number | "">("");
 	const [unidadSearch, setUnidadSearch] = useState("");
@@ -361,11 +369,27 @@ export default function DatosEmpresa() {
 		return empresa?.unidades?.find((u) => u.idunidad === unidadId)?.nombreunidad || "";
 	};
 
-	// Obtener nombre de proyecto
-	const getProyectoNombre = (empresaId: number, unidadId: number, proyectoId: number) => {
+	// Obtener descripción de unidad
+	const getUnidadDescripcion = (empresaId: number, unidadId: number) => {
 		const empresa = empresasData.find((e) => e.idempresa === empresaId);
-		const unidad = empresa?.unidades?.find((u) => u.idunidad === unidadId);
-		return unidad?.proyectos?.find((p) => p.idproyecto === proyectoId)?.nombreproyecto || "";
+		return empresa?.unidades?.find((u) => u.idunidad === unidadId)?.descripcionunidad || "";
+	};
+
+	// Obtener datos completos de un proyecto (incluyendo unidad)
+	const getProyectoConUnidad = (proyectoId: number) => {
+		for (const empresa of empresasData) {
+			for (const unidad of empresa.unidades || []) {
+				const proyecto = unidad.proyectos?.find((p) => p.idproyecto === proyectoId);
+				if (proyecto) {
+					return {
+						proyecto,
+						unidad,
+						empresa
+					};
+				}
+			}
+		}
+		return null;
 	};
 
 	// Funciones para Jefes de Proyecto
@@ -709,7 +733,12 @@ export default function DatosEmpresa() {
 												onClick={() => {
 													setProyectoUnidadesSeleccionadas([
 														...proyectoUnidadesSeleccionadas,
-														{ empresaId: proyectoEmpresaTemp as number, unidadId: u.idunidad }
+														{ 
+															empresaId: proyectoEmpresaTemp as number, 
+															unidadId: u.idunidad,
+															nombreunidad: u.nombreunidad,
+															descripcionunidad: u.descripcionunidad
+														}
 													]);
 													clearMessages();
 												}}
@@ -735,7 +764,14 @@ export default function DatosEmpresa() {
 								<ul className={styles.examenList}>
 									{proyectoUnidadesSeleccionadas.map((sel, idx) => (
 										<li key={idx}>
-											✓ {getEmpresaNombre(sel.empresaId)} → {getUnidadNombre(sel.empresaId, sel.unidadId)}
+											<div>
+												✓ {getEmpresaNombre(sel.empresaId)} → {sel.nombreunidad}
+												{sel.descripcionunidad && (
+													<div style={{ fontSize: "0.85em", color: "#666", marginTop: "4px" }}>
+														📝 {sel.descripcionunidad}
+													</div>
+												)}
+											</div>
 											<button
 												type="button"
 												className={styles.removeButtonInline}
@@ -845,7 +881,10 @@ export default function DatosEmpresa() {
 														{
 															empresaId: centroEmpresaTemp as number,
 															unidadId: centroUnidadTemp as number,
-															proyectoId: p.idproyecto
+															proyectoId: p.idproyecto,
+															nombreproyecto: p.nombreproyecto,
+															nombreunidad: getUnidadNombre(centroEmpresaTemp as number, centroUnidadTemp as number),
+															descripcionunidad: getUnidadDescripcion(centroEmpresaTemp as number, centroUnidadTemp as number)
 														}
 													]);
 													clearMessages();
@@ -874,7 +913,14 @@ export default function DatosEmpresa() {
 								<ul className={styles.examenList}>
 									{centroProyectosSeleccionados.map((sel, idx) => (
 										<li key={idx}>
-											✓ {getEmpresaNombre(sel.empresaId)} → {getUnidadNombre(sel.empresaId, sel.unidadId)} → {getProyectoNombre(sel.empresaId, sel.unidadId, sel.proyectoId)}
+											<div>
+												✓ {getEmpresaNombre(sel.empresaId)} → {sel.nombreunidad} → {sel.nombreproyecto}
+												{sel.descripcionunidad && (
+													<div style={{ fontSize: "0.85em", color: "#666", marginTop: "4px" }}>
+														📝 {sel.descripcionunidad}
+													</div>
+												)}
+											</div>
 											<button
 												type="button"
 												className={styles.removeButtonInline}
@@ -1304,7 +1350,7 @@ export default function DatosEmpresa() {
 								emp.unidades?.flatMap((unidad) =>
 									unidad.proyectos?.map((proyecto) => (
 										<option key={proyecto.idproyecto} value={proyecto.idproyecto}>
-											{emp.nombre_empresa} → {unidad.nombreunidad} → {proyecto.nombreproyecto}
+											{emp.nombre_empresa} → {unidad.nombreunidad}{unidad.descripcionunidad ? ` (${unidad.descripcionunidad})` : ""} → {proyecto.nombreproyecto}
 										</option>
 									))
 								)
@@ -1312,66 +1358,93 @@ export default function DatosEmpresa() {
 						</select>
 					</div>
 
+					{jefeProyectoSeleccionado && getProyectoConUnidad(jefeProyectoSeleccionado as number) && (
+						<div className={styles.proyectoInfoCard}>
+							<div className={styles.proyectoInfoHeader}>
+								<span className={styles.proyectoInfoIcon}>📋</span>
+								<h4>Detalle del Proyecto Seleccionado</h4>
+							</div>
+							<div className={styles.proyectoInfoGrid}>
+								<div className={styles.proyectoInfoItem}>
+									<span className={styles.proyectoInfoLabel}>🏢 Empresa</span>
+									<span className={styles.proyectoInfoValue}>{getProyectoConUnidad(jefeProyectoSeleccionado as number)?.empresa.nombre_empresa}</span>
+								</div>
+								<div className={styles.proyectoInfoItem}>
+									<span className={styles.proyectoInfoLabel}>🏗️ Unidad de Negocio</span>
+									<span className={styles.proyectoInfoValue}>{getProyectoConUnidad(jefeProyectoSeleccionado as number)?.unidad.nombreunidad}</span>
+								</div>
+								<div className={styles.proyectoInfoItem}>
+									<span className={styles.proyectoInfoLabel}>📂 Proyecto</span>
+									<span className={styles.proyectoInfoValue}>{getProyectoConUnidad(jefeProyectoSeleccionado as number)?.proyecto.nombreproyecto}</span>
+								</div>
+							</div>
+							{getProyectoConUnidad(jefeProyectoSeleccionado as number)?.unidad.descripcionunidad && (
+								<div className={styles.unidadDescripcionBanner}>
+									<span className={styles.unidadDescripcionLabel}>📝 Descripción de la Unidad</span>
+									<p className={styles.unidadDescripcionTexto}>{getProyectoConUnidad(jefeProyectoSeleccionado as number)?.unidad.descripcionunidad}</p>
+								</div>
+							)}
+						</div>
+					)}
+
 					<div className={styles.field}>
 						<label>Buscar Colaborador por Cédula</label>
-						<div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
-							<input
-								type="text"
-								className={styles.input}
-								placeholder="Ingresa la cédula del colaborador"
-								value={jefeProyectoCedula}
-								onChange={(e) => {
-									setJefeProyectoCedula(e.target.value);
-									handleBuscarColaboradorJefe(e.target.value);
-								}}
-							/>
-						</div>
-
-						{/* Resultados de búsqueda */}
-						{jefeProyectoSearchResults.length > 0 && (
-							<div className={styles.searchResults}>
-								{jefeProyectoSearchResults.map((usuario) => (
-									<button
-										key={usuario.id_colaborador}
-										type="button"
-										className={`${styles.addButton} ${
-											jefeProyectoColaboradorSeleccionado?.id_colaborador === usuario.id_colaborador
-												? styles.selectedButton
-												: ""
-										}`}
-										onClick={() => handleSeleccionarColaboradorJefe(usuario)}
-									>
-										{jefeProyectoColaboradorSeleccionado?.id_colaborador === usuario.id_colaborador
-											? "✓ "
-											: ""}
-										{usuario.cc_colaborador} - {usuario.nombre_colaborador} {usuario.apellido_colaborador}
-									</button>
-								))}
-							</div>
-						)}
-
-						{/* Colaborador seleccionado */}
-						{jefeProyectoColaboradorSeleccionado && (
-							<div className={styles.previewSection}>
-								<h4>Colaborador seleccionado</h4>
-								<ul className={styles.examenList}>
-									<li>
-										<strong>Cédula:</strong> {jefeProyectoColaboradorSeleccionado.cc_colaborador}
-									</li>
-									<li>
-										<strong>Nombre:</strong> {jefeProyectoColaboradorSeleccionado.nombre_colaborador}{" "}
-										{jefeProyectoColaboradorSeleccionado.apellido_colaborador}
-									</li>
-									<li>
-										<strong>Correo:</strong> {jefeProyectoColaboradorSeleccionado.correo_colaborador}
-									</li>
-									<li>
-										<strong>Cargo:</strong> {jefeProyectoColaboradorSeleccionado.nombrecargo || "N/A"}
-									</li>
-								</ul>
-							</div>
-						)}
+						<input
+							type="text"
+							className={styles.input}
+							placeholder="Ingresa la cédula del colaborador"
+							value={jefeProyectoCedula}
+							onChange={(e) => {
+								setJefeProyectoCedula(e.target.value);
+								handleBuscarColaboradorJefe(e.target.value);
+							}}
+						/>
 					</div>
+
+					{/* Resultados de búsqueda */}
+					{jefeProyectoSearchResults.length > 0 && (
+						<div className={styles.searchResults}>
+							{jefeProyectoSearchResults.map((usuario) => (
+								<button
+									key={usuario.id_colaborador}
+									type="button"
+									className={`${styles.addButton} ${
+										jefeProyectoColaboradorSeleccionado?.id_colaborador === usuario.id_colaborador
+											? styles.selectedButton
+											: ""
+									}`}
+									onClick={() => handleSeleccionarColaboradorJefe(usuario)}
+								>
+									{jefeProyectoColaboradorSeleccionado?.id_colaborador === usuario.id_colaborador
+										? "✓ "
+										: ""}
+									{usuario.cc_colaborador} - {usuario.nombre_colaborador} {usuario.apellido_colaborador}
+								</button>
+							))}
+						</div>
+					)}
+
+					{/* Colaborador seleccionado */}
+					{jefeProyectoColaboradorSeleccionado && (
+						<div className={styles.previewSection}>
+							<h4>Colaborador seleccionado</h4>
+							<ul className={styles.examenList}>
+								<li>
+									<strong>Cédula:</strong> {jefeProyectoColaboradorSeleccionado.cc_colaborador}
+								</li>
+								<li>
+									<strong>Nombre:</strong> {jefeProyectoColaboradorSeleccionado.nombre_colaborador}{" "}
+									{jefeProyectoColaboradorSeleccionado.apellido_colaborador}
+								</li>
+								<li>
+									<strong>Correo:</strong> {jefeProyectoColaboradorSeleccionado.correo_colaborador}
+								</li>
+								<li>
+									<strong>Cargo:</strong> {jefeProyectoColaboradorSeleccionado.nombrecargo || "N/A"}
+								</li>
+							</ul>
+						</div>
+					)}
 
 					<div style={{ display: "flex", gap: "10px", marginTop: "15px" }}>
 						<button
@@ -1414,7 +1487,7 @@ export default function DatosEmpresa() {
 								emp.unidades?.flatMap((unidad) =>
 									unidad.proyectos?.map((proyecto) => (
 										<option key={proyecto.idproyecto} value={proyecto.idproyecto}>
-											{emp.nombre_empresa} → {unidad.nombreunidad} → {proyecto.nombreproyecto}
+											{emp.nombre_empresa} → {unidad.nombreunidad}{unidad.descripcionunidad ? ` (${unidad.descripcionunidad})` : ""} → {proyecto.nombreproyecto}
 										</option>
 									))
 								)
@@ -1422,25 +1495,54 @@ export default function DatosEmpresa() {
 						</select>
 					</div>
 
-					{jefeProyectoSeleccionado && jefeProyectoActual && (
-						<div className={styles.previewSection}>
-							<h4>Jefe actual</h4>
-							<ul className={styles.examenList}>
-								<li>
-									<strong>Cédula:</strong> {jefeProyectoActual.cedula}
-								</li>
-								<li>
-									<strong>Nombre:</strong> {jefeProyectoActual.nombre} {jefeProyectoActual.apellido}
-								</li>
-								<li>
-									<strong>Correo:</strong> {jefeProyectoActual.correo}
-								</li>
-							</ul>
+					{jefeProyectoSeleccionado && getProyectoConUnidad(jefeProyectoSeleccionado as number) && (
+						<div className={styles.proyectoInfoCard}>
+							<div className={styles.proyectoInfoHeader}>
+								<span className={styles.proyectoInfoIcon}>📋</span>
+								<h4>Detalle del Proyecto Seleccionado</h4>
+							</div>
+							<div className={styles.proyectoInfoGrid}>
+								<div className={styles.proyectoInfoItem}>
+									<span className={styles.proyectoInfoLabel}>🏢 Empresa</span>
+									<span className={styles.proyectoInfoValue}>{getProyectoConUnidad(jefeProyectoSeleccionado as number)?.empresa.nombre_empresa}</span>
+								</div>
+								<div className={styles.proyectoInfoItem}>
+									<span className={styles.proyectoInfoLabel}>🏗️ Unidad de Negocio</span>
+									<span className={styles.proyectoInfoValue}>{getProyectoConUnidad(jefeProyectoSeleccionado as number)?.unidad.nombreunidad}</span>
+								</div>
+								<div className={styles.proyectoInfoItem}>
+									<span className={styles.proyectoInfoLabel}>📂 Proyecto</span>
+									<span className={styles.proyectoInfoValue}>{getProyectoConUnidad(jefeProyectoSeleccionado as number)?.proyecto.nombreproyecto}</span>
+								</div>
+							</div>
+							{getProyectoConUnidad(jefeProyectoSeleccionado as number)?.unidad.descripcionunidad && (
+								<div className={styles.unidadDescripcionBanner}>
+									<span className={styles.unidadDescripcionLabel}>📝 Descripción de la Unidad</span>
+									<p className={styles.unidadDescripcionTexto}>{getProyectoConUnidad(jefeProyectoSeleccionado as number)?.unidad.descripcionunidad}</p>
+								</div>
+							)}
 						</div>
 					)}
 
-					<div className={styles.field}>
-						<label>Buscar Nuevo Colaborador por Cédula</label>
+				{jefeProyectoSeleccionado && jefeProyectoActual && (
+					<div className={styles.previewSection}>
+						<h4>Jefe actual</h4>
+						<ul className={styles.examenList}>
+							<li>
+								<strong>Cédula:</strong> {jefeProyectoActual.cedula}
+							</li>
+							<li>
+								<strong>Nombre:</strong> {jefeProyectoActual.nombre} {jefeProyectoActual.apellido}
+							</li>
+							<li>
+								<strong>Correo:</strong> {jefeProyectoActual.correo}
+							</li>
+						</ul>
+					</div>
+				)}
+
+				<div className={styles.field}>
+					<label>Buscar Nuevo Colaborador por Cédula</label>
 						<div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
 							<input
 								type="text"
@@ -1546,6 +1648,11 @@ export default function DatosEmpresa() {
 													{empresa.nombre_empresa} / {unidad.nombreunidad}
 												</span>
 											</div>
+											{unidad.descripcionunidad && (
+												<div className={styles.unidadDescBadge}>
+													<span className={styles.unidadDescBadgeLabel}>📝 Unidad:</span> {unidad.descripcionunidad}
+												</div>
+											)}
 											<div className={styles.projectBody}>
 												{proyecto.jefe_proyecto ? (
 													<div className={styles.jefInfo}>
@@ -1576,7 +1683,8 @@ export default function DatosEmpresa() {
 						</div>
 					))}
 				</div>
+				</div>
 			</div>
-		</div>	</div>
+		</div>
 	);
 }

@@ -21,4 +21,3 @@ urlpatterns = [
     path("Region/", views.DatosRegionView.as_view(), name="datos-region"),
     path("reporte-usuarios/", views.ReporteUsuariosView.as_view(), name="reporte-usuarios"),
 ]
-

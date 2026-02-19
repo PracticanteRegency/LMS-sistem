@@ -189,7 +189,7 @@ class Register(APIView):
             except Exception:
                 return JsonResponse({'error': 'JSON inválido'}, status=400)
 
-        # 'is_staff' no es requerido para RegisterTemporal; se ignorará y se usará 0
+        # Validar campos raíz requeridos
         required_root = ['usuario', 'password', 'idcolaborador']
         if any(key not in payload for key in required_root):
             return JsonResponse({'error': 'Faltan campos requeridos'}, status=400)
@@ -203,17 +203,23 @@ class Register(APIView):
         if any(key not in colab_data for key in required_colab):
             return JsonResponse({'error': 'Faltan datos del colaborador'}, status=400)
 
-        # Validar que la cédula no exista
-        cc_colaborador = colab_data.get('cc_colaborador', '').strip()
-        if Colaboradores.objects.filter(cccolaborador=cc_colaborador).exists():
-            return JsonResponse({'error': f'La cédula {cc_colaborador} ya existe en la base de datos'}, status=400)
-
-        # Validar que el usuario no exista
+        # VALIDACIONES TEMPRANAS - Verificar ANTES DE TODO
+        # 1. Validar que el usuario NO exista (por nombre de usuario)
         usuario_nombre = payload.get('usuario', '').strip()
+        if not usuario_nombre:
+            return JsonResponse({'error': 'El usuario no puede estar vacío'}, status=400)
         if Usuarios.objects.filter(usuario=usuario_nombre).exists():
-            return JsonResponse({'error': f'El usuario {usuario_nombre} ya existe en la base de datos'}, status=400)
+            return JsonResponse({'error': f'El usuario "{usuario_nombre}" ya existe en la base de datos'}, status=400)
+
+        # 2. Validar que la cédula NO exista (validar colaborador por cédula)
+        cc_colaborador = colab_data.get('cc_colaborador', '').strip()
+        if not cc_colaborador:
+            return JsonResponse({'error': 'La cédula del colaborador no puede estar vacía'}, status=400)
+        if Colaboradores.objects.filter(cccolaborador=cc_colaborador).exists():
+            return JsonResponse({'error': f'El colaborador con cédula "{cc_colaborador}" ya existe en la base de datos'}, status=400)
 
         try:
+            # CREAR NUEVO COLABORADOR
             colaborador = Colaboradores.objects.create(
                 cccolaborador=colab_data['cc_colaborador'],
                 nombrecolaborador=colab_data['nombre_colaborador'],
@@ -226,9 +232,10 @@ class Register(APIView):
                 centroop_id=colab_data['centroOP'],
             )
 
+            # CREAR NUEVO USUARIO
             user = Usuarios(
                 usuario=payload['usuario'],
-                tipousuario=int(payload['is_staff']),
+                tipousuario=int(payload.get('is_staff', 0)),
                 idcolaboradoru=colaborador,
                 estadousuario=1,
             )
@@ -236,7 +243,7 @@ class Register(APIView):
             user.save()
 
             return JsonResponse({
-                'mensaje': 'Usuario creado',
+                'mensaje': 'Usuario y colaborador creados correctamente',
                 'usuario_id': user.id,
                 'colaborador_id': colaborador.idcolaborador,
             }, status=201)
@@ -340,6 +347,13 @@ class RegisterTemporal(APIView):
                 pass
             return JsonResponse({'error': 'Faltan campos requeridos'}, status=400)
 
+        # VALIDACIÓN TEMPRANA: Verificar usuario antes de cualquier otra validación
+        usuario_nombre = payload.get('usuario', '').strip()
+        if not usuario_nombre:
+            return JsonResponse({'error': 'El usuario no puede estar vacío'}, status=400)
+        if Usuarios.objects.filter(usuario=usuario_nombre).exists():
+            return JsonResponse({'error': f'El usuario {usuario_nombre} ya existe en la base de datos'}, status=400)
+
         colab_data = payload.get('idcolaborador') or {}
         required_colab_min = [
             'cc_colaborador', 'nombre_colaborador', 'apellido_colaborador'
@@ -347,15 +361,12 @@ class RegisterTemporal(APIView):
         if any(key not in colab_data for key in required_colab_min):
             return JsonResponse({'error': 'Faltan datos mínimos del colaborador'}, status=400)
 
-        # Validar que la cédula no exista
+        # Validar cédula
         cc_colaborador = colab_data.get('cc_colaborador', '').strip()
+        if not cc_colaborador:
+            return JsonResponse({'error': 'La cédula del colaborador no puede estar vacía'}, status=400)
         if Colaboradores.objects.filter(cccolaborador=cc_colaborador).exists():
             return JsonResponse({'error': f'La cédula {cc_colaborador} ya existe en la base de datos'}, status=400)
-
-        # Validar que el usuario no exista
-        usuario_nombre = payload.get('usuario', '').strip()
-        if Usuarios.objects.filter(usuario=usuario_nombre).exists():
-            return JsonResponse({'error': f'El usuario {usuario_nombre} ya existe en la base de datos'}, status=400)
 
         try:
             colaborador = Colaboradores.objects.create(
@@ -1288,13 +1299,14 @@ class RegistrarMasivoView(APIView):
     Solo SuperAdmin y admin puede realizar esta acción.
     
     CSV esperado (separador ;):
-    cédula;Nombre;Correo;Número;Región;Nivel;Empresa;Unidad;Proyecto;Centro;Cargo
+    cédula;Nombre;Correo;Número;Región;Nivel;Empresa;Unidad;Descripción Unidad;Proyecto;Centro;Cargo
     
     - La cédula se usa como usuario y contraseña.
     - tipousuario por defecto es 0 (colaborador normal).
     - En la columna Nombre vienen apellidos y nombre juntos:
       las dos primeras palabras son apellidos, las siguientes son nombres.
-    - Empresa, Unidad, Proyecto y Centro se usan para filtrar el CentroOp.
+    - Empresa, Unidad, Descripción Unidad, Proyecto y Centro se usan para filtrar el CentroOp.
+      La Descripción Unidad ayuda a identificar la unidad de negocio correcta.
     - Cargo, Nivel y Región se buscan por nombre en la BD.
     """
     permission_classes = [IsAuthenticated, IsSuperUserOrAdmin]
@@ -1317,22 +1329,47 @@ class RegistrarMasivoView(APIView):
             nombres = ''
         return apellidos, nombres
 
-    def _buscar_centro_op(self, empresa_nombre, unidad_nombre, proyecto_nombre, centro_nombre):
+    def _buscar_centro_op(self, empresa_nombre, unidad_nombre, unidad_descripcion, proyecto_nombre, centro_nombre):
         """
         Busca el CentroOp filtrando por la jerarquía:
-        Empresa -> Unidad -> Proyecto -> Centro
+        Empresa -> Unidad (busca por nombre O descripción) -> Proyecto -> Centro
+        
+        La búsqueda es flexible: puede encontrar la unidad por nombre O por descripción.
         """
         try:
+            from django.db.models import Q
+            
+            # Construir query para buscar la unidad
+            # Busca por: (nombre de unidad) O (descripción de unidad)
+            unidad_query = Q(estadounidad=1)
+            
+            nombre_check = Q()
+            desc_check = Q()
+            
+            if unidad_nombre:
+                nombre_check = Q(nombreunidad__iexact=unidad_nombre.strip())
+            
+            if unidad_descripcion:
+                desc_check = Q(descripcionunidad__iexact=unidad_descripcion.strip())
+            
+            # Si ambas están presentes, buscar por cualquiera
+            if nombre_check and desc_check:
+                unidad_query = unidad_query & (nombre_check | desc_check)
+            elif nombre_check:
+                unidad_query = unidad_query & nombre_check
+            elif desc_check:
+                unidad_query = unidad_query & desc_check
+            
             centro = Centroop.objects.filter(
                 nombrecentrop__iexact=centro_nombre.strip(),
                 estadocentrop=1,
                 id_proyecto__nombreproyecto__iexact=proyecto_nombre.strip(),
                 id_proyecto__estadoproyecto=1,
-                id_proyecto__id_unidad__nombreunidad__iexact=unidad_nombre.strip(),
-                id_proyecto__id_unidad__estadounidad=1,
                 id_proyecto__id_unidad__id_empresa__nombre_empresa__iexact=empresa_nombre.strip(),
                 id_proyecto__id_unidad__id_empresa__estadoempresa=1,
+                id_proyecto__id_unidad__in=Unidadnegocio.objects.filter(unidad_query)
             ).first()
+            
             return centro
         except Exception:
             return None
@@ -1409,18 +1446,41 @@ class RegistrarMasivoView(APIView):
                 col_limpio = col_limpio.replace('é', 'e').replace('á', 'a').replace('í', 'i').replace('ó', 'o').replace('ú', 'u').replace('ñ', 'n')
                 columnas_normalizadas[col.strip()] = col_limpio
 
-            # Mapeo de columnas esperadas
+            # Mapeo de columnas esperadas - con prioridad de coincidencia exacta
             mapeo_columnas = {
                 'cedula': None, 'nombre': None, 'correo': None, 'numero': None,
                 'region': None, 'nivel': None, 'empresa': None, 'unidad': None,
-                'proyecto': None, 'centro': None, 'cargo': None
+                'descripcion': None, 'proyecto': None, 'centro': None, 'cargo': None
             }
 
-            for col_original, col_norm in columnas_normalizadas.items():
-                for esperada in mapeo_columnas:
-                    if esperada in col_norm:
-                        mapeo_columnas[esperada] = col_original
-                        break
+            # Primera pasada: buscar coincidencias exactas o muy específicas
+            # Priorizar las búsquedas más específicas primero (ej: "descripcion unidad" antes de solo "unidad")
+            busquedas_prioritarias = [
+                ('descripcion', ['descripcion unidad', 'desc unidad']),
+                ('unidad', ['nombreunidad', 'unidad']),
+                ('cedula', ['cedula', 'cc', 'id']),
+                ('numero', ['numero', 'telefono', 'celular']),
+                ('region', ['region', 'regional']),
+                ('nivel', ['nivel']),
+                ('empresa', ['empresa']),
+                ('proyecto', ['proyecto']),
+                ('centro', ['centro']),
+                ('cargo', ['cargo']),
+                ('nombre', ['nombre']),
+                ('correo', ['correo', 'email']),
+            ]
+            
+            for esperada, patrones in busquedas_prioritarias:
+                for col_original, col_norm in columnas_normalizadas.items():
+                    if mapeo_columnas[esperada] is None:
+                        # Buscar por coincidencia exacta primero
+                        if col_norm in patrones or any(patron == col_norm for patron in patrones):
+                            mapeo_columnas[esperada] = col_original
+                            break
+                        # Si no hay exacta, buscar por substring (pero solo si no fue ya asignada otra columna a este campo)
+                        if any(patron in col_norm for patron in patrones):
+                            mapeo_columnas[esperada] = col_original
+                            break
 
             # Verificar columnas mínimas requeridas
             requeridas = ['cedula', 'nombre']
@@ -1449,25 +1509,22 @@ class RegistrarMasivoView(APIView):
                 nivel_nombre = fila_limpia.get(mapeo_columnas.get('nivel', ''), '').strip() if mapeo_columnas.get('nivel') else ''
                 empresa_nombre = fila_limpia.get(mapeo_columnas.get('empresa', ''), '').strip() if mapeo_columnas.get('empresa') else ''
                 unidad_nombre = fila_limpia.get(mapeo_columnas.get('unidad', ''), '').strip() if mapeo_columnas.get('unidad') else ''
+                unidad_descripcion = fila_limpia.get(mapeo_columnas.get('descripcion', ''), '').strip() if mapeo_columnas.get('descripcion') else ''
                 proyecto_nombre = fila_limpia.get(mapeo_columnas.get('proyecto', ''), '').strip() if mapeo_columnas.get('proyecto') else ''
                 centro_nombre = fila_limpia.get(mapeo_columnas.get('centro', ''), '').strip() if mapeo_columnas.get('centro') else ''
                 cargo_nombre = fila_limpia.get(mapeo_columnas.get('cargo', ''), '').strip() if mapeo_columnas.get('cargo') else ''
 
-                # Validar campos mínimos
+                # Saltar filas vacías o incompletas (sin contar como error)
                 if not cedula or not nombre_completo:
-                    errores_validacion.append({
-                        "fila": num_fila,
-                        "cedula": cedula,
-                        "error": "Cédula o nombre vacío"
-                    })
                     continue
 
+                # VALIDACIÓN TEMPRANA: Verificar existencia del usuario/colaborador ANTES de todo
                 # Verificar si el colaborador ya existe por cédula
                 if Colaboradores.objects.filter(cccolaborador=cedula).exists():
                     errores_validacion.append({
                         "fila": num_fila,
                         "cedula": cedula,
-                        "error": f"La cédula {cedula} ya existe en la base de datos"
+                        "error": f"Colaborador ya existe: La cédula {cedula} ya está registrada en la base de datos"
                     })
                     continue
 
@@ -1476,7 +1533,7 @@ class RegistrarMasivoView(APIView):
                     errores_validacion.append({
                         "fila": num_fila,
                         "cedula": cedula,
-                        "error": f"El usuario con cédula {cedula} ya existe"
+                        "error": f"Usuario ya existe: El usuario con cédula {cedula} ya está registrado"
                     })
                     continue
 
@@ -1487,13 +1544,13 @@ class RegistrarMasivoView(APIView):
                 centro_op = None
                 if empresa_nombre and unidad_nombre and proyecto_nombre and centro_nombre:
                     centro_op = self._buscar_centro_op(
-                        empresa_nombre, unidad_nombre, proyecto_nombre, centro_nombre
+                        empresa_nombre, unidad_nombre, unidad_descripcion, proyecto_nombre, centro_nombre
                     )
                     if not centro_op:
                         errores_validacion.append({
                             "fila": num_fila,
                             "cedula": cedula,
-                            "error": f"Centro de operación no encontrado: Empresa={empresa_nombre}, Unidad={unidad_nombre}, Proyecto={proyecto_nombre}, Centro={centro_nombre}"
+                            "error": f"Centro de operación no encontrado: Empresa={empresa_nombre}, Unidad={unidad_nombre}, Descripción={unidad_descripcion}, Proyecto={proyecto_nombre}, Centro={centro_nombre}"
                         })
                         continue
 
@@ -1631,6 +1688,298 @@ class RegistrarMasivoView(APIView):
                 status=500
             )
 
+    def put(self, request):
+        """
+        Actualización masiva de usuarios existentes a través de un archivo CSV.
+        Busca al colaborador por cédula y actualiza sus datos.
+        NO actualiza el estado del colaborador.
+        
+        CSV esperado (mismo formato que POST):
+        cédula;Nombre;Correo;Número;Región;Nivel;Empresa;Unidad;Descripción Unidad;Proyecto;Centro;Cargo
+        """
+        archivo = request.FILES.get('archivo')
+        if not archivo:
+            return Response(
+                {"error": "Se requiere un archivo CSV. Envíelo con el campo 'archivo'."},
+                status=400
+            )
+
+        if not archivo.name.lower().endswith('.csv'):
+            return Response(
+                {"error": "El archivo debe ser de tipo .csv"},
+                status=400
+            )
+
+        try:
+            # Leer archivo CSV
+            try:
+                contenido = archivo.read().decode('utf-8-sig')
+            except UnicodeDecodeError:
+                try:
+                    archivo.seek(0)
+                    contenido = archivo.read().decode('latin-1')
+                except Exception:
+                    return Response(
+                        {"error": "No se pudo leer el archivo. Asegúrese de que esté en formato UTF-8."},
+                        status=400
+                    )
+
+            # Detectar delimitador
+            primera_linea = contenido.split('\n')[0]
+            if ';' in primera_linea:
+                delimitador = ';'
+            elif ',' in primera_linea:
+                delimitador = ','
+            else:
+                delimitador = ';'
+
+            reader = csv.DictReader(io.StringIO(contenido), delimiter=delimitador)
+
+            if reader.fieldnames is None:
+                return Response(
+                    {"error": "El archivo CSV está vacío o no tiene encabezados."},
+                    status=400
+                )
+
+            # Mapeo flexible de columnas (mismo que POST)
+            columnas_normalizadas = {}
+            for col in reader.fieldnames:
+                col_limpio = col.strip().lower()
+                col_limpio = col_limpio.replace('é', 'e').replace('á', 'a').replace('í', 'i').replace('ó', 'o').replace('ú', 'u').replace('ñ', 'n')
+                columnas_normalizadas[col.strip()] = col_limpio
+
+            mapeo_columnas = {
+                'cedula': None, 'nombre': None, 'correo': None, 'numero': None,
+                'region': None, 'nivel': None, 'empresa': None, 'unidad': None,
+                'descripcion': None, 'proyecto': None, 'centro': None, 'cargo': None
+            }
+
+            busquedas_prioritarias = [
+                ('descripcion', ['descripcion unidad', 'desc unidad']),
+                ('unidad', ['nombreunidad', 'unidad']),
+                ('cedula', ['cedula', 'cc', 'id']),
+                ('numero', ['numero', 'telefono', 'celular']),
+                ('region', ['region', 'regional']),
+                ('nivel', ['nivel']),
+                ('empresa', ['empresa']),
+                ('proyecto', ['proyecto']),
+                ('centro', ['centro']),
+                ('cargo', ['cargo']),
+                ('nombre', ['nombre']),
+                ('correo', ['correo', 'email']),
+            ]
+
+            for esperada, patrones in busquedas_prioritarias:
+                for col_original, col_norm in columnas_normalizadas.items():
+                    if mapeo_columnas[esperada] is None:
+                        if col_norm in patrones or any(patron == col_norm for patron in patrones):
+                            mapeo_columnas[esperada] = col_original
+                            break
+                        if any(patron in col_norm for patron in patrones):
+                            mapeo_columnas[esperada] = col_original
+                            break
+
+            # Verificar columna mínima: cédula
+            if mapeo_columnas['cedula'] is None:
+                return Response(
+                    {"error": f"Falta la columna 'cédula' en el CSV. Columnas encontradas: {', '.join(reader.fieldnames)}"},
+                    status=400
+                )
+
+            # =====================================================
+            # PASO 1: VALIDAR TODAS LAS FILAS
+            # =====================================================
+            filas_datos = []
+            errores_validacion = []
+
+            for num_fila, fila in enumerate(reader, start=2):
+                fila_limpia = {k.strip(): (v.strip() if v else '') for k, v in fila.items()}
+
+                cedula = fila_limpia.get(mapeo_columnas.get('cedula', ''), '').strip()
+                nombre_completo = fila_limpia.get(mapeo_columnas.get('nombre', ''), '').strip()
+                correo = fila_limpia.get(mapeo_columnas.get('correo', ''), '').strip() if mapeo_columnas.get('correo') else ''
+                telefono = fila_limpia.get(mapeo_columnas.get('numero', ''), '').strip() if mapeo_columnas.get('numero') else ''
+                region_nombre = fila_limpia.get(mapeo_columnas.get('region', ''), '').strip() if mapeo_columnas.get('region') else ''
+                nivel_nombre = fila_limpia.get(mapeo_columnas.get('nivel', ''), '').strip() if mapeo_columnas.get('nivel') else ''
+                empresa_nombre = fila_limpia.get(mapeo_columnas.get('empresa', ''), '').strip() if mapeo_columnas.get('empresa') else ''
+                unidad_nombre = fila_limpia.get(mapeo_columnas.get('unidad', ''), '').strip() if mapeo_columnas.get('unidad') else ''
+                unidad_descripcion = fila_limpia.get(mapeo_columnas.get('descripcion', ''), '').strip() if mapeo_columnas.get('descripcion') else ''
+                proyecto_nombre = fila_limpia.get(mapeo_columnas.get('proyecto', ''), '').strip() if mapeo_columnas.get('proyecto') else ''
+                centro_nombre = fila_limpia.get(mapeo_columnas.get('centro', ''), '').strip() if mapeo_columnas.get('centro') else ''
+                cargo_nombre = fila_limpia.get(mapeo_columnas.get('cargo', ''), '').strip() if mapeo_columnas.get('cargo') else ''
+
+                # Saltar filas vacías
+                if not cedula:
+                    continue
+
+                # Verificar que el colaborador EXISTE
+                colaborador = Colaboradores.objects.filter(cccolaborador=cedula).first()
+                if not colaborador:
+                    errores_validacion.append({
+                        "fila": num_fila,
+                        "cedula": cedula,
+                        "error": f"No se encontró colaborador con cédula {cedula}"
+                    })
+                    continue
+
+                # Separar nombre si viene
+                apellidos, nombres = None, None
+                if nombre_completo:
+                    apellidos, nombres = self._separar_nombre(nombre_completo)
+
+                # Buscar CentroOp por jerarquía
+                centro_op = None
+                if empresa_nombre and unidad_nombre and proyecto_nombre and centro_nombre:
+                    centro_op = self._buscar_centro_op(
+                        empresa_nombre, unidad_nombre, unidad_descripcion, proyecto_nombre, centro_nombre
+                    )
+                    if not centro_op:
+                        errores_validacion.append({
+                            "fila": num_fila,
+                            "cedula": cedula,
+                            "error": f"Centro de operación no encontrado: Empresa={empresa_nombre}, Unidad={unidad_nombre}, Descripción={unidad_descripcion}, Proyecto={proyecto_nombre}, Centro={centro_nombre}"
+                        })
+                        continue
+
+                # Buscar Cargo
+                cargo_obj = None
+                if cargo_nombre:
+                    cargo_obj = self._buscar_cargo(cargo_nombre)
+                    if not cargo_obj:
+                        errores_validacion.append({
+                            "fila": num_fila,
+                            "cedula": cedula,
+                            "error": f"Cargo no encontrado: {cargo_nombre}"
+                        })
+                        continue
+
+                # Buscar Nivel
+                nivel_obj = None
+                if nivel_nombre:
+                    nivel_obj = self._buscar_nivel(nivel_nombre)
+                    if not nivel_obj:
+                        errores_validacion.append({
+                            "fila": num_fila,
+                            "cedula": cedula,
+                            "error": f"Nivel no encontrado: {nivel_nombre}"
+                        })
+                        continue
+
+                # Buscar Regional
+                regional_obj = None
+                if region_nombre:
+                    regional_obj = self._buscar_regional(region_nombre)
+                    if not regional_obj:
+                        errores_validacion.append({
+                            "fila": num_fila,
+                            "cedula": cedula,
+                            "error": f"Regional no encontrada: {region_nombre}"
+                        })
+                        continue
+
+                filas_datos.append({
+                    "num_fila": num_fila,
+                    "cedula": cedula,
+                    "colaborador": colaborador,
+                    "nombre": nombres,
+                    "apellido": apellidos,
+                    "correo": correo,
+                    "telefono": telefono,
+                    "centro_op": centro_op,
+                    "cargo_obj": cargo_obj,
+                    "nivel_obj": nivel_obj,
+                    "regional_obj": regional_obj,
+                })
+
+            # =====================================================
+            # Si hay errores de validación, rechazar TODO
+            # =====================================================
+            if errores_validacion:
+                return Response({
+                    "error": "Validación fallida. No se actualizó ningún registro.",
+                    "total_errores": len(errores_validacion),
+                    "detalles_errores": errores_validacion
+                }, status=400)
+
+            if not filas_datos:
+                return Response({
+                    "error": "El archivo CSV no contiene filas válidas para procesar",
+                    "total_filas": 0,
+                    "actualizados": 0
+                }, status=400)
+
+            # =====================================================
+            # PASO 2: ACTUALIZAR EN UNA TRANSACCIÓN
+            # =====================================================
+            resultados = []
+            try:
+                with transaction.atomic():
+                    for fila_data in filas_datos:
+                        try:
+                            colaborador = fila_data['colaborador']
+
+                            # Actualizar nombre y apellido si vienen en el CSV
+                            if fila_data['nombre']:
+                                colaborador.nombrecolaborador = fila_data['nombre']
+                            if fila_data['apellido']:
+                                colaborador.apellidocolaborador = fila_data['apellido']
+
+                            # Actualizar correo y teléfono si vienen
+                            if fila_data['correo']:
+                                colaborador.correocolaborador = fila_data['correo']
+                            if fila_data['telefono']:
+                                colaborador.telefocolaborador = fila_data['telefono']
+
+                            # Actualizar centro de operación
+                            if fila_data['centro_op']:
+                                colaborador.centroop = fila_data['centro_op']
+
+                            # Actualizar cargo
+                            if fila_data['cargo_obj']:
+                                colaborador.cargocolaborador = fila_data['cargo_obj']
+
+                            # Actualizar nivel
+                            if fila_data['nivel_obj']:
+                                colaborador.nivelcolaborador = fila_data['nivel_obj']
+
+                            # Actualizar regional
+                            if fila_data['regional_obj']:
+                                colaborador.regionalcolab = fila_data['regional_obj']
+
+                            # NO se actualiza estadocolaborador
+                            colaborador.save()
+
+                            resultados.append({
+                                "fila": fila_data['num_fila'],
+                                "cedula": fila_data['cedula'],
+                                "nombre": colaborador.nombrecolaborador,
+                                "apellido": colaborador.apellidocolaborador,
+                                "colaborador_id": colaborador.idcolaborador,
+                                "success": True
+                            })
+
+                        except Exception as e:
+                            raise Exception(f"Error en fila {fila_data['num_fila']} (cédula {fila_data['cedula']}): {str(e)}")
+
+                return Response({
+                    "mensaje": f"Se actualizaron {len(resultados)} usuarios exitosamente",
+                    "total_actualizados": len(resultados),
+                    "detalles": resultados
+                }, status=200)
+
+            except Exception as e:
+                return Response({
+                    "error": f"Error durante la actualización. Ningún usuario fue modificado. Detalles: {str(e)}",
+                    "total_intentados": len(filas_datos),
+                    "actualizados": 0
+                }, status=500)
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error al procesar el archivo CSV: {str(e)}"},
+                status=500
+            )
+
     def get(self, request):
         """Devuelve la plantilla CSV de ejemplo como descarga."""
         import os
@@ -1710,6 +2059,7 @@ class ReporteUsuariosView(APIView):
                 'Cédula',
                 'Empresa',
                 'Unidad',
+                'Descripción Unidad',
                 'Proyecto',
                 'Centro OP',
                 'Nombre',
@@ -1748,6 +2098,7 @@ class ReporteUsuariosView(APIView):
                     colaborador.cccolaborador or '',
                     empresa.nombre_empresa if empresa else '',
                     unidad.nombreunidad if unidad else '',
+                    unidad.descripcionunidad if unidad else '',
                     proyecto.nombreproyecto if proyecto else '',
                     centro.nombrecentrop if centro else '',
                     colaborador.nombrecolaborador or '',
@@ -1768,13 +2119,13 @@ class ReporteUsuariosView(APIView):
                     celda.border = border
 
             # Ajustar ancho de columnas
-            anchos = [15, 20, 20, 20, 20, 20, 20, 25, 15, 20, 20, 20, 15]
+            anchos = [15, 20, 20, 25, 20, 20, 20, 20, 25, 15, 20, 20, 20, 15]
             for col_num, ancho in enumerate(anchos, start=1):
                 ws.column_dimensions[chr(64 + col_num)].width = ancho
 
             # Crear tabla dinámica con filtros automáticos
             # La tabla comienza en A1 y termina en la última columna y fila con datos
-            tab = Table(displayName="TablaColaboradores", ref=f"A1:M{max(2, ws.max_row)}")
+            tab = Table(displayName="TablaColaboradores", ref=f"A1:N{max(2, ws.max_row)}")
             
             # Aplicar estilo predefinido a la tabla
             style = TableStyleInfo(name="TableStyleMedium2", showFirstColumn=False,

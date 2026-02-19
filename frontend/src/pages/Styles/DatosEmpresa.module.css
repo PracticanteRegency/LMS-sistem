@@ -802,6 +802,103 @@ select {
   padding: 8px 0;
 }
 
+/* === Info card para proyecto seleccionado (Jefes) === */
+.proyectoInfoCard {
+  background: linear-gradient(135deg, #fafbff 0%, #f0f4ff 100%);
+  border: 1px solid #c7d2fe;
+  border-left: 4px solid #6366f1;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 12px 0;
+}
+
+.proyectoInfoHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e0e7ff;
+}
+
+.proyectoInfoHeader h4 {
+  margin: 0;
+  color: #4338ca;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.proyectoInfoIcon {
+  font-size: 18px;
+}
+
+.proyectoInfoGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.proyectoInfoItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.proyectoInfoLabel {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.proyectoInfoValue {
+  font-size: 14px;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.unidadDescripcionBanner {
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-top: 8px;
+}
+
+.unidadDescripcionLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: #92400e;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.unidadDescripcionTexto {
+  margin: 6px 0 0 0;
+  font-size: 14px;
+  color: #78350f;
+  line-height: 1.5;
+}
+
+/* Badge de descripcion de unidad en listado de proyectos */
+.unidadDescBadge {
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 4px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #78350f;
+  line-height: 1.4;
+}
+
+.unidadDescBadgeLabel {
+  font-weight: 600;
+  color: #92400e;
+}
+
 .buttonSmall {
   background-color: #ef4444;
   border-color: #ef4444;
@@ -1029,5 +1126,39 @@ select {
   .empresa {
     background: #1a1a1a;
     color: #FCE4E0;
+  }
+  .proyectoInfoCard {
+    background: linear-gradient(135deg, #1e1e2e 0%, #1a1a2e 100%);
+    border-color: #4338ca;
+  }
+  .proyectoInfoHeader {
+    border-bottom-color: #333;
+  }
+  .proyectoInfoHeader h4 {
+    color: #a5b4fc;
+  }
+  .proyectoInfoLabel {
+    color: #9ca3af;
+  }
+  .proyectoInfoValue {
+    color: #e0e0e0;
+  }
+  .unidadDescripcionBanner {
+    background: #2a2517;
+    border-color: #78350f;
+  }
+  .unidadDescripcionLabel {
+    color: #fbbf24;
+  }
+  .unidadDescripcionTexto {
+    color: #fde68a;
+  }
+  .unidadDescBadge {
+    background: #2a2517;
+    border-color: #78350f;
+    color: #fde68a;
+  }
+  .unidadDescBadgeLabel {
+    color: #fbbf24;
   }
 }

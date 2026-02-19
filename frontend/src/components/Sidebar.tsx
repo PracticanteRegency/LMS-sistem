@@ -77,7 +77,7 @@
               </>
             )}
 
-            {(userType === 1 || userType === 2 || userType === 3 || userType === 4) && (
+            {(userType === 2 || userType === 3 || userType === 4) && (
               <li className={styles.menuSection}>
                 <span className={styles.sectionTitle}>Gestión Empresarial</span>
                 <ul className={styles.submenu}>

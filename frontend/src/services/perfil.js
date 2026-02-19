@@ -222,6 +222,24 @@ const registrarUsuariosMasivo = async (file) => {
   }
 };
 
+const actualizarUsuariosMasivo = async (file) => {
+  try {
+    const formData = new FormData();
+    formData.append("archivo", file);
+    
+    const response = await api.put(`user/registrar-masivo/`, formData, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating users in bulk:', error);
+    throw error;
+  }
+};
+
 const GetReporteUsuarios = async (file) => {
   return dedupe('perfil:GetReporteUsuarios', { file }, async () => {
     const response = await api.get(`user/reporte-usuarios/?file=${file}`);
@@ -275,6 +293,7 @@ const Perfil = {
   actualizarRolUsuario,
   desactivarMultiplesUsuarios,
   registrarUsuariosMasivo,
+  actualizarUsuariosMasivo,
   descargarReporteUsuarios,
 };
 

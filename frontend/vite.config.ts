@@ -20,10 +20,10 @@ export default defineConfig({
     // via environment variables to avoid attempting to bind the dev server
     // to an external IP/port (which causes EADDRNOTAVAIL when the address
     // isn't available locally).
-    hmr: {
+    hmr: process.env.HMR_HOST ? {
       protocol: process.env.HMR_PROTOCOL || 'wss',
-      host: process.env.HMR_HOST || 'formacion.cloudregencyapps.com',
+      host: process.env.HMR_HOST,
       port: process.env.HMR_PORT ? parseInt(process.env.HMR_PORT, 10) : 443,
-    },
+    } : undefined,
   },
 })
