@@ -35,6 +35,17 @@
           style={{ flex: '1 1 auto', overflowY: 'auto', minHeight: 0, paddingBottom: 32 }}
         >
           <ul>
+            {/* Mi Campeonato Menu */}
+            <li className={styles.menuSection}>
+              <span className={styles.sectionTitle}>Mi Campeonato</span>
+              <ul className={styles.submenu}>
+                <li><Link to="/mundial" className={styles.submenuItem}>🏆 Home</Link></li>
+                {(userType === 2 || userType === 4) && (
+                  <li><Link to="/mundial/admin" className={styles.submenuItem}>⚙️ Admin</Link></li>
+                )}
+              </ul>
+            </li>
+
             {isAdmin ? (
               <>
                 <li className={styles.menuSection}>

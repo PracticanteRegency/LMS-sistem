@@ -3,7 +3,7 @@ import { AdminRoute } from "./AdminRoute.tsx";
 import { AuthContext } from "./context/AuthContext";
 import { getUser, isAuthenticated } from "./services/auth.ts";
 
-import Layout from "./components/Layout";
+import Layout from "./components/Layout"; // Update this path to match your actual Layout file location
 import Home from "./pages/Home";
 import LoginPage from "./pages/login";
 import Dashboard from "./pages/Dashboard";
@@ -30,6 +30,9 @@ import EditarUsuario from "./pages/EditarUsuario";
 import UsersCap from "./pages/UsersCap.tsx";
 import DatosEmpresa from "./pages/DatosEmpresa";
 import CargoNivelRegion from "./pages/CargoNivelRegion";
+import MundialHome from "./pages/MundialHome";
+import MundialPartidos from "./pages/MundialPartidos";
+import MundialAdmin from "./pages/MundialAdmin";
 
 export default function App() {
   const user = getUser();
@@ -106,6 +109,11 @@ export default function App() {
               <AdminRoute><CrearCapacitacion /></AdminRoute>
             }/>
             <Route path="/user/editar/:id" element={<EditarUsuario />} />
+
+            {/* RUTAS MUNDIAL */}
+            <Route path="/mundial" element={<ProtectedRoute><MundialHome /></ProtectedRoute>} />
+            <Route path="/mundial/partidos" element={<ProtectedRoute><MundialPartidos /></ProtectedRoute>} />
+            <Route path="/mundial/admin" element={<AdminRoute><MundialAdmin /></AdminRoute>} />
 
           </Route>
 

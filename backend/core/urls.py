@@ -27,7 +27,7 @@ urlpatterns = [
     path('examenes/', include("examenes.urls")),
     path('analitica/', include("analitica.urls")),
     path('capacitaciones/', include("capacitaciones.urls")),
-    
+    path('mundial/', include("mundial.urls")),
 ]
 
 # Servir archivos media en desarrollo

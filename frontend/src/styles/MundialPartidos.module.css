@@ -1,0 +1,958 @@
+/* ============================================================
+   MundialPartidos.module.css — MICampeonato Matches Page
+   Platform-consistent styles (light default, dark via media query)
+   ============================================================ */
+
+/* ===== PAGE ===== */
+.page {
+  min-height: 100%;
+}
+
+/* ===== HEADER ===== */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btnBack {
+  padding: 6px 14px;
+  background: transparent;
+  color: #555;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.btnBack:hover {
+  background: #f0f0f0;
+}
+
+.headerTitle {
+  font-size: 24px;
+  font-weight: 800;
+  color: #262626;
+  margin: 0;
+}
+
+.headerSubtitle {
+  font-size: 13px;
+  color: #777;
+  margin: 4px 0 0 0;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+}
+
+.headerBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: rgba(76, 175, 80, 0.1);
+  color: #4CAF50;
+  border-radius: 50px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ===== STATS BAR ===== */
+.statsBar {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.statChip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.statChipLabel {
+  font-size: 12px;
+  color: #777;
+  font-weight: 500;
+}
+
+.statChipValue {
+  font-size: 14px;
+  font-weight: 700;
+  color: #262626;
+}
+
+/* ===== FILTERS ===== */
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.searchWrapper {
+  position: relative;
+  max-width: 360px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 10px 12px 10px 36px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+  background: white;
+  color: #262626;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.searchInput:focus {
+  border-color: #4CAF50;
+}
+
+.phaseTabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.phaseTab,
+.phaseTabActive {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  background: white;
+  color: #555;
+  transition: all 0.2s;
+}
+
+.phaseTab:hover {
+  background: #f5f5f5;
+  border-color: #bbb;
+}
+
+.phaseTabActive {
+  background: #4CAF50;
+  color: #fff;
+  border-color: #4CAF50;
+}
+
+.phaseCount {
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.08);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+.phaseTabActive .phaseCount {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.groupTabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.groupTab,
+.groupTabActive {
+  padding: 6px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: white;
+  color: #555;
+  transition: all 0.2s;
+}
+
+.groupTab:hover {
+  background: #f5f5f5;
+}
+
+.groupTabActive {
+  background: #262626;
+  color: #fff;
+  border-color: #262626;
+}
+
+/* ===== MATCH CARDS GRID ===== */
+.matchesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.matchCard {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.matchCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.matchCardLocked {
+  opacity: 0.6;
+}
+
+.matchCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.matchPhase {
+  font-size: 12px;
+  font-weight: 600;
+  color: #777;
+  background: #f0f0f0;
+  padding: 3px 10px;
+  border-radius: 50px;
+}
+
+.matchMultiplier {
+  font-size: 12px;
+  font-weight: 700;
+  color: #4CAF50;
+  background: rgba(76, 175, 80, 0.1);
+  padding: 3px 10px;
+  border-radius: 50px;
+}
+
+.matchCardBody {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.matchTeam {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.matchFlag {
+  font-size: 28px;
+}
+
+.matchTeamName {
+  font-size: 12px;
+  font-weight: 600;
+  color: #262626;
+  text-align: center;
+}
+
+.matchVs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+}
+
+.matchVsText {
+  font-size: 14px;
+  font-weight: 800;
+  color: #999;
+}
+
+.matchPredScore {
+  font-size: 18px;
+  font-weight: 800;
+  color: #4CAF50;
+}
+
+.matchCardFooter {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  font-size: 12px;
+  color: #777;
+}
+
+.matchDate,
+.matchTime {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.matchStatus {
+  text-align: center;
+}
+
+/* Status Badges */
+.badgeLocked {
+  display: inline-block;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 50px;
+  background: rgba(255, 152, 0, 0.1);
+  color: #FF9800;
+}
+
+.badgeDone {
+  display: inline-block;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 50px;
+  background: rgba(76, 175, 80, 0.1);
+  color: #4CAF50;
+}
+
+.badgePending {
+  display: inline-block;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 50px;
+  background: rgba(33, 150, 243, 0.1);
+  color: #2196F3;
+}
+
+/* ===== EMPTY STATE ===== */
+.emptyState {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.emptyEmoji {
+  font-size: 48px;
+  margin: 0 0 12px 0;
+}
+
+.emptyTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #262626;
+  margin: 0 0 8px 0;
+}
+
+.emptyText {
+  font-size: 14px;
+  color: #777;
+  margin: 0;
+}
+
+/* ===== MODAL OVERLAY ===== */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  backdrop-filter: blur(2px);
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.modalTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #262626;
+  margin: 0;
+}
+
+.modalClose {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: #f0f0f0;
+  border-radius: 50%;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  transition: background 0.2s;
+}
+
+.modalClose:hover {
+  background: #e0e0e0;
+}
+
+.modalBody {
+  padding: 20px 24px;
+}
+
+.modalSubtext {
+  font-size: 13px;
+  color: #777;
+  margin: 0 0 20px 0;
+  text-align: center;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* Section Labels */
+.sectionLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  margin: 0 0 10px 0;
+}
+
+/* ===== WINNER GRID ===== */
+.winnerGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.winnerBtn,
+.winnerBtnActive {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 8px;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  background: white;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  transition: all 0.2s;
+}
+
+.winnerBtn:hover {
+  border-color: #bbb;
+  background: #fafafa;
+}
+
+.winnerBtnActive {
+  border-color: #4CAF50;
+  background: rgba(76, 175, 80, 0.06);
+  color: #4CAF50;
+}
+
+.winnerFlag {
+  font-size: 24px;
+}
+
+/* ===== SCORE ADJUSTER ===== */
+.scoreAdjuster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.scoreTeamCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.scoreTeamLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: #555;
+  text-align: center;
+}
+
+.scoreControls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.scoreBtn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  transition: background 0.2s;
+}
+
+.scoreBtn:hover {
+  background: #f5f5f5;
+}
+
+.scoreValue {
+  font-size: 28px;
+  font-weight: 800;
+  color: #262626;
+  min-width: 36px;
+  text-align: center;
+}
+
+.scoreSeparator {
+  font-size: 28px;
+  font-weight: 800;
+  color: #ccc;
+  margin-top: 24px;
+}
+
+/* Prediction Warning */
+.predictionWarning {
+  padding: 10px 14px;
+  background: rgba(255, 152, 0, 0.08);
+  border: 1px solid rgba(255, 152, 0, 0.2);
+  border-radius: 8px;
+  font-size: 13px;
+  color: #F57C00;
+  margin-bottom: 16px;
+}
+
+/* Prediction Info */
+.predictionInfo {
+  padding: 12px 14px;
+  background: #fafafa;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #555;
+  line-height: 1.8;
+}
+
+.predictionInfo p {
+  margin: 0;
+}
+
+/* ===== ACTION BUTTONS ===== */
+.btnPrimary {
+  padding: 10px 20px;
+  background: #4CAF50;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btnPrimary:hover {
+  background: #43A047;
+}
+
+.btnPrimary:disabled {
+  background: #bbb;
+  cursor: not-allowed;
+}
+
+.btnOutline {
+  padding: 10px 20px;
+  background: transparent;
+  color: #555;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btnOutline:hover {
+  background: #f5f5f5;
+}
+
+/* ===== SUCCESS OVERLAY ===== */
+.successOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+
+.successModal {
+  background: white;
+  border-radius: 16px;
+  padding: 36px 40px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  animation: successPop 0.3s ease;
+}
+
+@keyframes successPop {
+  0% { transform: scale(0.8); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.successCheck {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #4CAF50;
+  color: #fff;
+  font-size: 28px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+
+.successTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #262626;
+  margin: 0 0 8px 0;
+}
+
+.successText {
+  font-size: 14px;
+  color: #777;
+  margin: 0;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .headerTitle {
+    font-size: 20px;
+  }
+
+  .statsBar {
+    gap: 6px;
+  }
+
+  .statChip {
+    padding: 6px 10px;
+  }
+
+  .matchesGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .winnerGrid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .winnerBtn,
+  .winnerBtnActive {
+    flex-direction: row;
+    padding: 10px 14px;
+    gap: 10px;
+  }
+
+  .scoreAdjuster {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .scoreSeparator {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .phaseTabs {
+    gap: 4px;
+  }
+
+  .phaseTab,
+  .phaseTabActive {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+}
+
+/* ===== DARK MODE ===== */
+@media (prefers-color-scheme: dark) {
+  .headerTitle {
+    color: #f0f0f0;
+  }
+
+  .headerSubtitle {
+    color: #999;
+  }
+
+  .btnBack {
+    color: #ccc;
+    border-color: #444;
+  }
+
+  .btnBack:hover {
+    background: #2a2a2a;
+  }
+
+  .headerBadge {
+    background: rgba(76, 175, 80, 0.15);
+  }
+
+  .statChip {
+    background: #1e1e1e;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  .statChipLabel {
+    color: #999;
+  }
+
+  .statChipValue {
+    color: #e0e0e0;
+  }
+
+  .searchInput {
+    background: #1e1e1e;
+    border-color: #333;
+    color: #e0e0e0;
+  }
+
+  .searchInput:focus {
+    border-color: #4CAF50;
+  }
+
+  .phaseTab {
+    background: #1e1e1e;
+    border-color: #333;
+    color: #ccc;
+  }
+
+  .phaseTab:hover {
+    background: #2a2a2a;
+    border-color: #555;
+  }
+
+  .groupTab {
+    background: #1e1e1e;
+    border-color: #333;
+    color: #ccc;
+  }
+
+  .groupTab:hover {
+    background: #2a2a2a;
+  }
+
+  .groupTabActive {
+    background: #e0e0e0;
+    color: #121212;
+    border-color: #e0e0e0;
+  }
+
+  .matchCard {
+    background: #1e1e1e;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .matchCard:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  }
+
+  .matchPhase {
+    background: #333;
+    color: #bbb;
+  }
+
+  .matchTeamName {
+    color: #e0e0e0;
+  }
+
+  .matchVsText {
+    color: #666;
+  }
+
+  .matchCardFooter {
+    color: #999;
+  }
+
+  .emptyTitle {
+    color: #e0e0e0;
+  }
+
+  .emptyText {
+    color: #999;
+  }
+
+  /* Modal */
+  .modal {
+    background: #1e1e1e;
+  }
+
+  .modalHeader {
+    border-bottom-color: #333;
+  }
+
+  .modalTitle {
+    color: #e0e0e0;
+  }
+
+  .modalClose {
+    background: #333;
+    color: #ccc;
+  }
+
+  .modalClose:hover {
+    background: #444;
+  }
+
+  .modalSubtext {
+    color: #999;
+  }
+
+  .modalFooter {
+    border-top-color: #333;
+  }
+
+  .sectionLabel {
+    color: #ccc;
+  }
+
+  .winnerBtn {
+    background: #252525;
+    border-color: #444;
+    color: #ccc;
+  }
+
+  .winnerBtn:hover {
+    background: #2a2a2a;
+    border-color: #555;
+  }
+
+  .winnerBtnActive {
+    background: rgba(76, 175, 80, 0.1);
+    border-color: #4CAF50;
+    color: #66BB6A;
+  }
+
+  .scoreBtn {
+    background: #252525;
+    border-color: #444;
+    color: #ccc;
+  }
+
+  .scoreBtn:hover {
+    background: #333;
+  }
+
+  .scoreValue {
+    color: #f0f0f0;
+  }
+
+  .scoreSeparator {
+    color: #555;
+  }
+
+  .scoreTeamLabel {
+    color: #ccc;
+  }
+
+  .predictionWarning {
+    background: rgba(255, 152, 0, 0.1);
+    border-color: rgba(255, 152, 0, 0.25);
+  }
+
+  .predictionInfo {
+    background: #252525;
+    color: #ccc;
+  }
+
+  .btnOutline {
+    color: #ccc;
+    border-color: #444;
+  }
+
+  .btnOutline:hover {
+    background: #2a2a2a;
+  }
+
+  .successModal {
+    background: #1e1e1e;
+  }
+
+  .successTitle {
+    color: #e0e0e0;
+  }
+
+  .successText {
+    color: #999;
+  }
+}

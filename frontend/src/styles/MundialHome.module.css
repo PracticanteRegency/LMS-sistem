@@ -1,0 +1,1249 @@
+/* ============================================================
+   MundialHome.module.css — MICampeonato Home Page
+   Platform-consistent styles (light default, dark via media query)
+   ============================================================ */
+
+/* ===== PAGE WRAPPER ===== */
+.pageWrapper {
+  min-height: 100%;
+}
+
+/* ===== SECTION SHARED ===== */
+.sectionInner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.sectionHeader {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.sectionTitle {
+  font-size: 28px;
+  font-weight: 800;
+  color: #262626;
+  margin: 0 0 12px 0;
+}
+
+.sectionSubtitle {
+  font-size: 15px;
+  color: #777;
+  margin: 0;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.6;
+}
+
+.sectionCta {
+  text-align: center;
+  margin-top: 24px;
+}
+
+/* ===== HERO ===== */
+.hero {
+  position: relative;
+  padding: 60px 20px 48px;
+  text-align: center;
+  overflow: hidden;
+  background: linear-gradient(135deg, #1a472a 0%, #0d2818 50%, #0a1f12 100%);
+  border-radius: 12px;
+  margin-bottom: 32px;
+}
+
+.heroBg {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 30% 20%, rgba(76, 175, 80, 0.15), transparent 60%),
+              radial-gradient(ellipse at 70% 80%, rgba(255, 193, 7, 0.1), transparent 60%);
+  pointer-events: none;
+}
+
+.heroDots {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.heroDot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(76, 175, 80, 0.3);
+  animation: heroDotFloat 6s ease-in-out infinite;
+}
+
+.heroDot:nth-child(1) { top: 15%; left: 10%; animation-delay: 0s; }
+.heroDot:nth-child(2) { top: 60%; left: 80%; animation-delay: 1.5s; }
+.heroDot:nth-child(3) { top: 30%; left: 55%; animation-delay: 3s; }
+.heroDot:nth-child(4) { top: 75%; left: 25%; animation-delay: 4.5s; }
+
+@keyframes heroDotFloat {
+  0%, 100% { opacity: 0.3; transform: translateY(0); }
+  50% { opacity: 0.8; transform: translateY(-20px); }
+}
+
+.heroContent {
+  position: relative;
+  z-index: 1;
+}
+
+.heroPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(76, 175, 80, 0.15);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 50px;
+  padding: 6px 16px;
+  margin-bottom: 24px;
+}
+
+.heroPillDot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+}
+
+.heroPillDotCore {
+  position: absolute;
+  inset: 0;
+  background: #4CAF50;
+  border-radius: 50%;
+}
+
+.heroPillDotPing {
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  background: rgba(76, 175, 80, 0.5);
+  animation: heroPing 2s ease-out infinite;
+}
+
+@keyframes heroPing {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(2.5); }
+}
+
+.heroPillText {
+  font-size: 13px;
+  font-weight: 500;
+  color: #a5d6a7;
+}
+
+.heroTitle {
+  font-size: 40px;
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 16px 0;
+  line-height: 1.15;
+}
+
+.heroHighlight {
+  background: linear-gradient(135deg, #4CAF50, #FFC107);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.heroSubtitle {
+  font-size: 16px;
+  color: #c8c8c8;
+  margin: 0 0 32px 0;
+  max-width: 580px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.6;
+}
+
+.heroButtons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 40px;
+}
+
+.heroStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.heroStatCard {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  backdrop-filter: blur(4px);
+}
+
+.heroStatEmoji {
+  font-size: 24px;
+}
+
+.heroStatValue {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.heroStatLabel {
+  font-size: 12px;
+  color: #aaa;
+}
+
+/* ===== BUTTONS ===== */
+.btnPrimaryLg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 28px;
+  background: #4CAF50;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.btnPrimaryLg:hover {
+  background: #43A047;
+  transform: translateY(-1px);
+}
+
+.btnOutlineLg {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 28px;
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.btnOutlineLg:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 20px;
+  background: #4CAF50;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.btnPrimary:hover {
+  background: #43A047;
+}
+
+.btnOutline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 20px;
+  background: transparent;
+  color: #4CAF50;
+  border: 1px solid #4CAF50;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s;
+}
+
+.btnOutline:hover {
+  background: rgba(76, 175, 80, 0.08);
+}
+
+.btnGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 14px;
+  background: transparent;
+  color: #555;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.btnGhost:hover {
+  background: #f0f0f0;
+  border-color: #bbb;
+}
+
+.btnSmall {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.btnActive {
+  background: #4CAF50 !important;
+  color: #fff !important;
+  border-color: #4CAF50 !important;
+}
+
+/* ===== BADGES ===== */
+.badgeMuted {
+  display: inline-block;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 50px;
+  background: #f0f0f0;
+  color: #666;
+}
+
+.badgePrimary {
+  display: inline-block;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 50px;
+  background: rgba(76, 175, 80, 0.12);
+  color: #4CAF50;
+}
+
+/* ===== MATCHES SECTION ===== */
+.matchesSection {
+  padding: 48px 0;
+}
+
+.phaseFilter {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 28px;
+}
+
+.matchesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.matchCard {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.matchCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.matchCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.matchTeams {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.matchTeam {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.matchFlag {
+  font-size: 32px;
+}
+
+.matchTeamName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+  text-align: center;
+}
+
+.matchVs {
+  font-size: 14px;
+  font-weight: 800;
+  color: #999;
+  padding: 0 8px;
+}
+
+.matchDetails {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.matchDetail {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #777;
+}
+
+.matchDetailIcon {
+  font-size: 14px;
+}
+
+/* ===== HOW IT WORKS ===== */
+.howItWorks {
+  padding: 48px 0;
+  background: #fafafa;
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+
+.stepsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+  margin-bottom: 40px;
+}
+
+.stepCard {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 24px 20px;
+  text-align: center;
+  position: relative;
+  transition: transform 0.2s;
+}
+
+.stepCard:hover {
+  transform: translateY(-2px);
+}
+
+.stepNumber {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #ccc;
+}
+
+.stepEmoji {
+  font-size: 36px;
+  margin-bottom: 12px;
+}
+
+.stepTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #262626;
+  margin: 0 0 8px 0;
+}
+
+.stepDesc {
+  font-size: 13px;
+  color: #777;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Scoring Cards */
+.scoringGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+}
+
+.scoringCard {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 24px;
+}
+
+.scoringCardTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #262626;
+  margin: 0 0 16px 0;
+}
+
+.scoringCardDesc {
+  font-size: 13px;
+  color: #777;
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+
+.scoringItem {
+  display: flex;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+  align-items: flex-start;
+}
+
+.scoringItem:last-child {
+  border-bottom: none;
+}
+
+.scoringPoints {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 50px;
+}
+
+.scoringPointsValue {
+  font-size: 22px;
+  font-weight: 800;
+  color: #4CAF50;
+}
+
+.scoringPointsLabel {
+  font-size: 10px;
+  color: #999;
+  text-transform: uppercase;
+}
+
+.scoringCondition {
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+  margin: 0 0 4px 0;
+}
+
+.scoringExample {
+  font-size: 12px;
+  color: #999;
+  margin: 0;
+}
+
+/* Multipliers */
+.multiplierItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.multiplierItem:last-child {
+  border-bottom: none;
+}
+
+.multiplierPhase {
+  font-size: 14px;
+  color: #555;
+}
+
+.multiplierValue {
+  font-size: 15px;
+  font-weight: 700;
+  color: #4CAF50;
+  background: rgba(76, 175, 80, 0.08);
+  padding: 4px 12px;
+  border-radius: 6px;
+}
+
+/* ===== RANKING ===== */
+.rankingSection {
+  padding: 48px 0;
+}
+
+.rankingContainer {
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+/* Podium */
+.podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.podiumEntry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.podiumFirstWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.podiumTrophy {
+  font-size: 28px;
+  margin-bottom: 2px;
+}
+
+.podiumAvatarFirst,
+.podiumAvatarSecond,
+.podiumAvatarThird {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.podiumAvatarFirst {
+  background: linear-gradient(135deg, #FFD700, #FFA000);
+  width: 60px;
+  height: 60px;
+  font-size: 18px;
+  box-shadow: 0 0 16px rgba(255, 193, 7, 0.4);
+}
+
+.podiumAvatarSecond {
+  background: linear-gradient(135deg, #bbb, #888);
+}
+
+.podiumAvatarThird {
+  background: linear-gradient(135deg, #CD7F32, #A0522D);
+}
+
+.podiumName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+  margin: 0;
+}
+
+.podiumPoints {
+  font-size: 12px;
+  color: #777;
+  margin: 0;
+}
+
+.podiumBarFirst,
+.podiumBarSecond,
+.podiumBarThird {
+  width: 80px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  border-radius: 6px 6px 0 0;
+  padding-bottom: 8px;
+}
+
+.podiumBarFirst {
+  height: 100px;
+  background: linear-gradient(to top, rgba(255, 193, 7, 0.15), rgba(255, 193, 7, 0.05));
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-bottom: none;
+}
+
+.podiumBarSecond {
+  height: 72px;
+  background: linear-gradient(to top, rgba(180, 180, 180, 0.12), rgba(180, 180, 180, 0.04));
+  border: 1px solid rgba(180, 180, 180, 0.25);
+  border-bottom: none;
+}
+
+.podiumBarThird {
+  height: 56px;
+  background: linear-gradient(to top, rgba(205, 127, 50, 0.12), rgba(205, 127, 50, 0.04));
+  border: 1px solid rgba(205, 127, 50, 0.25);
+  border-bottom: none;
+}
+
+.podiumBarNumberFirst {
+  font-size: 20px;
+  font-weight: 800;
+  color: #FFC107;
+}
+
+.podiumBarNumberOther {
+  font-size: 18px;
+  font-weight: 800;
+  color: #999;
+}
+
+/* Ranking Table */
+.rankingTable {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rankingRow,
+.rankingRowTop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  transition: background 0.15s;
+}
+
+.rankingRow:hover,
+.rankingRowTop:hover {
+  background: #fafafa;
+}
+
+.rankingRowTop {
+  border-left: 3px solid #4CAF50;
+}
+
+.rankingRank {
+  min-width: 28px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #262626;
+}
+
+.rankingRankEmoji {
+  font-size: 20px;
+}
+
+.rankingAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #555;
+  flex-shrink: 0;
+}
+
+.rankingInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.rankingName {
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+  margin: 0;
+}
+
+.rankingHits {
+  font-size: 12px;
+  color: #999;
+  margin: 0;
+}
+
+.rankingRight {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.rankingTrend {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.trendUp {
+  color: #4CAF50;
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.trendDown {
+  color: #F44336;
+  background: rgba(244, 67, 54, 0.1);
+}
+
+.trendNeutral {
+  color: #999;
+  background: rgba(153, 153, 153, 0.1);
+}
+
+.rankingScore {
+  text-align: right;
+}
+
+.rankingScoreValue {
+  font-size: 18px;
+  font-weight: 800;
+  color: #262626;
+  margin: 0;
+}
+
+.rankingScoreLabel {
+  font-size: 10px;
+  color: #999;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+/* ===== PRIZES ===== */
+.prizesSection {
+  padding: 48px 0;
+  background: #fafafa;
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+
+.prizesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.prizeCard,
+.prizeCardFirst {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 28px 20px;
+  text-align: center;
+  transition: transform 0.2s;
+}
+
+.prizeCard:hover,
+.prizeCardFirst:hover {
+  transform: translateY(-2px);
+}
+
+.prizeCardFirst {
+  border: 2px solid rgba(255, 193, 7, 0.4);
+  box-shadow: 0 4px 16px rgba(255, 193, 7, 0.1);
+}
+
+.prizeIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  margin: 0 auto 12px;
+}
+
+.prizePosition {
+  font-size: 13px;
+  font-weight: 600;
+  color: #777;
+  margin: 0 0 4px 0;
+}
+
+.prizeAmount {
+  font-size: 28px;
+  font-weight: 800;
+  color: #262626;
+  margin: 0 0 4px 0;
+}
+
+.prizePercent {
+  font-size: 12px;
+  color: #999;
+  margin: 0;
+}
+
+/* Special Predictions */
+.specialCard {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 28px;
+  margin-bottom: 32px;
+}
+
+.specialHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.specialEmoji {
+  font-size: 24px;
+}
+
+.specialTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: #262626;
+  margin: 0;
+}
+
+.specialDesc {
+  font-size: 13px;
+  color: #777;
+  line-height: 1.5;
+  margin: 0 0 20px 0;
+}
+
+.specialGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.specialItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+}
+
+.specialItemName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+}
+
+.specialItemPoints {
+  font-size: 13px;
+  font-weight: 700;
+  color: #4CAF50;
+}
+
+/* Prizes CTA */
+.prizesCta {
+  text-align: center;
+}
+
+.prizesCtaNote {
+  font-size: 12px;
+  color: #999;
+  margin: 12px 0 0 0;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .heroTitle {
+    font-size: 28px;
+  }
+
+  .heroSubtitle {
+    font-size: 14px;
+  }
+
+  .heroStats {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    max-width: 260px;
+  }
+
+  .heroStatCard {
+    flex-direction: row;
+    justify-content: center;
+    gap: 10px;
+    padding: 10px 16px;
+  }
+
+  .heroButtons {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .sectionTitle {
+    font-size: 22px;
+  }
+
+  .matchesGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .stepsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .scoringGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .podium {
+    gap: 12px;
+  }
+
+  .podiumBarFirst,
+  .podiumBarSecond,
+  .podiumBarThird {
+    width: 60px;
+  }
+
+  .prizesGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .specialGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero {
+    padding: 40px 16px 32px;
+  }
+
+  .heroTitle {
+    font-size: 24px;
+  }
+
+  .sectionInner {
+    padding: 0 12px;
+  }
+
+  .phaseFilter {
+    gap: 4px;
+  }
+}
+
+/* ===== DARK MODE ===== */
+@media (prefers-color-scheme: dark) {
+  .sectionTitle {
+    color: #f0f0f0;
+  }
+
+  .sectionSubtitle {
+    color: #999;
+  }
+
+  /* Matches */
+  .matchCard {
+    background: #1e1e1e;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .matchCard:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  }
+
+  .matchTeamName {
+    color: #e0e0e0;
+  }
+
+  .matchVs {
+    color: #666;
+  }
+
+  .matchDetail {
+    color: #999;
+  }
+
+  /* How it works */
+  .howItWorks {
+    background: #161616;
+  }
+
+  .stepCard {
+    background: #1e1e1e;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .stepTitle {
+    color: #e0e0e0;
+  }
+
+  .stepDesc {
+    color: #999;
+  }
+
+  .stepNumber {
+    color: #444;
+  }
+
+  .scoringCard {
+    background: #1e1e1e;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .scoringCardTitle {
+    color: #e0e0e0;
+  }
+
+  .scoringCardDesc {
+    color: #999;
+  }
+
+  .scoringCondition {
+    color: #e0e0e0;
+  }
+
+  .scoringExample {
+    color: #777;
+  }
+
+  .scoringItem {
+    border-bottom-color: #333;
+  }
+
+  .multiplierItem {
+    border-bottom-color: #333;
+  }
+
+  .multiplierPhase {
+    color: #ccc;
+  }
+
+  .multiplierValue {
+    background: rgba(76, 175, 80, 0.15);
+  }
+
+  /* Ranking */
+  .rankingRow,
+  .rankingRowTop {
+    background: #1e1e1e;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  .rankingRow:hover,
+  .rankingRowTop:hover {
+    background: #252525;
+  }
+
+  .rankingRank {
+    color: #e0e0e0;
+  }
+
+  .rankingAvatar {
+    background: #333;
+    color: #ccc;
+  }
+
+  .rankingName {
+    color: #e0e0e0;
+  }
+
+  .rankingScoreValue {
+    color: #f0f0f0;
+  }
+
+  .podiumName {
+    color: #e0e0e0;
+  }
+
+  .podiumPoints {
+    color: #999;
+  }
+
+  /* Prizes */
+  .prizesSection {
+    background: #161616;
+  }
+
+  .prizeCard,
+  .prizeCardFirst {
+    background: #1e1e1e;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .prizeAmount {
+    color: #f0f0f0;
+  }
+
+  .specialCard {
+    background: #1e1e1e;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .specialTitle {
+    color: #e0e0e0;
+  }
+
+  .specialDesc {
+    color: #999;
+  }
+
+  .specialItem {
+    background: #252525;
+    border-color: #333;
+  }
+
+  .specialItemName {
+    color: #ccc;
+  }
+
+  /* Badges */
+  .badgeMuted {
+    background: #333;
+    color: #bbb;
+  }
+
+  .badgePrimary {
+    background: rgba(76, 175, 80, 0.2);
+  }
+
+  /* Buttons */
+  .btnGhost {
+    color: #ccc;
+    border-color: #444;
+  }
+
+  .btnGhost:hover {
+    background: #2a2a2a;
+    border-color: #666;
+  }
+
+  .btnOutline {
+    color: #66BB6A;
+    border-color: #66BB6A;
+  }
+
+  .btnOutline:hover {
+    background: rgba(76, 175, 80, 0.1);
+  }
+}
