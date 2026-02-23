@@ -834,7 +834,7 @@ class ImprimirReporteCorreosView(APIView):
             )
 
             # Título del reporte
-            num_cols = 11 + len(nombres_examenes)  # 11 columnas base + exámenes
+            num_cols = 12 + len(nombres_examenes)  # 12 columnas base + exámenes (incluyendo Ciudad)
             ws.merge_cells(f'A1:{get_column_letter(num_cols)}1')
             ws['A1'] = "REPORTE DETALLADO DE EXÁMENES POR TRABAJADOR"
             ws['A1'].font = Font(bold=True, size=14)
@@ -877,6 +877,7 @@ class ImprimirReporteCorreosView(APIView):
                 "Cargo",
                 "Nombre",
                 "Cédula",
+                "Ciudad",
                 "Tipo Examen",
                 "Total Exámenes"] + nombres_examenes
             for col_num, header in enumerate(headers, start=1):
@@ -924,6 +925,7 @@ class ImprimirReporteCorreosView(APIView):
                     registro.cargo.nombrecargo if registro.cargo else '',
                     registro.nombre_trabajador,
                     registro.documento_trabajador,
+                    registro.ciudad or '',
                     registro.tipo_examen or '',
                     total_examenes_trabajador  # Total horizontal por trabajador
                 ]
@@ -938,8 +940,8 @@ class ImprimirReporteCorreosView(APIView):
                 for col_num, value in enumerate(row_data, start=1):
                     cell = ws.cell(row=row, column=col_num, value=value)
                     cell.border = border_style
-                    # Centrar desde columna 10 en adelante (Tipo Examen + Total + Exámenes)
-                    if col_num >= 10:
+                    # Centrar desde columna 11 en adelante (Ciudad + Tipo Examen + Total + Exámenes)
+                    if col_num >= 11:
                         cell.alignment = center_alignment
 
                 row += 1
@@ -958,13 +960,13 @@ class ImprimirReporteCorreosView(APIView):
             ws.cell(row=row, column=1).border = border_style
 
             # Aplicar estilo a celdas vacías de la fila de totales
-            for col in range(2, 11):  # Columnas 2-10 (hasta Tipo Examen)
+            for col in range(2, 12):  # Columnas 2-11 (hasta Tipo Examen)
                 cell = ws.cell(row=row, column=col)
                 cell.fill = totales_fill
                 cell.border = border_style
 
             # Total de la columna "Total Exámenes" (suma vertical)
-            col_total_examenes = 11
+            col_total_examenes = 12
             suma_total_examenes = 0
             for r in range(data_start_row, data_end_row + 1):
                 val = ws.cell(row=r, column=col_total_examenes).value
@@ -978,7 +980,7 @@ class ImprimirReporteCorreosView(APIView):
             cell_total_vertical.border = border_style
 
             # Totales verticales por cada columna de examen
-            col_inicio_examenes = 12  # Columna donde empiezan los exámenes
+            col_inicio_examenes = 13  # Columna donde empiezan los exámenes
             gran_total_examenes = 0  # Para el total general
             
             for col_num in range(col_inicio_examenes, col_inicio_examenes + len(nombres_examenes)):
@@ -1036,8 +1038,9 @@ class ImprimirReporteCorreosView(APIView):
             ws.column_dimensions['G'].width = 25  # Cargo
             ws.column_dimensions['H'].width = 25  # Nombre
             ws.column_dimensions['I'].width = 15  # Cédula
-            ws.column_dimensions['J'].width = 18  # Tipo Examen
-            ws.column_dimensions['K'].width = 12  # Total Exámenes
+            ws.column_dimensions['J'].width = 15  # Ciudad
+            ws.column_dimensions['K'].width = 18  # Tipo Examen
+            ws.column_dimensions['L'].width = 12  # Total Exámenes
 
             # Columnas de exámenes
             for col_num in range(col_inicio_examenes, col_inicio_examenes + len(nombres_examenes)):
