@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { isAuthenticated } from './services/auth';
+import { isAuthenticated } from './services/auth.ts';
 
 interface Props {
   children: React.ReactElement;

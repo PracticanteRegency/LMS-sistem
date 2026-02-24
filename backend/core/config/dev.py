@@ -4,12 +4,12 @@ from core.config.base import *
 
 ALLOWED_HOSTS = [
     'localhost',
-    'http://formacion.cloudregencyapps.com',
-    'https://formacion.cloudregencyapps.com',
+    '62.72.7.176',
+    '.ngrok.io',
     'juvenescent-tamelessly-dennis.ngrok-free.dev',
-    'nginx',
+    '127.0.0.1',
     'formacion.cloudregencyapps.com',
-    '127.0.0.1'
+    'testserver',
 ]
 
 DEBUG = True

@@ -19,6 +19,4 @@ urlpatterns = [
     path('editar-colaborador-capacitacion/<int:capacitacion_id>/', views.EditarColaboradorCapacitacionView.as_view(), name='editar-colaborador-capacitacion'),
     path('obtener-colaboradores-capacitacion/<int:capacitacion_id>/', views.ObtenerColaboradoresCapacitacionView.as_view(), name='obtener-colaboradores-capacitacion'),
     path('reporte-capacitaciones/', views.ReporteCapacitacionesView.as_view(), name='reporte-capacitaciones'),
-
 ]
- 

@@ -46,15 +46,12 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 
 ALLOWED_HOSTS = [
     'localhost',
-    'http://formacion.cloudregencyapps.com'
-    'https://formacion.cloudregencyapps.com',
-    'formacion.cloudregencyapps.com',
-    '127.0.0.1',
+    '62.72.7.176',
     '.ngrok.io',
     'juvenescent-tamelessly-dennis.ngrok-free.dev',
     '127.0.0.1',
+    'formacion.cloudregencyapps.com',
     'testserver',
-    'https://juvenescent-tamelessly-dennis.ngrok-free.dev/api/'  # Para pruebas con APIClient
 ]
 
 # Application definition

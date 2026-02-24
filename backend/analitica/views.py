@@ -16,7 +16,7 @@ from calendar import monthrange
 
 from usuarios.models import Colaboradores
 
-from usuarios.permissions import IsSuperAdmin, IsAdminUser, IsUsuarioEspecial, IsSuperUserOrAdmin
+from usuarios.permissions import IsSuperAdmin, IsAdminUser, IsUsuarioEspecial, IsSuperUserOrAdmin, IsGestionEmpresarial
 
 from .models import Epresa, Unidadnegocio, Proyecto, Centroop
 from .serializers import (
@@ -191,7 +191,7 @@ class ProgresoEmpresarialFiltradoView(APIView):
 
 
 class EmpresaCreateView(APIView):
-    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
+    permission_classes = [IsAuthenticated, IsGestionEmpresarial]
 
     def post(self, request):
         serializer = EpresaSerializer(data=request.data)
@@ -205,7 +205,7 @@ class EmpresaCreateView(APIView):
 
 
 class VerEmpresaView(APIView):
-    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
+    permission_classes = [IsAuthenticated, IsGestionEmpresarial]
 
     def get(self, request, pk):
         empresa = Epresa.objects.filter(idempresa=pk).first()
@@ -235,7 +235,7 @@ class VerEmpresaView(APIView):
 
 
 class ListaEmpresasView(APIView):
-    permission_classes = [IsAuthenticated, IsSuperUserOrAdmin | IsUsuarioEspecial]
+    permission_classes = [IsAuthenticated, IsGestionEmpresarial]
 
     def get(self, request):
         empresas = Epresa.objects.filter(estadoempresa=1)
@@ -248,7 +248,7 @@ class ListaEmpresasView(APIView):
 # UNIDAD DE NEGOCIO
 # ============================
 class UnidadNegocioCreateView(APIView):
-    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
+    permission_classes = [IsAuthenticated, IsGestionEmpresarial]
 
     def post(self, request):
         serializer = UnidadNegocioSerializer(data=request.data)
@@ -262,7 +262,7 @@ class UnidadNegocioCreateView(APIView):
 
 
 class VerUnidadNegocioView(APIView):
-    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
+    permission_classes = [IsAuthenticated, IsGestionEmpresarial]
 
     def get(self, request, pk):
         unidad = Unidadnegocio.objects.filter(idunidad=pk).first()
@@ -293,7 +293,7 @@ class VerUnidadNegocioView(APIView):
 
 
 class ListaUnidadesNegocioView(APIView):
-    permission_classes = [IsAuthenticated, IsUsuarioEspecial, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsGestionEmpresarial]
 
     def get(self, request):
         unidades = Unidadnegocio.objects.select_related('id_empresa').all()
@@ -306,7 +306,7 @@ class ListaUnidadesNegocioView(APIView):
 # PROYECTOS
 # ============================
 class ProyectoCreateView(APIView):
-    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
+    permission_classes = [IsAuthenticated, IsGestionEmpresarial]
 
     def post(self, request):
         unidad_id = request.data.get("id_unidad")
@@ -332,7 +332,7 @@ class ProyectoCreateView(APIView):
 
 
 class VerProyectoView(APIView):
-    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
+    permission_classes = [IsAuthenticated, IsGestionEmpresarial]
 
     def get(self, request, pk):
         proyecto = Proyecto.objects.filter(idproyecto=pk).first()
@@ -364,7 +364,7 @@ class VerProyectoView(APIView):
 
 
 class ListaProyectosView(APIView):
-    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
+    permission_classes = [IsAuthenticated, IsGestionEmpresarial]
 
     def get(self, request):
         proyectos = Proyecto.objects.filter(estadoproyecto=1)
@@ -373,7 +373,7 @@ class ListaProyectosView(APIView):
 
 
 class JefesProyectoView(APIView):
-    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
+    permission_classes = [IsAuthenticated, IsGestionEmpresarial]
 
     def get(self, request, proyecto_id):
         """Obtener el jefe de un proyecto"""
@@ -478,7 +478,7 @@ class JefesProyectoView(APIView):
 # CENTRO OPERATIVO
 # ============================
 class CentroOperativoCreateView(APIView):
-    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
+    permission_classes = [IsAuthenticated, IsGestionEmpresarial]
 
     def post(self, request):
         with transaction.atomic():
@@ -493,7 +493,7 @@ class CentroOperativoCreateView(APIView):
 
 
 class VerCentroOperativoView(APIView):
-    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
+    permission_classes = [IsAuthenticated, IsGestionEmpresarial]
 
     def get(self, request, pk):
         centro = Centroop.objects.filter(idcentrop=pk).first()
@@ -524,7 +524,7 @@ class VerCentroOperativoView(APIView):
 
 
 class ListaCentrosOperativosView(APIView):
-    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
+    permission_classes = [IsAuthenticated, IsGestionEmpresarial]
 
     def get(self, request):
         centros = Centroop.objects.filter(estadocentrop=1).select_related("id_proyecto")
@@ -533,7 +533,7 @@ class ListaCentrosOperativosView(APIView):
     
     
 class CargarEstructuraView(APIView):
-    permission_classes = [IsAuthenticated, IsUsuarioEspecial]
+    permission_classes = [IsAuthenticated, IsGestionEmpresarial]
 
     def post(self, request):
         serializer = CargarEstructuraSerializer(data=request.data)

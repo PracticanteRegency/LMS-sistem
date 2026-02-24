@@ -1769,6 +1769,7 @@ class ReporteCapacitacionesView(APIView):
             headers = [
                 "Empresa",
                 "Unidad",
+                "Descripción Unidad",
                 "Proyecto",
                 "Centro Op",
                 "Cédula",
@@ -1801,20 +1802,23 @@ class ReporteCapacitacionesView(APIView):
                 # Obtener datos de las relaciones
                 centro_op = colaborador.centroop.nombrecentrop if colaborador.centroop else 'N/A'
                 proyecto = colaborador.centroop.id_proyecto.nombreproyecto if colaborador.centroop and colaborador.centroop.id_proyecto else 'N/A'
-                unidad = colaborador.centroop.id_proyecto.id_unidad.nombreunidad if colaborador.centroop and colaborador.centroop.id_proyecto and colaborador.centroop.id_proyecto.id_unidad else 'N/A'
-                empresa = colaborador.centroop.id_proyecto.id_unidad.id_empresa.nombre_empresa if colaborador.centroop and colaborador.centroop.id_proyecto and colaborador.centroop.id_proyecto.id_unidad and colaborador.centroop.id_proyecto.id_unidad.id_empresa else 'N/A'
+                unidad_obj = colaborador.centroop.id_proyecto.id_unidad if colaborador.centroop and colaborador.centroop.id_proyecto else None
+                unidad_nombre = unidad_obj.nombreunidad if unidad_obj else 'N/A'
+                unidad_desc = unidad_obj.descripcionunidad if unidad_obj else 'N/A'
+                empresa = unidad_obj.id_empresa.nombre_empresa if unidad_obj and unidad_obj.id_empresa else 'N/A'
                 
                 ws.cell(row=row, column=1).value = empresa
-                ws.cell(row=row, column=2).value = unidad
-                ws.cell(row=row, column=3).value = proyecto
-                ws.cell(row=row, column=4).value = centro_op
-                ws.cell(row=row, column=5).value = colaborador.cccolaborador
-                ws.cell(row=row, column=6).value = colaborador.nombrecolaborador
-                ws.cell(row=row, column=7).value = colaborador.apellidocolaborador
-                ws.cell(row=row, column=8).value = colaborador.correocolaborador
-                ws.cell(row=row, column=9).value = float(progreso.progreso)
-                ws.cell(row=row, column=10).value = progreso.fecha_registro.strftime('%d/%m/%Y %H:%M') if progreso.fecha_registro else 'N/A'
-                ws.cell(row=row, column=11).value = progreso.fecha_completada.strftime('%d/%m/%Y %H:%M') if progreso.fecha_completada else 'N/A'
+                ws.cell(row=row, column=2).value = unidad_nombre
+                ws.cell(row=row, column=3).value = unidad_desc
+                ws.cell(row=row, column=4).value = proyecto
+                ws.cell(row=row, column=5).value = centro_op
+                ws.cell(row=row, column=6).value = colaborador.cccolaborador
+                ws.cell(row=row, column=7).value = colaborador.nombrecolaborador
+                ws.cell(row=row, column=8).value = colaborador.apellidocolaborador
+                ws.cell(row=row, column=9).value = colaborador.correocolaborador
+                ws.cell(row=row, column=10).value = float(progreso.progreso)
+                ws.cell(row=row, column=11).value = progreso.fecha_registro.strftime('%d/%m/%Y %H:%M') if progreso.fecha_registro else 'N/A'
+                ws.cell(row=row, column=12).value = progreso.fecha_completada.strftime('%d/%m/%Y %H:%M') if progreso.fecha_completada else 'N/A'
                 
                 # Determinar estado: Completada, No Completado (si pasó fecha fin) o En Progreso
                 if progreso.completada == 1:
@@ -1823,18 +1827,18 @@ class ReporteCapacitacionesView(APIView):
                     estado = "No Completado"
                 else:
                     estado = "En Progreso"
-                ws.cell(row=row, column=12).value = estado
+                ws.cell(row=row, column=13).value = estado
                 
                 # Formato
-                for col in range(1, 13):
+                for col in range(1, 14):
                     cell = ws.cell(row=row, column=col)
                     cell.border = border
-                    if col == 9:  # Porcentaje
+                    if col == 10:  # Porcentaje
                         cell.alignment = center_alignment
                         cell.number_format = '0.00"%"'
-                    elif col in [10, 11]:  # Fechas
+                    elif col in [11, 12]:  # Fechas
                         cell.alignment = center_alignment
-                    elif col == 12:  # Estado Avance
+                    elif col == 13:  # Estado Avance
                         cell.alignment = center_alignment
                 
                 row += 1
@@ -1842,21 +1846,22 @@ class ReporteCapacitacionesView(APIView):
             # Ajustar anchos de columna
             ws.column_dimensions['A'].width = 25  # Empresa
             ws.column_dimensions['B'].width = 18  # Unidad
-            ws.column_dimensions['C'].width = 20  # Proyecto
-            ws.column_dimensions['D'].width = 18  # Centro Op
-            ws.column_dimensions['E'].width = 15  # Cédula
-            ws.column_dimensions['F'].width = 15  # Nombre
-            ws.column_dimensions['G'].width = 15  # Apellido
-            ws.column_dimensions['H'].width = 25  # Correo
-            ws.column_dimensions['I'].width = 16  # % Completación
-            ws.column_dimensions['J'].width = 18  # Fecha Registro
-            ws.column_dimensions['K'].width = 18  # Fecha Completación
-            ws.column_dimensions['L'].width = 14  # Estado Avance
+            ws.column_dimensions['C'].width = 25  # Descripción Unidad
+            ws.column_dimensions['D'].width = 20  # Proyecto
+            ws.column_dimensions['E'].width = 18  # Centro Op
+            ws.column_dimensions['F'].width = 15  # Cédula
+            ws.column_dimensions['G'].width = 15  # Nombre
+            ws.column_dimensions['H'].width = 15  # Apellido
+            ws.column_dimensions['I'].width = 25  # Correo
+            ws.column_dimensions['J'].width = 16  # % Completación
+            ws.column_dimensions['K'].width = 18  # Fecha Registro
+            ws.column_dimensions['L'].width = 18  # Fecha Completación
+            ws.column_dimensions['M'].width = 14  # Estado Avance
             
             # Habilitar filtros y congelar encabezado (facilita filtrado en Excel)
             try:
                 last_row = row - 1
-                ws.auto_filter.ref = f"A6:L{last_row}"
+                ws.auto_filter.ref = f"A6:M{last_row}"
                 ws.freeze_panes = ws['A7']
             except Exception:
                 pass
@@ -1942,6 +1947,7 @@ class ReporteCapacitacionesView(APIView):
                 "% Completación General",
                 "Empresa",
                 "Unidad",
+                "Descripción Unidad",
                 "Proyecto",
                 "Centro Op",
                 "Cédula",
@@ -1991,8 +1997,10 @@ class ReporteCapacitacionesView(APIView):
                         # Obtener datos de las relaciones
                         centro_op = colaborador.centroop.nombrecentrop if colaborador.centroop else 'N/A'
                         proyecto = colaborador.centroop.id_proyecto.nombreproyecto if colaborador.centroop and colaborador.centroop.id_proyecto else 'N/A'
-                        unidad = colaborador.centroop.id_proyecto.id_unidad.nombreunidad if colaborador.centroop and colaborador.centroop.id_proyecto and colaborador.centroop.id_proyecto.id_unidad else 'N/A'
-                        empresa = colaborador.centroop.id_proyecto.id_unidad.id_empresa.nombre_empresa if colaborador.centroop and colaborador.centroop.id_proyecto and colaborador.centroop.id_proyecto.id_unidad and colaborador.centroop.id_proyecto.id_unidad.id_empresa else 'N/A'
+                        unidad_obj = colaborador.centroop.id_proyecto.id_unidad if colaborador.centroop and colaborador.centroop.id_proyecto else None
+                        unidad_nombre = unidad_obj.nombreunidad if unidad_obj else 'N/A'
+                        unidad_desc = unidad_obj.descripcionunidad if unidad_obj else 'N/A'
+                        empresa = unidad_obj.id_empresa.nombre_empresa if unidad_obj and unidad_obj.id_empresa else 'N/A'
                         
                         # Mostrar info de capacitación en TODAS las filas
                         ws.cell(row=row, column=1).value = capacitacion.titulo
@@ -2004,14 +2012,15 @@ class ReporteCapacitacionesView(APIView):
                         
                         # Datos del colaborador
                         ws.cell(row=row, column=7).value = empresa
-                        ws.cell(row=row, column=8).value = unidad
-                        ws.cell(row=row, column=9).value = proyecto
-                        ws.cell(row=row, column=10).value = centro_op
-                        ws.cell(row=row, column=11).value = colaborador.cccolaborador
-                        ws.cell(row=row, column=12).value = colaborador.nombrecolaborador
-                        ws.cell(row=row, column=13).value = colaborador.apellidocolaborador
-                        ws.cell(row=row, column=14).value = colaborador.correocolaborador
-                        ws.cell(row=row, column=15).value = float(progreso.progreso)
+                        ws.cell(row=row, column=8).value = unidad_nombre
+                        ws.cell(row=row, column=9).value = unidad_desc
+                        ws.cell(row=row, column=10).value = proyecto
+                        ws.cell(row=row, column=11).value = centro_op
+                        ws.cell(row=row, column=12).value = colaborador.cccolaborador
+                        ws.cell(row=row, column=13).value = colaborador.nombrecolaborador
+                        ws.cell(row=row, column=14).value = colaborador.apellidocolaborador
+                        ws.cell(row=row, column=15).value = colaborador.correocolaborador
+                        ws.cell(row=row, column=16).value = float(progreso.progreso)
                         
                         # Determinar estado: Completada, No Completado (si pasó fecha fin) o En Progreso
                         if progreso.completada == 1:
@@ -2020,16 +2029,16 @@ class ReporteCapacitacionesView(APIView):
                             estado = "No Completado"
                         else:
                             estado = "En Progreso"
-                        ws.cell(row=row, column=16).value = estado
+                        ws.cell(row=row, column=17).value = estado
                         
                         # Aplicar bordes y formato
-                        for col in range(1, 17):
+                        for col in range(1, 18):
                             cell = ws.cell(row=row, column=col)
                             cell.border = border
-                            if col in [6, 15]:  # Porcentajes
+                            if col in [6, 16]:  # Porcentajes
                                 cell.alignment = center_alignment
                                 cell.number_format = '0.00"%"'
-                            elif col == 16:  # Estado
+                            elif col == 17:  # Estado
                                 cell.alignment = center_alignment
                             else:
                                 cell.alignment = Alignment(vertical='center')
@@ -2042,34 +2051,35 @@ class ReporteCapacitacionesView(APIView):
                     ws.cell(row=row, column=3).value = capacitacion.fecha_creacion.strftime('%d/%m/%Y') if capacitacion.fecha_creacion else 'N/A'
                     ws.cell(row=row, column=4).value = "Sin colaboradores"
                     
-                    for col in range(1, 17):
+                    for col in range(1, 18):
                         cell = ws.cell(row=row, column=col)
                         cell.border = border
                     
                     row += 1
             
             # Ajustar anchos de columna
-            ws.column_dimensions['A'].width = 25
-            ws.column_dimensions['B'].width = 15
-            ws.column_dimensions['C'].width = 16
-            ws.column_dimensions['D'].width = 18
-            ws.column_dimensions['E'].width = 18
-            ws.column_dimensions['F'].width = 18
-            ws.column_dimensions['G'].width = 15
-            ws.column_dimensions['H'].width = 15
-            ws.column_dimensions['I'].width = 15
-            ws.column_dimensions['J'].width = 25
-            ws.column_dimensions['K'].width = 18
-            ws.column_dimensions['L'].width = 20
-            ws.column_dimensions['M'].width = 18
-            ws.column_dimensions['N'].width = 25
-            ws.column_dimensions['O'].width = 16
-            ws.column_dimensions['P'].width = 14
+            ws.column_dimensions['A'].width = 25  # Capacitación
+            ws.column_dimensions['B'].width = 15  # Tipo
+            ws.column_dimensions['C'].width = 16  # Fecha Creación
+            ws.column_dimensions['D'].width = 18  # Total Colaboradores
+            ws.column_dimensions['E'].width = 18  # Total Completados
+            ws.column_dimensions['F'].width = 18  # % Completación General
+            ws.column_dimensions['G'].width = 15  # Empresa
+            ws.column_dimensions['H'].width = 15  # Unidad
+            ws.column_dimensions['I'].width = 25  # Descripción Unidad
+            ws.column_dimensions['J'].width = 15  # Proyecto
+            ws.column_dimensions['K'].width = 18  # Centro Op
+            ws.column_dimensions['L'].width = 15  # Cédula
+            ws.column_dimensions['M'].width = 18  # Nombre
+            ws.column_dimensions['N'].width = 18  # Apellido
+            ws.column_dimensions['O'].width = 25  # Correo
+            ws.column_dimensions['P'].width = 16  # % Completación
+            ws.column_dimensions['Q'].width = 14  # Estado Avance
             
             # Habilitar filtros y congelar encabezado (facilita filtrado en Excel)
             try:
                 last_row = row - 1
-                ws.auto_filter.ref = f"A4:P{last_row}"
+                ws.auto_filter.ref = f"A4:Q{last_row}"
                 ws.freeze_panes = ws['A5']
             except Exception:
                 pass

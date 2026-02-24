@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import styles from "./Styles/Usuarios.module.css";
 import { useNavigate } from "react-router-dom";
-import { getUserId, getUserRole } from "../services/auth";
+import { getUserId, getUserRole } from "../services/auth.ts";
 import PerfilService from "../services/perfil";
 import AnaliticaService from "../services/analitica";
 import api from "../services/axios";

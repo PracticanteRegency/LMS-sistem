@@ -206,6 +206,7 @@ docker exec -it nginx ping backend
 
 ```bash
 docker network connect shared_net backend
+docker network connect shared_net frontend
 ```
 
 ---

@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { AdminRoute } from "./AdminRoute.tsx";
 import { AuthContext } from "./context/AuthContext";
-import { getUser, isAuthenticated } from "./services/auth";
+import { getUser, isAuthenticated } from "./services/auth.ts";
 
 import Layout from "./components/Layout";
 import Home from "./pages/Home";

@@ -3,7 +3,6 @@ import styles from "./Styles/Usuarios.module.css";
 import Perfil from "../services/perfil";
 import { useNavigate } from "react-router-dom";
 import { getUserRole } from "../services/auth";
-import axios from "axios";
 
 interface Usuario {
   id_colaborador: number;
@@ -42,6 +41,7 @@ export default function Usuarios() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [uploadResult, setUploadResult] = useState<any>(null);
+  const [uploadMode, setUploadMode] = useState<'create' | 'update'>('create');
 
 
   useEffect(() => {
@@ -111,6 +111,20 @@ export default function Usuarios() {
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       handleSearch();
+    }
+  };
+
+  const handleDescargarReporte = async () => {
+    try {
+      setLoading(true);
+      await (Perfil as any).descargarReporteUsuarios();
+      setSuccess("Reporte descargado correctamente");
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err: any) {
+      setError(err?.response?.data?.error || "Error al descargar el reporte");
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -230,10 +244,17 @@ export default function Usuarios() {
     formData.append("archivo", uploadFile);
 
     try {
-      const response = await (Perfil as any).registrarUsuariosMasivo(uploadFile);
+      const response = uploadMode === 'update'
+        ? await (Perfil as any).actualizarUsuariosMasivo(uploadFile)
+        : await (Perfil as any).registrarUsuariosMasivo(uploadFile);
 
       setUploadResult(response);
-      setSuccess(`Se registraron ${response.total_creados} usuarios correctamente`);
+
+      if (uploadMode === 'update') {
+        setSuccess(`Se actualizaron ${response.total_actualizados} usuarios correctamente`);
+      } else {
+        setSuccess(`Se registraron ${response.total_creados} usuarios correctamente`);
+      }
       setUploadFile(null);
       
       // Recargar usuarios después de 2 segundos
@@ -243,11 +264,13 @@ export default function Usuarios() {
         setUploadResult(null);
       }, 2000);
     } catch (err: any) {
-      const errorMsg = err?.response?.data?.error || "Error al cargar usuarios";
-      const detalles = err?.response?.data?.detalles_errores || err?.response?.data?.detalles;
-      setError(errorMsg);
+      const errorData = err?.response?.data;
+      const errorMsg = errorData?.error || "Error al cargar usuarios";
+      const detalles = errorData?.detalles_errores || errorData?.detalles;
+      const totalErrores = errorData?.total_errores || detalles?.length || 0;
       setUploadResult({
         error: errorMsg,
+        total_errores: totalErrores,
         detalles_errores: detalles,
       });
     } finally {
@@ -288,6 +311,14 @@ export default function Usuarios() {
               style={{ backgroundColor: "#4CAF50", marginRight: "8px" }}
             >
               📤 Registrar Masivo
+            </button>
+            <button
+              className={styles.btnReport}
+              onClick={handleDescargarReporte}
+              title="Descargar reporte de todos los usuarios en Excel"
+              style={{ backgroundColor: "#2196F3", marginRight: "8px" }}
+            >
+              📊 Descargar Reporte
             </button>
             <button
               className={styles.btnReport}
@@ -459,15 +490,19 @@ export default function Usuarios() {
           setShowUploadModal(false);
           setUploadResult(null);
           setUploadFile(null);
+          setUploadMode('create');
         }}>
           <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>📤 Registrar Usuarios Masivamente</h2>
+              <h2 className={styles.modalTitle}>
+                {uploadMode === 'update' ? '🔄 Actualizar Usuarios Masivamente' : '📤 Registrar Usuarios Masivamente'}
+              </h2>
               <button
                 onClick={() => {
                   setShowUploadModal(false);
                   setUploadResult(null);
                   setUploadFile(null);
+                  setUploadMode('create');
                 }}
                 className={styles.modalCloseBtn}
               >
@@ -475,11 +510,27 @@ export default function Usuarios() {
               </button>
             </div>
 
+            {/* Selector de modo */}
+            <div className={styles.uploadModeToggle}>
+              <button
+                className={`${styles.modeBtn} ${uploadMode === 'create' ? styles.modeBtnActive : ''}`}
+                onClick={() => { setUploadMode('create'); setUploadResult(null); setUploadFile(null); }}
+              >
+                📤 Registrar Nuevos
+              </button>
+              <button
+                className={`${styles.modeBtn} ${uploadMode === 'update' ? styles.modeBtnActive : ''}`}
+                onClick={() => { setUploadMode('update'); setUploadResult(null); setUploadFile(null); }}
+              >
+                🔄 Actualizar Existentes
+              </button>
+            </div>
+
             {/* Instrucciones */}
             <div className={styles.instructionsBox}>
               <h3 className={styles.instructionsTitle}>📋 Formato esperado del CSV (UTF-8):</h3>
               <p className={styles.instructionsFormat}>
-                cédula;Nombre;Correo;Número;Región;Nivel;Empresa;Unidad;Proyecto;Centro;Cargo
+                cédula;Nombre;Correo;Número;Región;Nivel;Empresa;Unidad;Descripción Unidad;Proyecto;Centro;Cargo
               </p>
               <ul className={styles.instructionsList}>
                 <li><strong>cédula:</strong> Identificación única (se usa como usuario y contraseña)</li>
@@ -487,11 +538,14 @@ export default function Usuarios() {
                 <li><strong>Correo:</strong> Email del usuario (opcional)</li>
                 <li><strong>Número:</strong> Teléfono (opcional)</li>
                 <li><strong>Región, Nivel:</strong> Deben existir en la base de datos</li>
-                <li><strong>Empresa, Unidad, Proyecto, Centro:</strong> Se usan para filtrar el Centro de Operación</li>
+                <li><strong>Empresa, Unidad, Descripción Unidad:</strong> Identifica la unidad de negocio para filtrar el Centro de Operación</li>
+                <li><strong>Proyecto, Centro:</strong> Se usan junto con Empresa y Unidad para filtrar el Centro de Operación</li>
                 <li><strong>Cargo:</strong> Debe existir en la base de datos</li>
               </ul>
               <p className={styles.warningText}>
-                ⚠️ Si hay cualquier error, se cancela el registro completo (sin crear ningún usuario)
+                {uploadMode === 'update'
+                  ? '⚠️ Si hay cualquier error, se cancela la actualización completa (sin modificar ningún usuario). No se actualiza el estado del colaborador.'
+                  : '⚠️ Si hay cualquier error, se cancela el registro completo (sin crear ningún usuario)'}
               </p>
             </div>
 
@@ -523,35 +577,95 @@ export default function Usuarios() {
               <div className={`${styles.resultsBox} ${uploadResult.error ? styles.resultsBoxError : styles.resultsBoxSuccess}`}>
                 {uploadResult.error ? (
                   <>
-                    <p className={styles.resultErrorMsg}>
-                      ❌ {uploadResult.error}
-                    </p>
-                    {uploadResult.detalles_errores && (
-                      <div className={styles.resultDetailsList}>
-                        <strong>Errores encontrados:</strong>
-                        <ul>
-                          {uploadResult.detalles_errores.slice(0, 10).map((err: any, idx: number) => (
-                            <li key={idx}>
-                              Fila {err.fila}: {err.error}
-                            </li>
-                          ))}
-                        </ul>
-                        {uploadResult.detalles_errores.length > 10 && (
-                          <p className={styles.resultDetailsMore}>
-                            ... y {uploadResult.detalles_errores.length - 10} errores más
+                    {/* Encabezado del error */}
+                    <div className={styles.errorHeader}>
+                      <span className={styles.errorIcon}>⚠️</span>
+                      <div>
+                        <p className={styles.resultErrorMsg}>
+                          {uploadResult.error}
+                        </p>
+                        {uploadResult.detalles_errores && (
+                          <p className={styles.errorCount}>
+                            Se encontraron <strong>{uploadResult.detalles_errores.length}</strong> error{uploadResult.detalles_errores.length !== 1 ? 'es' : ''} en el archivo
                           </p>
                         )}
                       </div>
+                    </div>
+
+                    {/* Resumen agrupado por tipo de error */}
+                    {uploadResult.detalles_errores && uploadResult.detalles_errores.length > 1 && (
+                      <div className={styles.errorSummary}>
+                        <strong className={styles.errorSummaryTitle}>📊 Resumen de errores:</strong>
+                        <div className={styles.errorTags}>
+                          {Object.entries(
+                            uploadResult.detalles_errores.reduce((acc: Record<string, number>, err: any) => {
+                              const tipo = err.error?.includes('ya existe') ? 'Duplicados'
+                                : err.error?.includes('no encontrad') ? 'No encontrados'
+                                : err.error?.includes('vacío') ? 'Campos vacíos'
+                                : 'Otros';
+                              acc[tipo] = (acc[tipo] || 0) + 1;
+                              return acc;
+                            }, {} as Record<string, number>)
+                          ).map(([tipo, count]) => (
+                            <span key={tipo} className={styles.errorTag}>
+                              {tipo}: {count as number}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
                     )}
+
+                    {/* Tabla detallada de errores */}
+                    {uploadResult.detalles_errores && (
+                      <div className={styles.errorTableWrapper}>
+                        <table className={styles.errorTable}>
+                          <thead>
+                            <tr>
+                              <th>Fila</th>
+                              <th>Cédula</th>
+                              <th>Error</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {uploadResult.detalles_errores.map((err: any, idx: number) => (
+                              <tr key={idx}>
+                                <td className={styles.errorRowNum}>{err.fila}</td>
+                                <td className={styles.errorCedula}>{err.cedula || '—'}</td>
+                                <td className={styles.errorMessage}>{err.error}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {/* Botón para reintentar */}
+                    <button
+                      className={styles.retryBtn}
+                      onClick={() => {
+                        setUploadResult(null);
+                        setUploadFile(null);
+                      }}
+                    >
+                      🔄 Corregir y volver a intentar
+                    </button>
                   </>
                 ) : (
                   <>
                     <p className={styles.resultSuccessMsg}>
                       ✅ {uploadResult.mensaje}
                     </p>
+                    {(uploadResult.total_creados || uploadResult.total_actualizados) && (
+                      <p className={styles.successCount}>
+                        {uploadResult.total_actualizados
+                          ? <>Se actualizaron <strong>{uploadResult.total_actualizados}</strong> usuarios correctamente</>
+                          : <>Se registraron <strong>{uploadResult.total_creados}</strong> usuarios correctamente</>
+                        }
+                      </p>
+                    )}
                     {uploadResult.detalles && (
                       <div className={styles.resultDetailsList}>
-                        <strong>Usuarios registrados:</strong>
+                        <strong>{uploadResult.total_actualizados ? 'Usuarios actualizados:' : 'Usuarios registrados:'}</strong>
                         <ul>
                           {uploadResult.detalles.slice(0, 5).map((user: any, idx: number) => (
                             <li key={idx}>
@@ -586,6 +700,7 @@ export default function Usuarios() {
                   setShowUploadModal(false);
                   setUploadResult(null);
                   setUploadFile(null);
+                  setUploadMode('create');
                 }}
                 className={styles.modalBtnClose}
               >
@@ -597,7 +712,7 @@ export default function Usuarios() {
                   disabled={!uploadFile || uploadLoading}
                   className={styles.modalBtnSubmit}
                 >
-                  {uploadLoading ? "Cargando..." : "Cargar Usuarios"}
+                  {uploadLoading ? "Cargando..." : uploadMode === 'update' ? "Actualizar Usuarios" : "Cargar Usuarios"}
                 </button>
               )}
             </div>

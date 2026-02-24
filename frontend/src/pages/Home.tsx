@@ -46,8 +46,13 @@ export default function Home() {
   return (
     <div className={styles.container}>
       <h1 className={styles.mainTitle}>Capacitaciones</h1>
-      <div className={styles.grid}>
-        {caps.map((cap: any) => {
+      {(!caps || caps.length === 0) ? (
+        <div style={{ padding: 24, textAlign: 'center' }}>
+          <p style={{ fontSize: 16}}>No tienes capacitaciones nuevas, revisa tu perfil para ver avances.</p>
+        </div>
+      ) : (
+        <div className={styles.grid}>
+          {caps.map((cap: any) => {
           const id = cap.id || cap.id_capacitacion || cap.pk;
           const title = cap.titulo || cap.nombre || cap.nombre_capacitacion || "Sin título";
           // Handle multiple possible image fields and decode base64 when needed
@@ -104,8 +109,9 @@ export default function Home() {
               </div>
             </div>
           );
-        })}
-      </div>
+          })}
+        </div>
+      )}
     </div>
   );
 }

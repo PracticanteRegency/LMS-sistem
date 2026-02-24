@@ -222,6 +222,61 @@ const registrarUsuariosMasivo = async (file) => {
   }
 };
 
+const actualizarUsuariosMasivo = async (file) => {
+  try {
+    const formData = new FormData();
+    formData.append("archivo", file);
+    
+    const response = await api.put(`user/registrar-masivo/`, formData, {
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating users in bulk:', error);
+    throw error;
+  }
+};
+
+const GetReporteUsuarios = async (file) => {
+  return dedupe('perfil:GetReporteUsuarios', { file }, async () => {
+    const response = await api.get(`user/reporte-usuarios/?file=${file}`);
+    return response.data;
+  });
+};
+
+const descargarReporteUsuarios = async () => {
+  try {
+    const response = await api.get('user/reporte-usuarios/', {
+      responseType: 'blob',
+    });
+    
+    // Crear un URL temporal para el blob
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    
+    // Crear un elemento <a> temporal
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'Reporte_Usuarios.xlsx');
+    
+    // Agregar al DOM y hacer click
+    document.body.appendChild(link);
+    link.click();
+    
+    // Limpiar
+    link.parentNode?.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error descargando reporte de usuarios:', error);
+    throw error;
+  }
+};
+
+
 const Perfil = {
   getPerfil,
   getListUsers,
@@ -238,6 +293,8 @@ const Perfil = {
   actualizarRolUsuario,
   desactivarMultiplesUsuarios,
   registrarUsuariosMasivo,
+  actualizarUsuariosMasivo,
+  descargarReporteUsuarios,
 };
 
 export default Perfil
