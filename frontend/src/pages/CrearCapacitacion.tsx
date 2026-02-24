@@ -797,7 +797,26 @@ const handleRespuestaChange = async (
         }
       } catch (uploadErr: any) {
         console.error(uploadErr);
-        setError(uploadErr.message || 'Error subiendo archivos');
+        
+        // Extraer detalles del error de subida de archivos
+        let errorMessage = 'Error al subir archivos';
+        
+        if (uploadErr.response?.data) {
+          const data = uploadErr.response.data;
+          if (typeof data === 'string') {
+            errorMessage = data;
+          } else if (data.error) {
+            errorMessage = data.error;
+          } else if (data.message) {
+            errorMessage = data.message;
+          } else if (data.detail) {
+            errorMessage = data.detail;
+          }
+        } else if (uploadErr.message) {
+          errorMessage = uploadErr.message;
+        }
+        
+        setError(errorMessage);
         setLoading(false);
         return;
       }
@@ -809,7 +828,45 @@ const handleRespuestaChange = async (
       navigate("/capacitaciones/list");
     } catch (err: any) {
       console.error("Error al crear capacitación:", err);
-      setError(err.message || "Error al crear la capacitación");
+      
+      // Extraer mensaje de error del backend
+      let errorMessage = "Error al crear la capacitación";
+      
+      // Intentar obtener detalles del error desde diferentes fuentes
+      if (err.response?.data) {
+        const data = err.response.data;
+        
+        // Si hay un mensaje de error directo
+        if (typeof data === 'string') {
+          errorMessage = data;
+        } else if (data.error) {
+          errorMessage = data.error;
+        } else if (data.message) {
+          errorMessage = data.message;
+        } else if (data.detail) {
+          errorMessage = data.detail;
+        } else if (typeof data === 'object') {
+          // Buscar errores en los campos
+          const errors = Object.entries(data)
+            .map(([field, messages]: any) => {
+              if (Array.isArray(messages)) {
+                return `${field}: ${messages.join(", ")}`;
+              } else if (typeof messages === 'object') {
+                return `${field}: ${JSON.stringify(messages)}`;
+              }
+              return `${field}: ${messages}`;
+            })
+            .filter(msg => msg);
+          
+          if (errors.length > 0) {
+            errorMessage = errors.join(" | ");
+          }
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -1536,7 +1593,51 @@ const handleRespuestaChange = async (
           )}
         </div>
         )}
-        {error && <p className={styles.error}>{error}</p>}
+        {error && (
+          <div className={styles.errorContainer} style={{
+            backgroundColor: "#fee2e2",
+            border: "1px solid #fca5a5",
+            borderRadius: "6px",
+            padding: "16px",
+            marginTop: "16px",
+            marginBottom: "16px"
+          }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+              <div style={{ fontSize: "20px", color: "#dc2626", flexShrink: 0 }}>⚠️</div>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: "0 0 8px 0", fontWeight: "600", color: "#991b1b" }}>
+                  Error al guardar la capacitación
+                </p>
+                <p style={{ 
+                  margin: "0", 
+                  color: "#7f1d1d", 
+                  fontSize: "14px", 
+                  lineHeight: "1.5",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word"
+                }}>
+                  {error}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setError(null)}
+                  style={{
+                    marginTop: "8px",
+                    padding: "4px 8px",
+                    fontSize: "12px",
+                    backgroundColor: "#dc2626",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: "pointer"
+                  }}
+                >
+                  Descartar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         </form>
       </div>
   );
