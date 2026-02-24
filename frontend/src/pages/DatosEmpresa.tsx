@@ -743,7 +743,14 @@ export default function DatosEmpresa() {
 													clearMessages();
 												}}
 											>
-												➕ {u.nombreunidad}
+												<div>
+													➕ {u.nombreunidad}
+													{u.descripcionunidad && (
+														<div style={{ fontSize: "0.85em", color: "#555", marginTop: "4px" }}>
+															📝 {u.descripcionunidad}
+														</div>
+													)}
+												</div>
 											</button>
 										))}
 									{getUnidadesByEmpresa(proyectoEmpresaTemp).filter((u) => 
@@ -870,29 +877,39 @@ export default function DatosEmpresa() {
 											)
 										)
 										.slice(0, 8)
-										.map((p) => (
-											<button
-												key={p.idproyecto}
-												type="button"
-												className={styles.addButton}
-												onClick={() => {
-													setCentroProyectosSeleccionados([
-														...centroProyectosSeleccionados,
-														{
-															empresaId: centroEmpresaTemp as number,
-															unidadId: centroUnidadTemp as number,
-															proyectoId: p.idproyecto,
-															nombreproyecto: p.nombreproyecto,
-															nombreunidad: getUnidadNombre(centroEmpresaTemp as number, centroUnidadTemp as number),
-															descripcionunidad: getUnidadDescripcion(centroEmpresaTemp as number, centroUnidadTemp as number)
-														}
-													]);
-													clearMessages();
-												}}
-											>
-												➕ {p.nombreproyecto}
-											</button>
-										))}
+										.map((p) => {
+											const desc = getUnidadDescripcion(centroEmpresaTemp as number, centroUnidadTemp as number);
+											return (
+												<button
+													key={p.idproyecto}
+													type="button"
+													className={styles.addButton}
+													onClick={() => {
+														setCentroProyectosSeleccionados([
+															...centroProyectosSeleccionados,
+															{
+																empresaId: centroEmpresaTemp as number,
+																unidadId: centroUnidadTemp as number,
+																proyectoId: p.idproyecto,
+																nombreproyecto: p.nombreproyecto,
+																nombreunidad: getUnidadNombre(centroEmpresaTemp as number, centroUnidadTemp as number),
+																descripcionunidad: desc
+															}
+														]);
+														clearMessages();
+													}}
+												>
+													<div>
+														➕ {p.nombreproyecto}
+														{desc && (
+															<div style={{ fontSize: "0.85em", color: "#555", marginTop: "4px" }}>
+																📝 Unidad: {desc}
+															</div>
+														)}
+													</div>
+												</button>
+											);
+										})}
 									{getProyectosByUnidad(centroEmpresaTemp, centroUnidadTemp).filter((p) => 
 										p.nombreproyecto.toLowerCase().includes(proyectoSearch.toLowerCase()) &&
 										!centroProyectosSeleccionados.some((sel) => 
@@ -1074,8 +1091,15 @@ export default function DatosEmpresa() {
 												clearMessages();
 											}}
 										>
-											{editId === u.idunidad ? "✓ " : ""}
-											{u.nombreunidad}
+											<div>
+												{editId === u.idunidad ? "✓ " : ""}
+												{u.nombreunidad}
+												{u.descripcionunidad && (
+													<div style={{ fontSize: "0.85em", color: "#555", marginTop: "4px" }}>
+														📝 {u.descripcionunidad}
+													</div>
+												)}
+											</div>
 										</button>
 									))}
 								{getUnidadesByEmpresa(editEmpresaTemp).filter((u) => u.nombreunidad.toLowerCase().includes(editUnidadSearch.toLowerCase())).length === 0 && (
@@ -1155,21 +1179,31 @@ export default function DatosEmpresa() {
 								{getProyectosByUnidad(editEmpresaTemp, editUnidadTemp)
 									.filter((p) => p.nombreproyecto.toLowerCase().includes(editProyectoSearch.toLowerCase()))
 									.slice(0, 8)
-									.map((p) => (
-										<button
-											key={p.idproyecto}
-											type="button"
-											className={`${styles.addButton} ${editId === p.idproyecto ? styles.selectedButton : ""}`}
-											onClick={() => {
-												setEditId(p.idproyecto);
-												setEditProyectoSearch("");
-												clearMessages();
-											}}
-										>
-											{editId === p.idproyecto ? "✓ " : ""}
-											{p.nombreproyecto}
-										</button>
-									))}
+									.map((p) => {
+										const desc = getUnidadDescripcion(editEmpresaTemp as number, editUnidadTemp as number);
+										return (
+											<button
+												key={p.idproyecto}
+												type="button"
+												className={`${styles.addButton} ${editId === p.idproyecto ? styles.selectedButton : ""}`}
+												onClick={() => {
+													setEditId(p.idproyecto);
+													setEditProyectoSearch("");
+													clearMessages();
+												}}
+											>
+												<div>
+													{editId === p.idproyecto ? "✓ " : ""}
+													{p.nombreproyecto}
+													{desc && (
+														<div style={{ fontSize: "0.85em", color: "#555", marginTop: "4px" }}>
+															📝 Unidad: {desc}
+														</div>
+													)}
+												</div>
+											</button>
+										);
+									})}
 								{getProyectosByUnidad(editEmpresaTemp, editUnidadTemp).filter((p) => p.nombreproyecto.toLowerCase().includes(editProyectoSearch.toLowerCase())).length === 0 && (
 									<p className={styles.smallNote}>No hay resultados.</p>
 								)}
