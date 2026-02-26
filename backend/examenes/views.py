@@ -724,7 +724,9 @@ class ImprimirReporteCorreosView(APIView):
             ).prefetch_related(
                 Prefetch(
                     'examenes',
-                    queryset=ExamenTrabajador.objects.select_related('examen'),
+                    queryset=ExamenTrabajador.objects.filter(
+                        examen__activo=True
+                    ).select_related('examen'),
                     to_attr='examenes_enviados_precargados'
                 )
             )
@@ -811,6 +813,9 @@ class ImprimirReporteCorreosView(APIView):
             examenes_activos = Examen.objects.filter(
                 activo=True).order_by('nombre')
             nombres_examenes = [ex.nombre for ex in examenes_activos]
+            
+            # Deduplicar nombres de exámenes (por si hay duplicados en la BD)
+            nombres_examenes = list(dict.fromkeys(nombres_examenes))  # Mantiene orden, elimina duplicados
 
             # Crear el workbook de Excel
             wb = Workbook()
@@ -890,6 +895,12 @@ class ImprimirReporteCorreosView(APIView):
             row += 1
             data_start_row = row
 
+            # Variables para acumular totales durante el procesamiento
+            suma_total_examenes = 0
+            totales_por_examen = {}  # Dict para guardar totales por columna de examen
+            for nombre_ex in nombres_examenes:
+                totales_por_examen[nombre_ex] = 0
+
             # Datos de trabajadores
             for registro in registros:
                 # Obtener unidad y proyecto del centro
@@ -907,13 +918,20 @@ class ImprimirReporteCorreosView(APIView):
                 # OPTIMIZADO: Usar exámenes precargados con Prefetch (sin query adicional)
                 examenes_enviados = getattr(registro, 'examenes_enviados_precargados', [])
 
-                # Crear set con nombres de exámenes enviados (sin importar estado)
+                # Crear set con nombres de exámenes ÚNICOS del trabajador (deduplicado)
                 examenes_trabajador = set()
                 for ex_env in examenes_enviados:
-                    if ex_env.examen:
+                    if ex_env.examen and ex_env.examen.nombre in nombres_examenes:
                         examenes_trabajador.add(ex_env.examen.nombre)
 
                 total_examenes_trabajador = len(examenes_trabajador)
+                
+                # Acumular el total de exámenes
+                suma_total_examenes += total_examenes_trabajador
+                
+                # Acumular totales por examen (una sola vez por examen único)
+                for nombre_examen in examenes_trabajador:
+                    totales_por_examen[nombre_examen] += 1
 
                 row_data = [
                     registro.uuid_trabajador or '',
@@ -930,7 +948,7 @@ class ImprimirReporteCorreosView(APIView):
                     total_examenes_trabajador  # Total horizontal por trabajador
                 ]
 
-                # Agregar X para cada examen enviado (sin importar estado)
+                # Agregar X para cada examen activo enviado (una X por examen único)
                 for nombre_examen in nombres_examenes:
                     if nombre_examen in examenes_trabajador:
                         row_data.append('X')
@@ -965,14 +983,8 @@ class ImprimirReporteCorreosView(APIView):
                 cell.fill = totales_fill
                 cell.border = border_style
 
-            # Total de la columna "Total Exámenes" (suma vertical)
+            # Total de la columna "Total Exámenes" (suma que ya calculamos)
             col_total_examenes = 12
-            suma_total_examenes = 0
-            for r in range(data_start_row, data_end_row + 1):
-                val = ws.cell(row=r, column=col_total_examenes).value
-                if val and isinstance(val, int):
-                    suma_total_examenes += val
-
             cell_total_vertical = ws.cell(row=row, column=col_total_examenes, value=suma_total_examenes)
             cell_total_vertical.font = Font(bold=True, size=11)
             cell_total_vertical.fill = totales_fill
@@ -983,14 +995,9 @@ class ImprimirReporteCorreosView(APIView):
             col_inicio_examenes = 13  # Columna donde empiezan los exámenes
             gran_total_examenes = 0  # Para el total general
             
-            for col_num in range(col_inicio_examenes, col_inicio_examenes + len(nombres_examenes)):
-                # Contar X en cada columna (total vertical)
-                total_col = 0
-                for r in range(data_start_row, data_end_row + 1):
-                    val = ws.cell(row=r, column=col_num).value
-                    if val == 'X':
-                        total_col += 1
-
+            for col_num, nombre_examen in enumerate(nombres_examenes, start=col_inicio_examenes):
+                # Usar el total que ya calculamos
+                total_col = totales_por_examen[nombre_examen]
                 gran_total_examenes += total_col
 
                 cell = ws.cell(row=row, column=col_num, value=total_col)
