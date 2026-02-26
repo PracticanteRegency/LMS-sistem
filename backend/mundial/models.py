@@ -105,8 +105,8 @@ class Equipo(models.Model):
     """Modelo para equipos participantes en el torneo."""
     nombre = models.CharField(max_length=100, unique=True)
     bandera_imagen = models.ImageField(
-        upload_to="banderas/", null=True, blank=True
-    )  # Imagen subida por admin en media/banderas/
+        upload_to="mundial/banderas/", null=True, blank=True
+    )  # Imagen subida por admin en media/mundial/banderas/
     bandera_emoji = models.CharField(max_length=10, blank=True)  # Emoji fallback "🇲🇽"
     activo = models.BooleanField(default=True)
     creado_en = models.DateTimeField(auto_now_add=True)
@@ -282,22 +282,22 @@ class Partido(models.Model):
         return None
 
     def puede_predecir(self):
-        """Acepta predicciones si está ABIERTO y faltan más de 1h para el inicio."""
-        if self.estado != EstadoPartido.ABIERTO:
+        """Acepta predicciones si está ABIERTO y faltan más de 1 hora para el partido."""
+        if self.estado.lower() != EstadoPartido.ABIERTO:
             return False
         return timezone.now() < (self.fecha_hora_inicio - timedelta(hours=1))
 
     def puede_editar_admin(self):
         """Admin puede editar campos del partido solo si está ABIERTO."""
-        return self.estado == EstadoPartido.ABIERTO
+        return self.estado.lower() == EstadoPartido.ABIERTO
 
     def puede_ingresar_resultado(self):
         """Admin puede ingresar resultado solo si el partido está BLOQUEADO."""
-        return self.estado == EstadoPartido.BLOQUEADO
+        return self.estado.lower() == EstadoPartido.BLOQUEADO
 
     def verificar_y_bloquear(self):
         """Bloquea el partido automáticamente cuando ya no acepta predicciones."""
-        if self.estado == EstadoPartido.ABIERTO and not self.puede_predecir():
+        if self.estado.lower() == EstadoPartido.ABIERTO and not self.puede_predecir():
             self.estado = EstadoPartido.BLOQUEADO
             self.save(update_fields=["estado"])
             return True
@@ -353,11 +353,16 @@ class Prediccion(models.Model):
         """
         Calcula los puntos de la predicción según la configuración.
         Reglas:
-          - Resultado exacto en tiempo reglamentario → puntos_resultado_exacto (ej: 3 pts)
-          - Solo ganador correcto → puntos_ganador_correcto (ej: 1 pt)
+          TIEMPO REGLAMENTARIO:
+          - Resultado exacto (ej: 2-2) → puntos_resultado_exacto (3 pts)
+          - Solo ganador correcto (incluyendo empate) → puntos_ganador_correcto (1 pt)
           - No se acumulan ambos (exacto o ganador, lo que aplique)
-          - Penaltis exactos → +puntos_resultado_exacto adicionales
-          - Solo ganador en penaltis → +puntos_ganador_correcto adicionales
+          
+          PENALTIS (cuando el partido fue a penaltis):
+          - Solo se evalúan si el usuario predijo penaltis (predice_penaltis=True)
+          - Marcador exacto penaltis → +puntos_resultado_exacto (3 pts)
+          - Solo ganador penaltis correcto → +puntos_ganador_correcto (1 pt)
+          
           - Todos los puntos se multiplican por el multiplicador de la fase
         """
         if self.partido.resultado is None:
@@ -369,9 +374,11 @@ class Prediccion(models.Model):
         # Tiempo reglamentario
         if (self.goles_local == self.partido.goles_local
                 and self.goles_visitante == self.partido.goles_visitante):
+            # Resultado exacto
             puntos_base = config_torneo.puntos_resultado_exacto
             self.es_acierto_exacto = True
         elif self.ganador == self.partido.ganador:
+            # Solo ganador correcto (incluyendo empate)
             puntos_base = config_torneo.puntos_ganador_correcto
 
         # Multiplicador de la fase
@@ -391,8 +398,10 @@ class Prediccion(models.Model):
             puntos_pen_base = 0
             if (self.penaltis_local == self.partido.penaltis_local
                     and self.penaltis_visitante == self.partido.penaltis_visitante):
+                # Marcador exacto penaltis
                 puntos_pen_base = config_torneo.puntos_resultado_exacto
             elif self.ganador_penaltis == self.partido.ganador_penaltis:
+                # Solo ganador penaltis correcto
                 puntos_pen_base = config_torneo.puntos_ganador_correcto
             self.puntos_penaltis = int(puntos_pen_base * multiplicador)
 

@@ -109,3 +109,8 @@ export const updateConfigEspecial = (id, data) =>
 
 /** Obtener estadísticas generales */
 export const getEstadisticas = () => api.get(`${BASE}/estadisticas/`);
+
+// ===== HOME DATA (Consolidated) =====
+
+/** Obtener todos los datos necesarios para la página home en una sola petición */
+export const getHomeData = () => api.get(`${BASE}/home/`);

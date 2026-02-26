@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import styles from "../styles/MundialHome.module.css";
 import { getTrendColor } from "../services/mundial.ts";
 import type { MatchData, RankingEntry } from "../services/mundial.ts";
+import dedupe from "../services/dedupe.js";
 import {
   // @ts-ignore
   getPartidos,
@@ -12,6 +13,12 @@ import {
   getConfiguracion,
   // @ts-ignore
   getPrediccionesEspeciales,
+  // @ts-ignore
+  getHomeData,
+  // @ts-ignore
+  getEquipos,
+  // @ts-ignore
+  upsertPrediccionEspecial,
 } from "../services/mundial.js";
 
 // All data from backend API
@@ -113,7 +120,7 @@ function ScoringRulesGrid() {
   const [multiplierRules, setMultiplierRules] = useState<any[]>([]);
 
   useEffect(() => {
-    getConfiguracion()
+    dedupe("config", {}, () => getConfiguracion())
       .then((res: any): void => {
         if (res.data?.scoring_rules) setScoringRules(res.data.scoring_rules);
         if (res.data?.multiplier_rules) setMultiplierRules(res.data.multiplier_rules);
@@ -158,25 +165,49 @@ function ScoringRulesGrid() {
   );
 }
 
+/* ===== SCORING RULES (STANDALONE VERSION FOR HOME) ===== */
+function ScoringRulesGridStandalone({ scoringRules = [], multiplierRules = [] }: { scoringRules?: any[], multiplierRules?: any[] }) {
+  return (
+    <div className={styles.scoringGrid}>
+      <div className={styles.scoringCard}>
+        <h3 className={styles.scoringCardTitle}>Sistema de Puntuación</h3>
+        {scoringRules.map((item, idx) => (
+          <div key={idx} className={styles.scoringItem}>
+            <div className={styles.scoringPoints}>
+              <span className={styles.scoringPointsValue}>{item.points}</span>
+              <span className={styles.scoringPointsLabel}>puntos</span>
+            </div>
+            <div>
+              <p className={styles.scoringCondition}>{item.condition}</p>
+              <p className={styles.scoringExample}>{item.example}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className={styles.scoringCard}>
+        <h3 className={styles.scoringCardTitle}>Multiplicadores por Fase</h3>
+        <p className={styles.scoringCardDesc}>
+          Los puntos base se multiplican según la fase del torneo. ¡Las predicciones en fases finales valen más!
+        </p>
+        {multiplierRules.map((item, idx) => (
+          <div key={idx} className={styles.multiplierItem}>
+            <span className={styles.multiplierPhase}>{item.phase}</span>
+            <span className={styles.multiplierValue}>{item.multiplier}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ===== MATCHES ===== */
-function MatchesSection() {
-  const [activePhase, setActivePhase] = useState("Grupos");
-  const [matches, setMatches] = useState<MatchData[]>([]);
-  const [phases, setPhases] = useState<string[]>([]);
+function MatchesSection({ initialMatches = [] }: { initialMatches?: MatchData[] }) {
+  const [matches, setMatches] = useState<MatchData[]>(initialMatches);
 
   useEffect(() => {
-    getPartidos()
-      .then((res: any): void => {
-        const data = res.data || [];
-        setMatches(data);
-        const uniquePhases = ["Todos", ...new Set(data.map((m: MatchData) => m.phase))] as string[];
-        setPhases(uniquePhases);
-      })
-      .catch(() => {
-        setMatches([]);
-        setPhases(["Todos"]);
-      });
-  }, []);
+    setMatches(initialMatches);
+  }, [initialMatches]);
 
   return (
     <section id="partidos" className={styles.matchesSection}>
@@ -188,57 +219,44 @@ function MatchesSection() {
           </p>
         </div>
 
-        <div className={styles.phaseFilter}>
-          {phases.map((phase) => (
-            <button
-              key={phase}
-              className={`${styles.btnGhost} ${styles.btnSmall} ${activePhase === phase ? styles.btnActive : ""}`}
-              onClick={() => setActivePhase(phase)}
-            >
-              {phase}
-            </button>
-          ))}
-        </div>
-
         <div className={styles.matchesGrid}>
           {matches
-            .filter((match) => activePhase === "Todos" || match.phase === activePhase)
             .slice(0, 6)
             .map((match: MatchData) => (
               <div key={match.id} className={styles.matchCard}>
                 <div className={styles.matchCardHeader}>
                   <span className={styles.badgeMuted}>{match.phase}</span>
-                <span className={styles.badgePrimary}>{match.multiplier}</span>
-              </div>
+                  <span className={styles.badgePrimary}>{match.multiplier}</span>
+                </div>
 
-              <div className={styles.matchTeams}>
-                <div className={styles.matchTeam}>
-                  <span className={styles.matchFlag}>{match.homeFlag}</span>
-                  <span className={styles.matchTeamName}>{match.homeTeam}</span>
+                <div className={styles.matchTeams}>
+                  <div className={styles.matchTeam}>
+                    <img src={match.homeFlag} alt={match.homeTeam} className={styles.matchFlagImg} />
+                    <span className={styles.matchTeamName}>{match.homeTeam}</span>
+                  </div>
+                  <span className={styles.matchVs}>VS</span>
+                  <div className={styles.matchTeam}>
+                    <img src={match.awayFlag} alt={match.awayTeam} className={styles.matchFlagImg} />
+                    <span className={styles.matchTeamName}>{match.awayTeam}</span>
+                  </div>
                 </div>
-                <span className={styles.matchVs}>VS</span>
-                <div className={styles.matchTeam}>
-                  <span className={styles.matchFlag}>{match.awayFlag}</span>
-                  <span className={styles.matchTeamName}>{match.awayTeam}</span>
-                </div>
-              </div>
 
-              <div className={styles.matchDetails}>
-                <div className={styles.matchDetail}>
-                  <span className={styles.matchDetailIcon}>📅</span>
-                  <span>{match.date}</span>
+                <div className={styles.matchDetails}>
+                  <div className={styles.matchDetail}>
+                    <span className={styles.matchDetailIcon}>📅</span>
+                    <span>{match.date}</span>
+                  </div>
+                  <div className={styles.matchDetail}>
+                    <span className={styles.matchDetailIcon}>⏰</span>
+                    <span>{match.time}</span>
+                  </div>
                 </div>
-                <div className={styles.matchDetail}>
-                  <span className={styles.matchDetailIcon}>⏰</span>
-                  <span>{match.time}</span>
-                </div>
-              </div>
 
-              <Link to="/mundial/partidos" className={styles.btnPrimary} style={{ width: "100%", textAlign: "center" }}>
-                Hacer Predicción →
-              </Link>
-            </div>
-          ))}
+                <Link to="/mundial/partidos" className={styles.btnPrimary} style={{ width: "100%", textAlign: "center" }}>
+                  Hacer Predicción →
+                </Link>
+              </div>
+            ))}
         </div>
 
         <div className={styles.sectionCta}>
@@ -252,26 +270,14 @@ function MatchesSection() {
 }
 
 /* ===== PRIZES ===== */
-function PrizesSection() {
-  const [prizes, setPrizes] = useState<any[]>([]);
-  const [specialPredictions, setSpecialPredictions] = useState<any[]>([]);
+function PrizesSection({ initialPrizes = [], initialSpecialPredictions = [] }: { initialPrizes?: any[], initialSpecialPredictions?: any[] }) {
+  const [prizes, setPrizes] = useState<any[]>(initialPrizes);
+  const [specialPredictions, setSpecialPredictions] = useState<any[]>(initialSpecialPredictions);
 
   useEffect(() => {
-    getConfiguracion()
-      .then((res: any): void => {
-        if (res.data?.prizes) setPrizes(res.data.prizes);
-      })
-      .catch(() => {
-        setPrizes([]);
-      });
-    getPrediccionesEspeciales()
-      .then((res: any): void => {
-        if (res.data) setSpecialPredictions(res.data);
-      })
-      .catch(() => {
-        setSpecialPredictions([]);
-      });
-  }, []);
+    setPrizes(initialPrizes);
+    setSpecialPredictions(initialSpecialPredictions);
+  }, [initialPrizes, initialSpecialPredictions]);
 
   return (
     <section id="premios" className={styles.prizesSection}>
@@ -328,19 +334,187 @@ function PrizesSection() {
   );
 }
 
-/* ===== RANKING ===== */
-function RankingSection() {
-  const [players, setPlayers] = useState<RankingEntry[]>([]);
+/* ===== SPECIAL PREDICTIONS ===== */
+function SpecialPredictionsSection({ initialSpecialPredictions = [] }: { initialSpecialPredictions?: any[] }) {
+  const [predictions, setPredictions] = useState<any[]>(initialSpecialPredictions);
+  const [userPredictions, setUserPredictions] = useState<any[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<{ [key: string]: any }>({});
+  const [selectedPlayer, setSelectedPlayer] = useState<{ [key: string]: string }>({});
+  const [loading, setLoading] = useState(false);
+  const [teams, setTeams] = useState<any[]>([]);
 
   useEffect(() => {
-    getRanking()
+    setPredictions(initialSpecialPredictions);
+  }, [initialSpecialPredictions]);
+
+  useEffect(() => {
+    // Cargar equipos
+    dedupe("equipos-for-special", {}, () => getEquipos())
       .then((res: any): void => {
-        if (res.data) setPlayers(res.data);
+        const data = Array.isArray(res.data) ? res.data : res.data?.equipos || [];
+        setTeams(data);
       })
       .catch(() => {
-        setPlayers([]);
+        setTeams([]);
+      });
+
+    // Cargar predicciones especiales del usuario
+    dedupe("my-special-predictions", {}, () => getPrediccionesEspeciales())
+      .then((res: any): void => {
+        const data = res.data?.predicciones || [];
+        setUserPredictions(data);
+        // Inicializar selectedTeam y selectedPlayer con las predicciones existentes
+        const teamMap: any = {};
+        const playerMap: any = {};
+        data.forEach((pred: any) => {
+          if (pred.equipo_seleccionado) {
+            teamMap[pred.tipo] = pred.equipo_seleccionado;
+          }
+          if (pred.jugador_seleccionado) {
+            playerMap[pred.tipo] = pred.jugador_seleccionado;
+          }
+        });
+        setSelectedTeam(teamMap);
+        setSelectedPlayer(playerMap);
+      })
+      .catch(() => {
+        setUserPredictions([]);
       });
   }, []);
+
+  const handleSubmitSpecial = async (tipo: string) => {
+    setLoading(true);
+    try {
+      const payload: any = { tipo };
+      
+      if (["campeon", "subcampeon", "tercer_lugar"].includes(tipo)) {
+        const teamId = selectedTeam[tipo];
+        if (!teamId) {
+          alert("Selecciona un equipo");
+          setLoading(false);
+          return;
+        }
+        payload.equipo_seleccionado = teamId;
+      } else if (tipo === "maximo_goleador") {
+        const player = selectedPlayer[tipo];
+        if (!player) {
+          alert("Ingresa el nombre del jugador");
+          setLoading(false);
+          return;
+        }
+        payload.jugador_seleccionado = player;
+      }
+
+      const res = await upsertPrediccionEspecial(payload);
+      
+      // Actualizar estado local
+      const existingIndex = userPredictions.findIndex(p => p.tipo === tipo);
+      if (existingIndex >= 0) {
+        const updated = [...userPredictions];
+        updated[existingIndex] = res.data;
+        setUserPredictions(updated);
+      } else {
+        setUserPredictions([...userPredictions, res.data]);
+      }
+
+      alert("Predicción guardada ✓");
+    } catch (error: any) {
+      console.error("Error:", error);
+      alert("Error al guardar la predicción");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section id="especiales" className={styles.specialSection}>
+      <div className={styles.sectionInner}>
+        <div className={styles.sectionHeader}>
+          <h2 className={styles.sectionTitle}>🎯 Predicciones Especiales</h2>
+          <p className={styles.sectionSubtitle}>
+            Responde una sola vez y gana puntos extras al finalizar el torneo.
+          </p>
+        </div>
+
+        {predictions.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "2rem", color: "var(--muted-foreground)" }}>
+            No hay predicciones especiales disponibles en este momento
+          </div>
+        ) : (
+          <div className={styles.specialGrid}>
+            {predictions.map((pred) => {
+              const userPred = userPredictions.find(p => p.tipo === pred.tipo);
+              const isTeamType = ["campeon", "subcampeon", "tercer_lugar"].includes(pred.tipo);
+
+              return (
+                <div key={pred.tipo} className={styles.specialPredictionCard}>
+                  <div className={styles.specialPredHeader}>
+                    <h3 style={{ fontWeight: 700, marginBottom: "0.5rem" }}>{pred.get_tipo_display || pred.tipo}</h3>
+                    <span className={styles.specialPoints}>+{pred.puntos_acierto} pts</span>
+                  </div>
+
+                  {userPred ? (
+                    <div style={{ padding: "1rem", backgroundColor: "var(--muted)", borderRadius: "6px", marginBottom: "1rem" }}>
+                      <p style={{ fontSize: "0.875rem", color: "var(--success)" }}>✓ Respondida</p>
+                      <p style={{ fontWeight: 600, marginTop: "0.5rem" }}>
+                        {isTeamType ? userPred.equipo_seleccionado?.nombre : userPred.jugador_seleccionado}
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {isTeamType ? (
+                        <select
+                          value={selectedTeam[pred.tipo] || ""}
+                          onChange={(e) => setSelectedTeam({ ...selectedTeam, [pred.tipo]: parseInt(e.target.value) })}
+                          className={styles.specialSelect}
+                          disabled={loading}
+                        >
+                          <option value="">Selecciona un equipo...</option>
+                          {teams.map((team) => (
+                            <option key={team.id} value={team.id}>
+                              {team.bandera_emoji} {team.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={selectedPlayer[pred.tipo] || ""}
+                          onChange={(e) => setSelectedPlayer({ ...selectedPlayer, [pred.tipo]: e.target.value })}
+                          placeholder="Ej: Mbappé"
+                          className={styles.specialInput}
+                          disabled={loading}
+                        />
+                      )}
+                      <button
+                        className={styles.specialSubmitBtn}
+                        onClick={() => handleSubmitSpecial(pred.tipo)}
+                        disabled={loading}
+                        style={{ marginTop: "0.75rem", width: "100%" }}
+                      >
+                        {loading ? "Guardando..." : "Responder"}
+                      </button>
+                    </>
+                  )}
+
+                  <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: "0.75rem" }}>
+                    Cierra: {pred.fecha_cierre ? new Date(pred.fecha_cierre).toLocaleDateString() : "—"}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+function RankingSection({ initialPlayers = [] }: { initialPlayers?: RankingEntry[] }) {
+  const [players, setPlayers] = useState<RankingEntry[]>(initialPlayers);
+
+  useEffect(() => {
+    setPlayers(initialPlayers);
+  }, [initialPlayers]);
 
   return (
     <section id="ranking" className={styles.rankingSection}>
@@ -393,7 +567,7 @@ function RankingSection() {
 
               return (
                 <div
-                  key={player.rank}
+                  key={player.name}
                   className={player.rank <= 3 ? styles.rankingRowTop : styles.rankingRow}
                 >
                   <div className={styles.rankingRank}>
@@ -412,8 +586,8 @@ function RankingSection() {
                     <span className={`${styles.rankingTrend} ${
                       trendType === "up" ? styles.trendUp : trendType === "down" ? styles.trendDown : styles.trendNeutral
                     }`}>
-                      {player.trend.startsWith("+") ? "↑" : player.trend.startsWith("-") ? "↓" : "—"}
-                      {player.trend}
+                      {player.trend ? (player.trend.startsWith("+") ? "↑" : player.trend.startsWith("-") ? "↓" : "—") : "—"}
+                      {player.trend || "—"}
                     </span>
                     <div className={styles.rankingScore}>
                       <p className={styles.rankingScoreValue}>{player.points}</p>
@@ -437,24 +611,113 @@ function RankingSection() {
 /* ===== PÁGINA PRINCIPAL — MICampeonato ===== */
 export default function MundialHome() {
   const [steps, setSteps] = useState<any[]>([]);
+  const [scoringRules, setScoringRules] = useState<any[]>([]);
+  const [multiplierRules, setMultiplierRules] = useState<any[]>([]);
+  const [matches, setMatches] = useState<MatchData[]>([]);
+  const [prizes, setPrizes] = useState<any[]>([]);
+  const [specialPredictions, setSpecialPredictions] = useState<any[]>([]);
+  const [players, setPlayers] = useState<RankingEntry[]>([]);
 
   useEffect(() => {
-    getConfiguracion()
+    dedupe("home", {}, () => getHomeData())
       .then((res: any): void => {
-        if (res.data?.steps) setSteps(res.data.steps);
+        const data = res.data || {};
+        
+        // ============================================
+        // CONFIGURACIÓN (from configuracion endpoint)
+        // ============================================
+        if (data.configuracion) {
+          if (data.configuracion?.scoring_rules) setScoringRules(data.configuracion.scoring_rules);
+          if (data.configuracion?.multiplier_rules) setMultiplierRules(data.configuracion.multiplier_rules);
+          if (data.configuracion?.steps) setSteps(data.configuracion.steps);
+          if (data.configuracion?.prizes) setPrizes(data.configuracion.prizes);
+        }
+        
+        // ============================================
+        // PREDICCIONES ESPECIALES (from predicciones-especiales endpoint)
+        // Structure: { predicciones: [...] }
+        // ============================================
+        if (data.predicciones_especiales) {
+          const especiales = data.predicciones_especiales?.predicciones || [];
+          setSpecialPredictions(especiales);
+        }
+        
+        // ============================================
+        // PARTIDOS (from partidos endpoint)
+        // Structure: { partidos: [...], total: number, equipos: [...], estadisticas: {...} }
+        // Transform backend formato to frontend MatchData format
+        // ============================================
+        if (data.partidos) {
+          const partidos = (data.partidos?.partidos || []).map((partido: any) => ({
+            id: partido.id,
+            equipo_local: partido.equipo_local,
+            equipo_local_nombre: partido.equipo_local_nombre,
+            equipo_local_bandera: partido.equipo_local_bandera,
+            equipo_visitante: partido.equipo_visitante,
+            equipo_visitante_nombre: partido.equipo_visitante_nombre,
+            equipo_visitante_bandera: partido.equipo_visitante_bandera,
+            fecha: partido.fecha,
+            hora: partido.hora,
+            fase: partido.fase,
+            grupo: partido.grupo,
+            multiplicador: partido.multiplicador,
+            estado: partido.estado,
+            puede_predecir: partido.puede_predecir,
+            resultado: partido.resultado,
+            fue_a_penaltis: partido.fue_a_penaltis,
+            mi_prediccion: partido.mi_prediccion,
+            // Legacy fields for compatibility
+            homeTeam: partido.equipo_local_nombre,
+            homeFlag: partido.equipo_local_bandera,
+            awayTeam: partido.equipo_visitante_nombre,
+            awayFlag: partido.equipo_visitante_bandera,
+            date: partido.fecha,
+            time: partido.hora,
+            phase: partido.fase,
+            group: partido.grupo,
+            multiplier: partido.multiplicador,
+            status: partido.estado,
+          }));
+          setMatches(partidos);
+        }
+        
+        // ============================================
+        // RANKING (from ranking endpoint)
+        // Structure: { ranking: [...], total_participantes: number, mi_posicion: {...} }
+        // Transform backend formato to frontend RankingEntry format
+        // ============================================
+        if (data.ranking) {
+          const rankingData = (data.ranking?.ranking || []).map((entry: any) => ({
+            rank: entry.posicion,
+            name: entry.nombre,
+            avatar: entry.iniciales || entry.nombre.charAt(0),
+            points: entry.puntos_totales,
+            exactHits: entry.aciertos_exactos,
+            trend: entry.tendencia_str || "0",
+          }));
+          setPlayers(rankingData);
+        }
       })
       .catch(() => {
         setSteps([]);
+        setScoringRules([]);
+        setMultiplierRules([]);
+        setMatches([]);
+        setPrizes([]);
+        setSpecialPredictions([]);
+        setPlayers([]);
       });
   }, []);
 
   return (
     <div className={styles.pageWrapper}>
       <Hero />
-      <MatchesSection />
+      <MatchesSection initialMatches={matches} />
+      <RankingSection initialPlayers={players} />
+      <SpecialPredictionsSection initialSpecialPredictions={specialPredictions} />
+      <PrizesSection initialPrizes={prizes} initialSpecialPredictions={specialPredictions} />
       <HowItWorks steps={steps} />
-      <RankingSection />
-      <PrizesSection />
+      <ScoringRulesGridStandalone scoringRules={scoringRules} multiplierRules={multiplierRules} />
     </div>
   );
 }

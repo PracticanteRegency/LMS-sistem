@@ -2,6 +2,9 @@ from django.urls import path
 from mundial import views
 
 urlpatterns = [
+    # ── Home Data (Consolidated endpoint) ──────────────────────
+    path("home/", views.HomeDataView.as_view(), name="home-data"),
+
     # ── Ediciones del mundial ────────────────────────────────────
     path("ediciones/", views.EdicionMundialListCreateView.as_view(), name="edicion-list-create"),
     path("ediciones/<int:pk>/", views.EdicionMundialDetailView.as_view(), name="edicion-detail"),

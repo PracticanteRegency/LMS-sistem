@@ -51,6 +51,8 @@ class EquipoSerializer(serializers.ModelSerializer):
 
 
 class EquipoCreateUpdateSerializer(serializers.ModelSerializer):
+    bandera_imagen = serializers.ImageField(required=False, allow_null=True)
+
     class Meta:
         model = Equipo
         fields = ["nombre", "bandera_imagen", "bandera_emoji", "activo"]
@@ -170,6 +172,14 @@ class PartidoCreateUpdateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "No se puede editar este partido. Solo se pueden editar partidos en estado ABIERTO."
             )
+        
+        # Si es actualización y el partido está cerrado, no permitir cambiar equipos
+        if self.instance and self.instance.estado != EstadoPartido.ABIERTO:
+            if data.get("equipo_local") or data.get("equipo_visitante"):
+                raise serializers.ValidationError(
+                    "No se pueden cambiar los equipos de un partido que ya está cerrado o finalizado."
+                )
+        
         return data
 
     def _asignar_multiplicador(self, validated_data):
@@ -185,6 +195,8 @@ class PartidoCreateUpdateSerializer(serializers.ModelSerializer):
         return validated_data
 
     def create(self, validated_data):
+        # Forzar que los partidos nuevos se creen en estado ABIERTO
+        validated_data["estado"] = EstadoPartido.ABIERTO
         validated_data = self._asignar_multiplicador(validated_data)
         return super().create(validated_data)
 
@@ -370,14 +382,21 @@ class ConfiguracionTorneoSerializer(serializers.ModelSerializer):
         model = ConfiguracionTorneo
         fields = [
             "id", "edicion",
+            # Puntuación
             "puntos_resultado_exacto", "puntos_ganador_correcto",
+            # Multiplicadores
             "multiplicador_grupos", "multiplicador_dieciseisavos", "multiplicador_octavos",
             "multiplicador_cuartos", "multiplicador_semifinales", "multiplicador_tercer_puesto",
             "multiplicador_final", "multiplicadores",
+            # Predicciones especiales
             "puntos_campeon", "puntos_subcampeon", "puntos_tercer_lugar", "puntos_maximo_goleador",
+            # Premios
             "porcentaje_primer_lugar", "porcentaje_segundo_lugar", "porcentaje_tercer_lugar",
-            "fondo_premios_total", "puede_editarse", "actualizado_en",
+            "fondo_premios_total",
+            # Estado
+            "puede_editarse", "actualizado_en",
         ]
+        read_only_fields = ["actualizado_en", "puede_editarse"]
 
     def get_multiplicadores(self, obj):
         return {

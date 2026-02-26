@@ -1,4 +1,6 @@
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.db.models import Q
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -63,7 +65,7 @@ class EdicionMundialListCreateView(APIView):
     def get_permissions(self):
         if self.request.method == "POST":
             return [IsAuthenticated(), IsSuperUserOrAdmin()]
-        return [AllowAny()]
+        return [IsAuthenticated()]
 
     def get(self, request):
         ediciones = EdicionMundial.objects.all()
@@ -80,7 +82,7 @@ class EdicionMundialDetailView(APIView):
     def get_permissions(self):
         if self.request.method in ["PUT", "PATCH"]:
             return [IsAuthenticated(), IsSuperUserOrAdmin()]
-        return [AllowAny()]
+        return [IsAuthenticated()]
 
     def get(self, request, pk):
         edicion = get_object_or_404(EdicionMundial, pk=pk)
@@ -104,7 +106,7 @@ class EquipoListCreateView(APIView):
     def get_permissions(self):
         if self.request.method == "POST":
             return [IsAuthenticated(), IsSuperUserOrAdmin()]
-        return [AllowAny()]
+        return [IsAuthenticated()]
 
     def get(self, request):
         """Lista todos los equipos activos."""
@@ -128,7 +130,7 @@ class EquipoDetailView(APIView):
     def get_permissions(self):
         if self.request.method in ["PUT", "PATCH", "DELETE"]:
             return [IsAuthenticated(), IsSuperUserOrAdmin()]
-        return [AllowAny()]
+        return [IsAuthenticated()]
 
     def get(self, request, pk):
         equipo = get_object_or_404(Equipo, pk=pk)
@@ -219,7 +221,15 @@ class PartidoListCreateView(APIView):
 
     def post(self, request):
         """Admin crea un partido."""
-        serializer = PartidoCreateUpdateSerializer(data=request.data)
+        edicion = _get_edicion_o_404()
+        if not edicion:
+            return Response({"error": "No hay edición activa"}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Inyectar edición en los datos
+        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        data['edicion'] = edicion.id
+        
+        serializer = PartidoCreateUpdateSerializer(data=data)
         serializer.is_valid(raise_exception=True)
         partido = serializer.save()
         return Response(
@@ -279,11 +289,12 @@ class PartidoDetailView(APIView):
         return Response(PartidoAdminSerializer(partido, context={"request": request}).data)
 
     def delete(self, request, pk):
-        """Admin elimina un partido y todas sus predicciones. Solo si está ABIERTO."""
+        """Admin elimina un partido y todas sus predicciones. Solo si está ABIERTO o BLOQUEADO."""
         partido = get_object_or_404(Partido, pk=pk)
-        if not partido.puede_editar_admin():
+        # Allow deletion if ABIERTO or BLOQUEADO (not FINALIZADO)
+        if partido.estado == EstadoPartido.FINALIZADO:
             return Response(
-                {"error": "No se puede eliminar un partido que ya está BLOQUEADO o FINALIZADO."},
+                {"error": "No se puede eliminar un partido que ya está FINALIZADO."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         total_predicciones = partido.predicciones.count()
@@ -469,15 +480,39 @@ class RankingView(APIView):
 
 class ConfiguracionTorneoView(APIView):
     def get_permissions(self):
-        if self.request.method in ["PUT", "PATCH"]:
+        if self.request.method in ["PUT", "PATCH", "POST", "DELETE"]:
             return [IsAuthenticated(), IsSuperUserOrAdmin()]
-        return [AllowAny()]
+        return [IsAuthenticated()]
 
     def get(self, request):
         """Cualquier usuario puede ver la configuración (multiplicadores, puntos, premios)."""
         edicion = _get_edicion_o_404()
+        if not edicion:
+            return Response({"error": "No hay edición activa."}, status=404)
         config = ConfiguracionTorneo.obtener_para_edicion(edicion)
         return Response(ConfiguracionTorneoSerializer(config).data)
+
+    def post(self, request):
+        """Admin crea una nueva configuración para una edición específica."""
+        edicion_id = request.data.get("edicion")
+        if not edicion_id:
+            return Response(
+                {"error": "Debe especificar el ID de la edición en 'edicion'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        edicion = get_object_or_404(EdicionMundial, pk=edicion_id)
+        
+        # Verifica si ya existe configuración para esta edición
+        if ConfiguracionTorneo.objects.filter(edicion=edicion).exists():
+            return Response(
+                {"error": "Ya existe configuración para esta edición."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        serializer = ConfiguracionTorneoSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def put(self, request):
         """Solo admin puede editar, y solo antes de que inicie el mundial."""
@@ -495,6 +530,29 @@ class ConfiguracionTorneoView(APIView):
         serializer.save()
         return Response(serializer.data)
 
+    def delete(self, request):
+        """Admin puede eliminar la configuración de la edición activa."""
+        edicion = _get_edicion_o_404()
+        if not edicion:
+            return Response({"error": "No hay edición activa."}, status=404)
+        
+        try:
+            config = ConfiguracionTorneo.objects.get(edicion=edicion)
+        except ConfiguracionTorneo.DoesNotExist:
+            return Response(
+                {"error": "No existe configuración para esta edición."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        
+        if not config.puede_editarse():
+            return Response(
+                {"error": "No se puede eliminar: el mundial ya ha iniciado."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        
+        config.delete()
+        return Response({"mensaje": "Configuración eliminada correctamente."}, status=status.HTTP_204_NO_CONTENT)
+
 
 # ================================================================
 # CONFIGURACION PREDICCIONES ESPECIALES
@@ -504,7 +562,7 @@ class ConfiguracionPrediccionEspecialListView(APIView):
     def get_permissions(self):
         if self.request.method == "POST":
             return [IsAuthenticated(), IsSuperUserOrAdmin()]
-        return [AllowAny()]
+        return [IsAuthenticated()]
 
     def get(self, request):
         """Todos pueden ver la lista de predicciones especiales habilitadas."""
@@ -555,3 +613,102 @@ class EstadisticasView(APIView):
         colaborador = _get_colaborador(request)
         stats = obtener_estadisticas(edicion, colaborador)
         return Response(EstadisticasSerializer(stats).data)
+
+
+# ================================================================
+# HOME DATA (Consolidates multiple endpoints for homepage)
+# ================================================================
+
+class HomeDataView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """
+        Retorna toda la información necesaria para la página home en una única petición.
+        Combina datos de: partidos/, predicciones-especiales/, configuracion/, ranking/
+        """
+        edicion = _get_edicion_o_404()
+        if not edicion:
+            return Response({"partidos": {}, "predicciones_especiales": {}, "configuracion": {}, "ranking": {}})
+
+        try:
+            colaborador = _get_colaborador(request)
+            
+            # ============================================
+            # 1. PARTIDOS (PartidoListCreateView)
+            # ============================================
+            verificar_bloqueos_partidos(edicion)
+            verificar_bloqueo_configuracion(edicion)
+
+            qs_partidos = Partido.objects.filter(edicion=edicion).select_related(
+                "equipo_local", "equipo_visitante"
+            )
+
+            partidos = PartidoSerializer(qs_partidos, many=True, context={"request": request}).data
+            
+            estadisticas_partidos = {
+                "total_partidos": qs_partidos.count(),
+                "partidos_predichos": (
+                    Prediccion.objects.filter(
+                        partido__edicion=edicion, colaborador=colaborador
+                    ).count() if colaborador else 0
+                ),
+                "partidos_pendientes": qs_partidos.exclude(estado=EstadoPartido.FINALIZADO).count(),
+            }
+
+            # Obtener equipos únicos que participan en esta edición (usando distinct)
+            equipos_list = Equipo.objects.filter(
+                Q(partidos_local__edicion=edicion) | Q(partidos_visitante__edicion=edicion)
+            ).distinct()
+            equipos = EquipoSerializer(equipos_list, many=True).data
+
+            partidos_response = {
+                "partidos": partidos,
+                "total": qs_partidos.count(),
+                "equipos": equipos,
+                "estadisticas": estadisticas_partidos,
+            }
+
+            # ============================================
+            # 2. PREDICCIONES ESPECIALES (PrediccionEspecialListCreateView)
+            # ============================================
+            predicciones_especiales_qs = PrediccionEspecial.objects.filter(
+                colaborador=colaborador
+            ).select_related("equipo_seleccionado") if colaborador else PrediccionEspecial.objects.none()
+
+            predicciones_especiales_response = {
+                "predicciones": PrediccionEspecialSerializer(predicciones_especiales_qs, many=True).data,
+            }
+
+            # ============================================
+            # 3. CONFIGURACION TORNEO (ConfiguracionTorneoView)
+            # ============================================
+            config = ConfiguracionTorneo.obtener_para_edicion(edicion)
+            configuracion_response = ConfiguracionTorneoSerializer(config).data
+
+            # ============================================
+            # 4. RANKING (RankingView)
+            # ============================================
+            limite = int(request.query_params.get("limite", 10))
+            top = obtener_ranking_top(edicion, limite)
+
+            mi_ranking = obtener_posicion_usuario(edicion, colaborador) if colaborador else None
+
+            ranking_response = {
+                "ranking": RankingSerializer(top, many=True).data,
+                "total_participantes": RankingMundial.objects.filter(edicion=edicion).count(),
+                "mi_posicion": RankingSerializer(mi_ranking).data if mi_ranking else None,
+            }
+
+            return Response({
+                "partidos": partidos_response,
+                "predicciones_especiales": predicciones_especiales_response,
+                "configuracion": configuracion_response,
+                "ranking": ranking_response,
+            })
+
+        except Exception as e:
+            return Response(
+                {"error": f"Error al obtener datos: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

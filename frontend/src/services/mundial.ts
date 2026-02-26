@@ -6,25 +6,47 @@
 // ===== TYPES & INTERFACES =====
 
 export type WinnerChoice = "home" | "away" | "draw";
-export type MatchStatus = "open" | "locked" | "finished";
-export type AdminTab = "matches" | "results" | "settings";
+export type MatchStatus = "open" | "locked" | "finished" | "abierto" | "bloqueado" | "finalizado";
+export type AdminTab = "matches" | "results" | "teams" | "special" | "settings";
 
 export interface MatchData {
   id: number;
-  homeTeam: string;
-  homeFlag: string;
-  awayTeam: string;
-  awayFlag: string;
-  date: string;
-  time: string;
-  phase: string;
-  group: string | null;
-  multiplier: string;
-  status: MatchStatus;
+  equipo_local: number;
+  equipo_local_nombre: string;
+  equipo_local_bandera: string;
+  equipo_visitante: number;
+  equipo_visitante_nombre: string;
+  equipo_visitante_bandera: string;
+  fecha: string;
+  hora: string;
+  fase: string;
+  grupo: string | null;
+  multiplicador: string;
+  estado: string;
+  puede_predecir?: boolean;
+  // Legacy fallback fields for compatibility
+  homeTeam?: string;
+  homeFlag?: string;
+  awayTeam?: string;
+  awayFlag?: string;
+  date?: string;
+  time?: string;
+  phase?: string;
+  group?: string | null;
+  multiplier?: string;
+  status?: MatchStatus;
 }
 
 export interface Match extends MatchData {
-  result: { home: number; away: number } | null;
+  resultado: { goles_local: number; goles_visitante: number } | null;
+  result?: { home: number; away: number } | null;
+  fue_a_penaltis?: boolean;
+  puede_editar?: boolean;
+  puede_ingresar_resultado?: boolean;
+  goles_local?: number;
+  goles_visitante?: number;
+  penaltis_local?: number;
+  penaltis_visitante?: number;
 }
 
 export interface Prediction {
@@ -291,7 +313,8 @@ export function getPhaseMultiplier(phase: string): string {
   return found ? found.multiplier : "x1";
 }
 
-export function getTrendColor(trend: string): "up" | "down" | "neutral" {
+export function getTrendColor(trend: string | undefined): "up" | "down" | "neutral" {
+  if (!trend || typeof trend !== "string") return "neutral";
   if (trend.startsWith("+") && trend !== "+0") return "up";
   if (trend.startsWith("-")) return "down";
   return "neutral";

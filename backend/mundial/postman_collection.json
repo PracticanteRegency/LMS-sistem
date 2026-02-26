@@ -1,0 +1,723 @@
+{
+  "info": {
+    "_postman_id": "mundial-api-collection",
+    "name": "Mundial API",
+    "description": "Colección de endpoints para la API de Mundial",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Ediciones",
+      "item": [
+        {
+          "name": "Listar Ediciones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/ediciones/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "ediciones",
+                ""
+              ]
+            },
+            "description": "Obtener lista de todas las ediciones del mundial"
+          }
+        },
+        {
+          "name": "Crear Edición",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Mundial 2026\",\n  \"año\": 2026,\n  \"descripcion\": \"Copa Mundial 2026\"\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/mundial/ediciones/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "ediciones",
+                ""
+              ]
+            },
+            "description": "Crear una nueva edición del mundial"
+          }
+        },
+        {
+          "name": "Obtener Edición",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/ediciones/1/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "ediciones",
+                "1",
+                ""
+              ]
+            },
+            "description": "Obtener detalles de una edición específica"
+          }
+        },
+        {
+          "name": "Actualizar Edición",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Mundial 2026 - Actualizado\",\n  \"año\": 2026,\n  \"descripcion\": \"Copa Mundial 2026 Actualizada\"\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/mundial/ediciones/1/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "ediciones",
+                "1",
+                ""
+              ]
+            },
+            "description": "Actualizar una edición existente"
+          }
+        },
+        {
+          "name": "Eliminar Edición",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/ediciones/1/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "ediciones",
+                "1",
+                ""
+              ]
+            },
+            "description": "Eliminar una edición"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Equipos",
+      "item": [
+        {
+          "name": "Listar Equipos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/equipos/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "equipos",
+                ""
+              ]
+            },
+            "description": "Obtener lista de todos los equipos"
+          }
+        },
+        {
+          "name": "Crear Equipo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Argentina\",\n  \"codigo\": \"ARG\",\n  \"edicion_id\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/mundial/equipos/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "equipos",
+                ""
+              ]
+            },
+            "description": "Crear un nuevo equipo"
+          }
+        },
+        {
+          "name": "Obtener Equipo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/equipos/1/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "equipos",
+                "1",
+                ""
+              ]
+            },
+            "description": "Obtener detalles de un equipo específico"
+          }
+        },
+        {
+          "name": "Actualizar Equipo",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Argentina - Actualizado\",\n  \"codigo\": \"ARG\",\n  \"edicion_id\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/mundial/equipos/1/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "equipos",
+                "1",
+                ""
+              ]
+            },
+            "description": "Actualizar un equipo existente"
+          }
+        },
+        {
+          "name": "Eliminar Equipo",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/equipos/1/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "equipos",
+                "1",
+                ""
+              ]
+            },
+            "description": "Eliminar un equipo"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Partidos",
+      "item": [
+        {
+          "name": "Listar Partidos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/partidos/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "partidos",
+                ""
+              ]
+            },
+            "description": "Obtener lista de partidos con mi_prediccion"
+          }
+        },
+        {
+          "name": "Crear Partido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"equipo_local_id\": 1,\n  \"equipo_visitante_id\": 2,\n  \"fecha\": \"2026-06-21T14:00:00Z\",\n  \"edicion_id\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/mundial/partidos/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "partidos",
+                ""
+              ]
+            },
+            "description": "Crear un nuevo partido"
+          }
+        },
+        {
+          "name": "Obtener Partido",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/partidos/1/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "partidos",
+                "1",
+                ""
+              ]
+            },
+            "description": "Obtener detalles de un partido específico"
+          }
+        },
+        {
+          "name": "Actualizar Partido",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"equipo_local_id\": 1,\n  \"equipo_visitante_id\": 2,\n  \"fecha\": \"2026-06-21T14:00:00Z\",\n  \"edicion_id\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/mundial/partidos/1/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "partidos",
+                "1",
+                ""
+              ]
+            },
+            "description": "Actualizar un partido"
+          }
+        },
+        {
+          "name": "Eliminar Partido",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/partidos/1/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "partidos",
+                "1",
+                ""
+              ]
+            },
+            "description": "Eliminar un partido"
+          }
+        },
+        {
+          "name": "Obtener Resultado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/partidos/1/resultado/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "partidos",
+                "1",
+                "resultado",
+                ""
+              ]
+            },
+            "description": "Obtener el resultado de un partido"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Partidos Admin",
+      "item": [
+        {
+          "name": "Listar Partidos (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/admin/partidos/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "admin",
+                "partidos",
+                ""
+              ]
+            },
+            "description": "Obtener lista de partidos con estadísticas de control (Admin)"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Predicciones",
+      "item": [
+        {
+          "name": "Listar Predicciones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/predicciones/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "predicciones",
+                ""
+              ]
+            },
+            "description": "Obtener lista de predicciones de partidos"
+          }
+        },
+        {
+          "name": "Crear Predicción",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"partido_id\": 1,\n  \"usuario_id\": 1,\n  \"prediccion\": \"1\"\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/mundial/predicciones/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "predicciones",
+                ""
+              ]
+            },
+            "description": "Crear una nueva predicción"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Predicciones Especiales",
+      "item": [
+        {
+          "name": "Listar Predicciones Especiales",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/predicciones-especiales/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "predicciones-especiales",
+                ""
+              ]
+            },
+            "description": "Obtener lista de predicciones especiales"
+          }
+        },
+        {
+          "name": "Crear Predicción Especial",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"configuracion_id\": 1,\n  \"usuario_id\": 1,\n  \"prediccion\": \"equipo_id\"\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/mundial/predicciones-especiales/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "predicciones-especiales",
+                ""
+              ]
+            },
+            "description": "Crear una nueva predicción especial"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ranking",
+      "item": [
+        {
+          "name": "Obtener Ranking",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/ranking/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "ranking",
+                ""
+              ]
+            },
+            "description": "Obtener el ranking de usuarios"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Configuración",
+      "item": [
+        {
+          "name": "Obtener Configuración del Torneo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/configuracion/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "configuracion",
+                ""
+              ]
+            },
+            "description": "Obtener configuración del torneo"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Configuración Especiales",
+      "item": [
+        {
+          "name": "Listar Configuración Especiales",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/configuracion-especiales/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "configuracion-especiales",
+                ""
+              ]
+            },
+            "description": "Obtener lista de configuraciones de predicciones especiales"
+          }
+        },
+        {
+          "name": "Crear Configuración Especial",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Goleador del torneo\",\n  \"descripcion\": \"Predicción de quién será el goleador\",\n  \"edicion_id\": 1,\n  \"tipo\": \"equipo\"\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/mundial/configuracion-especiales/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "configuracion-especiales",
+                ""
+              ]
+            },
+            "description": "Crear una nueva configuración especial"
+          }
+        },
+        {
+          "name": "Obtener Configuración Especial",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/configuracion-especiales/1/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "configuracion-especiales",
+                "1",
+                ""
+              ]
+            },
+            "description": "Obtener detalles de una configuración especial"
+          }
+        },
+        {
+          "name": "Actualizar Configuración Especial",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Goleador del torneo - Actualizado\",\n  \"descripcion\": \"Predicción de quién será el goleador\",\n  \"edicion_id\": 1,\n  \"tipo\": \"equipo\"\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/mundial/configuracion-especiales/1/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "configuracion-especiales",
+                "1",
+                ""
+              ]
+            },
+            "description": "Actualizar una configuración especial"
+          }
+        },
+        {
+          "name": "Eliminar Configuración Especial",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/configuracion-especiales/1/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "configuracion-especiales",
+                "1",
+                ""
+              ]
+            },
+            "description": "Eliminar una configuración especial"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Estadísticas",
+      "item": [
+        {
+          "name": "Obtener Estadísticas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/mundial/estadisticas/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "mundial",
+                "estadisticas",
+                ""
+              ]
+            },
+            "description": "Obtener estadísticas generales"
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseURL",
+      "value": "http://localhost:8000",
+      "type": "string"
+    }
+  ]
+}

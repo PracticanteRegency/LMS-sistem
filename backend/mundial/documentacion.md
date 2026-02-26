@@ -216,7 +216,7 @@ Obtiene detalles de un partido.
 Actualiza un partido (solo si `estado=abierto`).
 
 #### `DELETE /mundial/partidos/<id>/` (Solo Admin)
-Elimina un partido y sus predicciones (solo si `estado=abierto`).
+Elimina un partido y sus predicciones (solo si `estado=abierto` o `estado=bloqueado`, no si está `finalizado`).
 
 #### `POST /mundial/partidos/<id>/resultado/` (Solo Admin)
 Registra el resultado final. Solo permitido si `estado=bloqueado`.
@@ -313,7 +313,7 @@ Crea o actualiza la predicción de un partido (upsert).
 
 **Validaciones:**
 - El partido debe existir y estar en estado `abierto`
-- Faltan más de 1h para el inicio del partido
+- El partido aún no ha comenzado (hora actual < hora inicio)
 - El `ganador` debe ser coherente con el marcador:
   - `goles_local > goles_visitante` → `ganador = "local"`
   - `goles_visitante > goles_local` → `ganador = "visitante"`
@@ -446,6 +446,17 @@ limite=10  // Top N (default: 10)
 
 ### 2.7 Configuración del Torneo
 
+**Descripción:** Una única tabla `ConfiguracionTorneo` almacena TODA la configuración del torneo: puntos, multiplicadores, reglas, premios, y datos generales. Se bloquea automáticamente 1 hora antes del primer partido de la edición.
+
+**Campos disponibles en la tabla:**
+- Información general: `nombre_torneo`, `descripcion`, `pais_sede`, `fecha_inicio`, `fecha_fin`
+- Puntuación: `puntos_resultado_exacto`, `puntos_ganador_correcto`, `puntos_bonus_acierto_exacto`
+- Multiplicadores por fase: `multiplicador_grupos`, `multiplicador_dieciseisavos`, `multiplicador_octavos`, etc.
+- Predicciones especiales: `puntos_campeon`, `puntos_subcampeon`, `puntos_tercer_lugar`, `puntos_maximo_goleador`
+- Premios: `porcentaje_primer_lugar`, `porcentaje_segundo_lugar`, `porcentaje_tercer_lugar`, `fondo_premios_total`
+- Configuración de reglas: `habilitar_predicciones_especiales`, `habilitar_penaltis`, `minutos_antes_bloqueo`, `maxima_diferencia_goles`
+- Control: `activa`, `puede_editarse`, `actualizado_en`
+
 #### `GET /mundial/configuracion/`
 Obtiene la configuración actual del torneo (visible para todos).
 
@@ -454,8 +465,14 @@ Obtiene la configuración actual del torneo (visible para todos).
 {
   "id": 1,
   "edicion": 1,
+  "nombre_torneo": "Copa Mundial 2026",
+  "descripcion": "Torneo de fútbol internacional USA/MX/CA",
+  "pais_sede": "USA/México/Canadá",
+  "fecha_inicio": "2026-06-11",
+  "fecha_fin": "2026-07-19",
   "puntos_resultado_exacto": 3,
   "puntos_ganador_correcto": 1,
+  "puntos_bonus_acierto_exacto": 1,
   "multiplicador_grupos": "x1",
   "multiplicador_dieciseisavos": "x1.25",
   "multiplicador_octavos": "x1.5",
@@ -480,26 +497,87 @@ Obtiene la configuración actual del torneo (visible para todos).
   "porcentaje_segundo_lugar": "30%",
   "porcentaje_tercer_lugar": "20%",
   "fondo_premios_total": "$50,000",
+  "habilitar_predicciones_especiales": true,
+  "habilitar_penaltis": true,
+  "minutos_antes_bloqueo": 60,
+  "maxima_diferencia_goles": 10,
+  "activa": true,
   "puede_editarse": true,
   "actualizado_en": "2026-01-15T10:30:00Z"
 }
 ```
 
-#### `PUT /mundial/configuracion/` (Solo Admin)
-Actualiza la configuración (bloqueada cuando inicia el torneo - 1h antes del primer partido).
+#### `POST /mundial/configuracion/` (Solo Admin)
+Crea una nueva configuración del torneo para una edición.
 
-**Request body:** (campos parciales)
+**Request body:**
 ```json
 {
+  "edicion": 1,
+  "nombre_torneo": "Copa Mundial 2026",
+  "descripcion": "Torneo de fútbol internacional",
+  "pais_sede": "USA/México/Canadá",
+  "fecha_inicio": "2026-06-11",
+  "fecha_fin": "2026-07-19",
   "puntos_resultado_exacto": 3,
   "puntos_ganador_correcto": 1,
+  "puntos_bonus_acierto_exacto": 1,
   "multiplicador_grupos": "x1",
-  "multiplicador_final": "x5",
-  "fondo_premios_total": "$100,000"
+  "multiplicador_dieciseisavos": "x1.25",
+  "multiplicador_octavos": "x1.5",
+  "multiplicador_cuartos": "x1.75",
+  "multiplicador_semifinales": "x2",
+  "multiplicador_tercer_puesto": "x2.5",
+  "multiplicador_final": "x3",
+  "puntos_campeon": 50,
+  "puntos_subcampeon": 30,
+  "puntos_tercer_lugar": 20,
+  "puntos_maximo_goleador": 25,
+  "porcentaje_primer_lugar": "50%",
+  "porcentaje_segundo_lugar": "30%",
+  "porcentaje_tercer_lugar": "20%",
+  "fondo_premios_total": "$50,000",
+  "habilitar_predicciones_especiales": true,
+  "habilitar_penaltis": true,
+  "minutos_antes_bloqueo": 60,
+  "maxima_diferencia_goles": 10,
+  "activa": true
 }
 ```
 
-**Validación:** Si `edicion.bloqueo_configuracion=true`, retorna 403.
+**Validación:**
+- Se valida que no exista otra configuración para la misma edición (error 400)
+- Se valida que la edición no esté bloqueada
+
+**Response 201:** Mismo formato que GET.
+
+#### `PUT /mundial/configuracion/` (Solo Admin)
+Actualiza la configuración del torneo (bloqueada cuando inicia - 1h antes del primer partido).
+
+**Request body:** (campos parciales - todos son opcionales)
+```json
+{
+  "puntos_resultado_exacto": 5,
+  "puntos_ganador_correcto": 2,
+  "multiplicador_grupos": "x1",
+  "multiplicador_final": "x5",
+  "puntos_campeon": 75,
+  "fondo_premios_total": "$100,000",
+  "minutos_antes_bloqueo": 90,
+  "habilitar_predicciones_especiales": false
+}
+```
+
+**Validación:** Si `edicion.bloqueo_configuracion=true`, retorna 403 Forbidden.
+
+**Response 200:** Configuración actualizada.
+
+#### `DELETE /mundial/configuracion/` (Solo Admin)
+Elimina la configuración del torneo (solo si no está bloqueada).
+
+**Validación:** Si `edicion.bloqueo_configuracion=true`, retorna 403 Forbidden.
+
+**Response 204:** Sin contenido.
 
 ---
 
@@ -578,7 +656,7 @@ Obtiene estadísticas generales para la homepage (requiere autenticación).
 | **Ranking** | `GET /mundial/ranking/?limite=N` |
 | **Admin > Partidos** | `GET /mundial/admin/partidos/`, `POST /mundial/partidos/`, `PUT /mundial/partidos/<id>/`, `DELETE /mundial/partidos/<id>/` |
 | **Admin > Resultados** | `GET /mundial/admin/partidos/`, `POST /mundial/partidos/<id>/resultado/` |
-| **Admin > Configuración** | `GET /mundial/configuracion/`, `PUT /mundial/configuracion/`, `GET /mundial/configuracion-especiales/`, `POST /mundial/configuracion-especiales/`, `PUT /mundial/configuracion-especiales/<id>/` |
+| **Admin > Configuración** | `GET /mundial/configuracion/`, `POST /mundial/configuracion/`, `PUT /mundial/configuracion/`, `DELETE /mundial/configuracion/`, `GET /mundial/configuracion-especiales/`, `POST /mundial/configuracion-especiales/`, `PUT /mundial/configuracion-especiales/<id>/`, `DELETE /mundial/configuracion-especiales/<id>/` |
 | **Admin > Equipos** | `GET /mundial/equipos/`, `POST /mundial/equipos/`, `PUT /mundial/equipos/<id>/`, `DELETE /mundial/equipos/<id>/` |
 
 ---
@@ -591,9 +669,12 @@ Authorization: Bearer <jwt_token>
 ```
 
 **Control de acceso:**
-- Endpoints sin restricción: `GET /mundial/equipos/`, `GET /mundial/configuracion/`, `GET /mundial/configuracion-especiales/`
-- Solo autenticado: Todos los GET de datos del usuario (mis predicciones, ranking, estadísticas)
-- Solo admin (`tipousuario` in [1, 4]): POST/PUT/DELETE de equipos, partidos, resultados, configuración
+- **Sin restricción:** `GET /mundial/equipos/`, `GET /mundial/configuracion/`, `GET /mundial/configuracion-especiales/`
+- **Solo autenticado:** Todos los GET de datos del usuario (mis predicciones, ranking, estadísticas)
+- **Solo admin** (`tipousuario` en [1, 4]): 
+  - POST/PUT/DELETE de equipos, partidos, resultados
+  - POST/PUT/DELETE de configuración del torneo
+  - POST/PUT/DELETE de configuración de predicciones especiales
 
 ---
 
