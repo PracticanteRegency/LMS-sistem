@@ -961,7 +961,7 @@ export default function MundialAdmin() {
               <button className={styles.btnPrimary} onClick={async () => {
                 if (!formTeamName) return;
                 try {
-                  const res = await createEquipo({
+                  await createEquipo({
                     nombre: formTeamName,
                     bandera_emoji: formTeamEmoji,
                     activo: formTeamActive
@@ -1048,7 +1048,7 @@ export default function MundialAdmin() {
               <button className={styles.btnPrimary} onClick={async () => {
                 if (!formSpecialType || !formSpecialDeadline) return;
                 try {
-                  const res = await createConfigEspecial({
+                  await createConfigEspecial({
                     tipo: formSpecialType,
                     puntos_acierto: formSpecialPoints,
                     fecha_cierre: formSpecialDeadline,
