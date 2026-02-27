@@ -74,6 +74,7 @@ class Perfil(APIView):
         progresos = (
             progresoCapacitaciones.objects
             .filter(colaborador=colaborador)
+            .exclude(capacitacion__estado=3)
             .select_related('capacitacion')
             .annotate(
                 total_lecciones=Count(
@@ -85,12 +86,12 @@ class Perfil(APIView):
                     0
                 ),
                 estado_orden=Case(
-                    When(capacitacion__estado=3, then=2),  # desactivadas (estado 3) en medio
-                    default=1,  # activas (estado 0, 1) primero
+                    When(capacitacion__estado=1, then=1),  # Estado 1 primero
+                    When(capacitacion__estado=2, then=2),  # Estado 2 después
                     output_field=IntegerField()
                 )
             )
-            .order_by('-fecha_registro', 'estado_orden')
+            .order_by('estado_orden', '-fecha_registro')
         )
 
         capacitaciones_totales = progresos.count()

@@ -221,16 +221,20 @@ const cargarColaboradores = async (file) => {
 export async function getCapacitacionDetalle(capacitacionId) {
   // Llama a: GET /capacitaciones/crear-capacitacion/<id>/
   // Respuesta esperada: objeto CapacitacionDetalleSerializer con campo `colaboradores`
-  const response = await api.get(`capacitaciones/crear-capacitacion/${capacitacionId}/`);
-  return response.data; // { id, titulo, descripcion, modulos, colaboradores: [...] }
+  return dedupe('cap:getCapacitacionDetalle', capacitacionId, async () => {
+    const response = await api.get(`capacitaciones/crear-capacitacion/${capacitacionId}/`);
+    return response.data; // { id, titulo, descripcion, modulos, colaboradores: [...] }
+  });
 }
 
 // Actualizar campos de la capacitación (sincronizar si envías `colaboradores` completo)
 export async function patchCapacitacion(capacitacionId, payload) {
   // Llama a: PATCH /capacitaciones/crear-capacitacion/<id>/
   // Payload: campos a actualizar o { colaboradores: [ids...] } para sincronizar
-  const response = await api.patch(`capacitaciones/crear-capacitacion/${capacitacionId}/`, payload);
-  return response.data;
+  return dedupe('cap:patchCapacitacion', { capacitacionId, payload }, async () => {
+    const response = await api.patch(`capacitaciones/crear-capacitacion/${capacitacionId}/`, payload);
+    return response.data;
+  });
 }
 
 // Agregar / eliminar colaboradores (operación parcial)
@@ -240,9 +244,11 @@ export async function updateColaboradores(capacitacionId, { add = [], remove = [
   // - No enviar IDs que estén en `add` y `remove` al mismo tiempo
   // - `add` debe contener IDs de colaboradores existentes
   // - Respuesta: { added: [...], removed: [...] }
-  const body = { add, remove };
-  const response = await api.post(`capacitaciones/crear-capacitacion/${capacitacionId}/`, body);
-  return response.data;
+  return dedupe('cap:updateColaboradores', { capacitacionId, add, remove }, async () => {
+    const body = { add, remove };
+    const response = await api.post(`capacitaciones/crear-capacitacion/${capacitacionId}/`, body);
+    return response.data;
+  });
 }
 
 // Ejemplo de uso rápido (con axios):
