@@ -132,6 +132,7 @@ class EnviarCorreoSerializer(serializers.Serializer):
     documento_trabajador = serializers.CharField(max_length=50)
     correo_destino = serializers.EmailField(required=False, allow_blank=True)
     ciudad = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    solicitante_extra_id = serializers.IntegerField(required=False, allow_null=True, help_text="ID del colaborador extra a incluir como solicitante en el envío")
 
 
 class ReporteCorreoSerializer(serializers.ModelSerializer):
@@ -279,6 +280,7 @@ class EnviarCorreoMasivoSerializer(serializers.Serializer):
             "Si es True, adjunta un Excel con el detalle"
         )
     )
+    solicitante_extra_id = serializers.IntegerField(required=False, allow_null=True, help_text="ID del colaborador extra a incluir como solicitante en el envío masivo")
 
     def validate_archivo_csv(self, file):
         """Valida que el archivo sea CSV"""

@@ -61,10 +61,13 @@ const GenerarReporteExcel = async (fechaInicio, fechaFin, empresas) => {
 };
 
 // POST: Enviar correos masivos por CSV
-const EnviarCorreoMasivo = async (file) => {
+const EnviarCorreoMasivo = async (file, solicitante_extra_id) => {
   return dedupe('exam:EnviarCorreoMasivo', { name: file?.name }, async () => {
     const formData = new FormData();
     formData.append('archivo_csv', file);
+    if (solicitante_extra_id) {
+      formData.append('solicitante_extra_id', solicitante_extra_id);
+    }
     
     const response = await api.post('examenes/correo/enviar-masivo/', formData, {
       headers: {
@@ -100,6 +103,14 @@ const EmpresaCargo = async () => {
 const crearExamen = async (payload) => {
   const response = await api.post("examenes/crear-examen/", payload);
   return response.data;
+};
+
+// GET: Obtener todos los colaboradores que han enviado correos (para selector de solicitante extra)
+const ObtenerTodosColaboradores = async () => {
+  return dedupe('exam:ObtenerTodosColaboradores', null, async () => {
+    const response = await api.get('examenes/filtrar-examenes/');
+    return response.data;
+  });
 };
 
 const FiltrarExamenesPorColaborador = async (colaboradorId, page = 1, pageSize = 10) => {
@@ -191,6 +202,7 @@ const ExamenesService = {
   ObtenerExamenesCargo,
   AgregarExamenesCargo,
   EliminarExamenesCargo,
+  ObtenerTodosColaboradores,
 };
 
 export default ExamenesService;

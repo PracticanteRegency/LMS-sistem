@@ -62,6 +62,7 @@ interface EnviarCorreoPayload {
   cargo_id: number;
   tipo_examen: TipoExamen;
   examenes_ids: number[];
+  solicitante_extra_id?: number;
 }
 
 interface EnviarCorreoResponse {
@@ -73,6 +74,17 @@ interface EnviarCorreoResponse {
   tipo_examen?: TipoExamen;
   examenes_asignados?: { id: number; nombre: string }[];
   total_examenes?: number;
+}
+
+interface ColaboradorItem {
+  id: number;
+  nombre: string;
+  correo: string;
+}
+
+interface ObtenerTodosColaboradoresResponse {
+  total: number;
+  colaboradores: ColaboradorItem[];
 }
 
 interface ReporteCorreoItem {
@@ -130,7 +142,7 @@ interface ExamenesService {
   ObtenerDetalleCorreo(correoId: number): Promise<DetalleCorreoResponse>;
   ObtenerTrabajadoresCorreo(correoId: number, page?: number, pageSize?: number): Promise<TrabajadoresCorreoResponse>;
   GenerarReporteExcel(fechaInicio: string, fechaFin: string, empresas: string): Promise<Blob>;
-  EnviarCorreoMasivo(file: File): Promise<any>;
+  EnviarCorreoMasivo(file: File, solicitante_extra_id?: number): Promise<any>;
   ActualizarEstadoTrabajadores(payload: { trabajador_ids: number[] }): Promise<any>;
   EmpresaCargo(): Promise<any>;
   crearExamen(payload: any): Promise<any>;
@@ -139,6 +151,7 @@ interface ExamenesService {
   ObtenerExamenesCargo(empresaId: number, cargoId?: number, tipo?: string): Promise<any>;
   AgregarExamenesCargo(payload: { empresa_id: number; cargo_id: number; tipo: string; examenes_ids: number[] }): Promise<any>;
   EliminarExamenesCargo(payload: { empresa_id: number; cargo_id: number; tipo: string; examenes_ids: number[] }): Promise<any>;
+  ObtenerTodosColaboradores(): Promise<ObtenerTodosColaboradoresResponse>;
 }
 
 declare const ExamenesService: ExamenesService;
