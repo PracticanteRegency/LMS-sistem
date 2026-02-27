@@ -203,7 +203,7 @@ export default function CrearUsuario() {
               <select className={styles.select} value={selectedUnidad ?? ''} onChange={(e) => { setSelectedUnidad(e.target.value ? Number(e.target.value) : null); setSelectedProyecto(null); setFullForm(f => ({...f, is_staff: "0"})); setFullError(""); }}>
                 <option value="">Seleccionar unidad</option>
                 {empresas.find((em) => em.idempresa === selectedEmpresa)?.unidades?.map((u: any) => (
-                  <option key={u.idunidad} value={u.idunidad}>{u.nombreunidad}</option>
+                  <option key={u.idunidad} value={u.idunidad}>{u.nombreunidad}{u.descripcionunidad ? ` (${u.descripcionunidad})` : ''}</option>
                 ))}
               </select>
               <select className={styles.select} value={selectedProyecto ?? ''} onChange={(e) => { setSelectedProyecto(e.target.value ? Number(e.target.value) : null); setFullForm(f => ({...f, is_staff: "0"})); setFullError(""); }}>

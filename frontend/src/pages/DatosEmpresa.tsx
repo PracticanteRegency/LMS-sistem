@@ -744,7 +744,7 @@ export default function DatosEmpresa() {
 												}}
 											>
 												<div>
-													➕ {u.nombreunidad}
+													➕ {u.nombreunidad}{u.descripcionunidad ? ` (${u.descripcionunidad})` : ''}
 													{u.descripcionunidad && (
 														<div style={{ fontSize: "0.85em", color: "#555", marginTop: "4px" }}>
 															📝 {u.descripcionunidad}
@@ -850,7 +850,7 @@ export default function DatosEmpresa() {
 									<option value="">Seleccione una unidad</option>
 									{getUnidadesByEmpresa(centroEmpresaTemp).map((u) => (
 										<option key={u.idunidad} value={u.idunidad}>
-											{u.nombreunidad}
+											{u.nombreunidad}{u.descripcionunidad ? ` (${u.descripcionunidad})` : ''}
 										</option>
 									))}
 								</select>
@@ -1093,7 +1093,7 @@ export default function DatosEmpresa() {
 										>
 											<div>
 												{editId === u.idunidad ? "✓ " : ""}
-												{u.nombreunidad}
+												{u.nombreunidad}{u.descripcionunidad ? ` (${u.descripcionunidad})` : ''}
 												{u.descripcionunidad && (
 													<div style={{ fontSize: "0.85em", color: "#555", marginTop: "4px" }}>
 														📝 {u.descripcionunidad}
@@ -1159,7 +1159,7 @@ export default function DatosEmpresa() {
 								<option value="">Seleccione una unidad</option>
 								{getUnidadesByEmpresa(editEmpresaTemp).map((u) => (
 									<option key={u.idunidad} value={u.idunidad}>
-										{u.nombreunidad}
+										{u.nombreunidad}{u.descripcionunidad ? ` (${u.descripcionunidad})` : ''}
 									</option>
 								))}
 							</select>
@@ -1261,7 +1261,7 @@ export default function DatosEmpresa() {
 								<option value="">Seleccione una unidad</option>
 								{getUnidadesByEmpresa(editEmpresaTemp).map((u) => (
 									<option key={u.idunidad} value={u.idunidad}>
-										{u.nombreunidad}
+										{u.nombreunidad}{u.descripcionunidad ? ` (${u.descripcionunidad})` : ''}
 									</option>
 								))}
 							</select>
