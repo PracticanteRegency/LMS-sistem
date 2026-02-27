@@ -219,17 +219,41 @@ class EnviarCorreoView(APIView):
 
         # Obtener colaborador autenticado
         enviado_por = self._get_colaborador(request)
+        
+        # Obtener correo del solicitante (colaborador autenticado)
+        correo_solicitante = self._get_correo_colaborador(enviado_por)
+        
+        # Obtener solicitante extra por ID de colaborador
+        solicitante_extra = None
+        solicitante_extra_id = data.get('solicitante_extra_id')
+        if solicitante_extra_id:
+            from usuarios.models import Colaboradores
+            try:
+                colab_extra = Colaboradores.objects.get(idcolaborador=solicitante_extra_id)
+                solicitante_extra = self._get_correo_colaborador(colab_extra)
+            except Colaboradores.DoesNotExist:
+                logger.warning(f"Colaborador extra con id {solicitante_extra_id} no encontrado")
 
         # Forzar destinatarios fijos para este endpoint
         correos_destino_fixed = (
-            "practicante.desarrollogh@regency.com.co,"
+            ""
+            #"practicante.desarrollogh@regency.com.co,"
             #"coordinador.seleccion@regency.com.co,"
             "operativo@servicompetentes.com,"
             "administrativo@servicompetentes.com"  
         )
         correos_list_fixed = [e.strip() for e in correos_destino_fixed.split(',') if e.strip()]
-        # Sobrescribir el campo de destino para que quede registrado en BD
-        data['correo_destino'] = correos_destino_fixed
+        
+        # Agregar solicitante y solicitante extra a la lista de destinatarios
+        correos_con_solicitantes = correos_list_fixed.copy()
+        if correo_solicitante:
+            correos_con_solicitantes.append(correo_solicitante)
+        if solicitante_extra:
+            correos_con_solicitantes.append(solicitante_extra)
+        
+        # Construir el string de correos para almacenar en BD (incluye fijos + solicitantes)
+        correos_para_bd = ', '.join(correos_con_solicitantes)
+        data['correo_destino'] = correos_para_bd
 
         # Obtener centro y derivar empresa
         centro = get_object_or_404(
@@ -257,16 +281,18 @@ class EnviarCorreoView(APIView):
             centro=centro,
             tipo_examen=tipo_examen,
             examenes=examenes,
-            colaborador=enviado_por
+            colaborador=enviado_por,
+            correos_solicitantes={'principal': correo_solicitante, 'extra': solicitante_extra}
         )
 
-        # Enviar correo a la lista fija (pasamos ciudad para trazabilidad en la respuesta)
+        # Enviar correo a la lista completa (fijos + solicitante + solicitante extra)
         resultado = self._enviar_correo(
             correo_obj,
-            correos_list_fixed,
+            correos_con_solicitantes,
             data['nombre_trabajador'],
             registro_trabajador,
-            ciudad=data.get('ciudad')
+            ciudad=data.get('ciudad'),
+            correos_solicitantes={'principal': correo_solicitante, 'extra': solicitante_extra}
         )
 
         return resultado
@@ -277,6 +303,18 @@ class EnviarCorreoView(APIView):
         if colaborador is None:
             colaborador = getattr(request.user, 'id_colaboradoru', None)
         return colaborador
+
+    def _get_correo_colaborador(self, colaborador):
+        """Obtiene el correo electrónico del colaborador."""
+        if colaborador is None:
+            return None
+        
+        # Intentar obtener correo con diferentes nombres de campo
+        correo = getattr(colaborador, 'correocolaborador', None) or \
+                 getattr(colaborador, 'correo', None) or \
+                 getattr(colaborador, 'email', None)
+        
+        return correo.strip() if correo else None
 
     def _clear_cache(self):
         """Limpia el cache de reportes de correos y datos de empresas con exámenes."""
@@ -304,7 +342,7 @@ class EnviarCorreoView(APIView):
         ))
 
     def _crear_registros_completos(
-            self, enviado_por, data, empresa, cargo, centro, tipo_examen, examenes, colaborador=None):
+            self, enviado_por, data, empresa, cargo, centro, tipo_examen, examenes, colaborador=None, correos_solicitantes=None):
         """
         Crea todos los registros necesarios en la base de datos:
         1. CorreoExamenEnviado (lote)
@@ -367,7 +405,8 @@ class EnviarCorreoView(APIView):
             uuid_correo=correo_obj.uuid_correo,
             uuid_trabajador=registro_trabajador.uuid_trabajador,
             fecha_envio=correo_obj.fecha_envio,
-            colaborador=colaborador
+            colaborador=colaborador,
+            correos_solicitantes=correos_solicitantes
         )
 
         # 6. Actualizar correo con cuerpo completo
@@ -377,7 +416,7 @@ class EnviarCorreoView(APIView):
         return correo_obj, registro_trabajador
 
     def _construir_cuerpo_correo(
-            self, data, cargo, empresa, centro, tipo_examen, examenes, uuid_correo, uuid_trabajador, fecha_envio, colaborador=None):
+            self, data, cargo, empresa, centro, tipo_examen, examenes, uuid_correo, uuid_trabajador, fecha_envio, colaborador=None, correos_solicitantes=None):
         """Construye el cuerpo del correo con toda la información incluyendo tipo de examen y datos del colaborador."""
         # Construir lista de exámenes
         lista_examenes = "\n".join([f"- {e.nombre}" for e in examenes])
@@ -408,6 +447,15 @@ class EnviarCorreoView(APIView):
         if not correo_colaborador:
             correo_colaborador = 'No disponible'
 
+        # Construir la línea de correos del solicitante
+        correos_solicitantes_text = correo_colaborador
+        if correos_solicitantes:
+            correos_adicionales = []
+            if correos_solicitantes.get('extra'):
+                correos_adicionales.append(correos_solicitantes['extra'])
+            if correos_adicionales:
+                correos_solicitantes_text = f"{correo_colaborador}, {', '.join(correos_adicionales)}"
+
         cuerpo = (
             f"Cordial Saludo.\n\n"
             f"Se han programado los siguientes exámenes médicos para el trabajador:\n\n"
@@ -423,15 +471,17 @@ class EnviarCorreoView(APIView):
             f"ID de Lote: {uuid_correo}\n"
             f"ID de Trabajador: {uuid_trabajador}\n"
             f"Solicitante: {nombre_colaborador}\n"
-            f"Correo del solicitante: {correo_colaborador}"
+            f"Correo del solicitante: {correos_solicitantes_text}"
         )
         return cuerpo
 
-    def _enviar_correo(self, correo_obj, destinatario, nombre_trabajador, registro_trabajador, ciudad=None):
+    def _enviar_correo(self, correo_obj, destinatario, nombre_trabajador, registro_trabajador, ciudad=None, correos_solicitantes=None):
         """Envía el correo y actualiza el estado del registro.
 
         Acepta `ciudad` únicamente para incluirla en logs y en la respuesta
         (no se guarda en `RegistroExamenes`).
+        
+        `correos_solicitantes` es un dict con 'principal' y 'extra' para incluir en logs.
         """
         logger = logging.getLogger(__name__)
         try:
@@ -441,6 +491,10 @@ class EnviarCorreoView(APIView):
             # Log del cuerpo para verificación
             logger.info(f"Enviar correo - UUID lote: {correo_obj.uuid_correo}")
             logger.info(f"Enviar correo - Ciudad (desde JSON): {ciudad}")
+            logger.info(f"Enviar correo - Destinatarios: {recipient_list}")
+            if correos_solicitantes:
+                logger.info(f"Enviar correo - Solicitante principal: {correos_solicitantes.get('principal')}")
+                logger.info(f"Enviar correo - Solicitante extra: {correos_solicitantes.get('extra')}")
             logger.info(f"Enviar correo - Cuerpo:\n{correo_obj.cuerpo_correo}")
 
             send_mail(
@@ -471,7 +525,11 @@ class EnviarCorreoView(APIView):
                     "tipo_examen": correo_obj.tipo_examen,
                     "examenes_asignados": total_examenes,
                     "registro_id": registro_trabajador.id,
-                    "ciudad": ciudad
+                    "ciudad": ciudad,
+                    "solicitantes_notificados": {
+                        "principal": correos_solicitantes.get('principal') if correos_solicitantes else None,
+                        "extra": correos_solicitantes.get('extra') if correos_solicitantes else None
+                    }
                 },
                 status=status.HTTP_200_OK
             )
@@ -1278,6 +1336,18 @@ class EnviarCorreoMasivoView(APIView):
             archivo_csv = serializer.validated_data['archivo_csv']
             # asunto y cuerpo_correo ya no se leen del request, se generan
             # automáticamente
+            solicitante_extra = None
+            solicitante_extra_id = serializer.validated_data.get('solicitante_extra_id')
+            if solicitante_extra_id:
+                from usuarios.models import Colaboradores as ColabModel
+                try:
+                    colab_extra = ColabModel.objects.get(idcolaborador=solicitante_extra_id)
+                    correo_extra = getattr(colab_extra, 'correocolaborador', None) or \
+                                   getattr(colab_extra, 'correo', None) or \
+                                   getattr(colab_extra, 'email', None)
+                    solicitante_extra = correo_extra.strip() if correo_extra else None
+                except ColabModel.DoesNotExist:
+                    logger.warning(f"Colaborador extra con id {solicitante_extra_id} no encontrado")
 
             # Leer CSV con múltiples intentos de codificación y delimitadores
             archivo_csv.seek(0)
@@ -1796,6 +1866,11 @@ class EnviarCorreoMasivoView(APIView):
             if not correo_colaborador:
                 correo_colaborador = getattr(request.user, 'email', None)
 
+            # Construir la línea de correos del solicitante
+            correos_solicitantes_text = correo_colaborador or 'No disponible'
+            if solicitante_extra:
+                correos_solicitantes_text = f"{correo_colaborador}, {solicitante_extra}" if correo_colaborador else f"No disponible, {solicitante_extra}"
+
             cuerpo_final = f"""
 <html>
 <body>
@@ -1806,17 +1881,30 @@ para los trabajadores en el excel adjunto.</p>
     <hr>
     <p><strong>ID de Seguimiento:</strong> {uuid_correo}</p>
     <p><strong>Solicitante:</strong> {nombre_colaborador if nombre_colaborador else 'No disponible'}</p>
-    <p><strong>Correo del solicitante:</strong> {correo_colaborador if correo_colaborador else 'No disponible'}</p>
+    <p><strong>Correo del solicitante:</strong> {correos_solicitantes_text}</p>
 </body>
 </html>
 """
 
             correos_destino = (
-                "practicante.desarrollogh@regency.com.co,"
+                ""
+                #"practicante.desarrollogh@regency.com.co,"
                 "operativo@servicompetentes.com,"
                 "administrativo@servicompetentes.com"
             )
             correos_list = [email.strip() for email in correos_destino.split(',') if email.strip()]
+            
+            # Agregar solicitante y solicitante extra a la lista de destinatarios
+            if correo_colaborador:
+                correos_list.append(correo_colaborador)
+            if solicitante_extra:
+                correos_list.append(solicitante_extra)
+            
+            # Remover duplicados manteniendo el orden
+            correos_list = list(dict.fromkeys(correos_list))
+            
+            # Actualizar correos_destino para que incluya solicitantes (para guardar en BD)
+            correos_destino = ', '.join(correos_list)
 
             # Obtener el colaborador del usuario autenticado
             colaborador = (
@@ -1953,7 +2041,11 @@ para los trabajadores en el excel adjunto.</p>
                         f"Se envió correo a {len(correos_list)} "
                         f"destinatarios con {len(trabajadores_validos)} "
                         f"trabajadores"
-                    )
+                    ),
+                    "solicitantes_notificados": {
+                        "principal": correo_colaborador,
+                        "extra": solicitante_extra
+                    }
                 },
                 status=status.HTTP_201_CREATED
             )
