@@ -49,32 +49,38 @@ const ObtenerTrabajadoresCorreo = async (correoId, page = 1, pageSize = 10, sear
 
 // GET: Generar reporte Excel con filtros de fecha y empresas
 const GenerarReporteExcel = async (fechaInicio, fechaFin, empresas) => {
-  const response = await api.get(
-    `examenes/imprimir-reporte/?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}&empresas=${empresas}`,
-    {
-      responseType: 'blob'
-    }
-  );
-  return response.data;
+  return dedupe(`exam:GenerarReporteExcel:${fechaInicio}:${fechaFin}:${empresas}`, null, async () => {
+    const response = await api.get(
+      `examenes/imprimir-reporte/?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}&empresas=${empresas}`,
+      {
+        responseType: 'blob'
+      }
+    );
+    return response.data;
+  });
 };
 
 // POST: Enviar correos masivos por CSV
 const EnviarCorreoMasivo = async (file) => {
-  const formData = new FormData();
-  formData.append('archivo_csv', file);
-  
-  const response = await api.post('examenes/correo/enviar-masivo/', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    }
+  return dedupe('exam:EnviarCorreoMasivo', { name: file?.name }, async () => {
+    const formData = new FormData();
+    formData.append('archivo_csv', file);
+    
+    const response = await api.post('examenes/correo/enviar-masivo/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response.data;
   });
-  return response.data;
 };
 
 // PATCH: Actualizar estado de trabajadores
 const ActualizarEstadoTrabajadores = async (payload) => {
-  const response = await api.patch("examenes/actualizar-estado/", payload);
-  return response.data;
+  return dedupe('exam:ActualizarEstadoTrabajadores', payload, async () => {
+    const response = await api.patch("examenes/actualizar-estado/", payload);
+    return response.data;
+  });
 };
 
 // GET: Preview de exámenes según empresa y cargo seleccionados

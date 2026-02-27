@@ -219,14 +219,14 @@ export default function EditarUsuario() {
           </div>
           <div style={{ minWidth: 200, marginBottom: 8 }}>
             <label htmlFor="unidad" style={{ fontWeight: 500, display: 'block', marginBottom: 4 }}>Unidad</label>
-            <select className={styles.select} id="unidad" value={selectedUnidad ?? ''} onChange={e => {
+              <select className={styles.select} id="unidad" value={selectedUnidad ?? ''} onChange={e => {
               setSelectedUnidad(e.target.value ? Number(e.target.value) : null);
               setSelectedProyecto(null);
               setForm((f: any) => ({ ...f, centroop_id: '' }));
             }}>
               <option value="">Seleccionar unidad</option>
               {empresas.find((em: any) => em.idempresa === selectedEmpresa)?.unidades?.map((u: any) => (
-                <option key={u.idunidad} value={u.idunidad}>{u.nombreunidad}</option>
+                <option key={u.idunidad} value={u.idunidad}>{u.nombreunidad}{u.descripcionunidad ? ` (${u.descripcionunidad})` : ''}</option>
               ))}
             </select>
           </div>
