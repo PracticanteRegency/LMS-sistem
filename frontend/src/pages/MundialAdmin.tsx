@@ -65,7 +65,10 @@ export default function MundialAdmin() {
 
   // Team form state
   const [formTeamName, setFormTeamName] = useState("");
+  const [formTeamCodigo, setFormTeamCodigo] = useState("");
+  const [formTeamEdicion, setFormTeamEdicion] = useState("");
   const [formTeamEmoji, setFormTeamEmoji] = useState("");
+  const [formTeamBanderaImagen, setFormTeamBanderaImagen] = useState<File | null>(null);
   const [formTeamActive, setFormTeamActive] = useState(true);
 
   // Special prediction form state
@@ -535,11 +538,11 @@ export default function MundialAdmin() {
                     >
                       <div className={styles.resultCardHeader}>
                         <div className={styles.resultTeams}>
-                          <span>{match.equipo_local_bandera || match.homeFlag}</span>
+                          <img src={match.equipo_local_bandera || match.homeFlag} alt={match.equipo_local_nombre || match.homeTeam} className={styles.resultTeamFlagImg} />
                           <span>{match.equipo_local_nombre || match.homeTeam}</span>
                           <span className={styles.vs}>VS</span>
                           <span>{match.equipo_visitante_nombre || match.awayTeam}</span>
-                          <span>{match.equipo_visitante_bandera || match.awayFlag}</span>
+                          <img src={match.equipo_visitante_bandera || match.awayFlag} alt={match.equipo_visitante_nombre || match.awayTeam} className={styles.resultTeamFlagImg} />
                         </div>
                         {getStatusBadge(match.estado || match.status || "")}
                       </div>
@@ -595,7 +598,10 @@ export default function MundialAdmin() {
               <h2 style={{ fontSize: "1.25rem", fontWeight: 700 }}>🏴 Equipos Participantes</h2>
               <button className={styles.btnPrimary} onClick={() => {
                 setFormTeamName("");
+                setFormTeamCodigo("");
+                setFormTeamEdicion("");
                 setFormTeamEmoji("");
+                setFormTeamBanderaImagen(null);
                 setFormTeamActive(true);
                 setShowCreateTeamModal(true);
               }}>
@@ -935,6 +941,42 @@ export default function MundialAdmin() {
                   className={styles.formInput}
                 />
               </div>
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label>Código</label>
+                  <input
+                    type="text"
+                    value={formTeamCodigo}
+                    onChange={(e) => setFormTeamCodigo(e.target.value)}
+                    placeholder="Ej: ARG"
+                    className={styles.formInput}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Edición</label>
+                  <input
+                    type="text"
+                    value={formTeamEdicion}
+                    onChange={(e) => setFormTeamEdicion(e.target.value)}
+                    placeholder="Ej: 2026"
+                    className={styles.formInput}
+                  />
+                </div>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Imagen de Bandera</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setFormTeamBanderaImagen(e.target.files?.[0] || null)}
+                  className={styles.formInput}
+                />
+                {formTeamBanderaImagen && (
+                  <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", marginTop: "0.5rem" }}>
+                    ✓ {formTeamBanderaImagen.name}
+                  </p>
+                )}
+              </div>
               <div className={styles.formGroup}>
                 <label>Emoji de Bandera</label>
                 <input
@@ -959,18 +1001,29 @@ export default function MundialAdmin() {
             <div className={styles.modalFooter}>
               <button className={styles.btnOutline} onClick={() => setShowCreateTeamModal(false)}>Cancelar</button>
               <button className={styles.btnPrimary} onClick={async () => {
-                if (!formTeamName) return;
+                if (!formTeamName || !formTeamCodigo || !formTeamEdicion || !formTeamBanderaImagen) {
+                  alert("Por favor completa todos los campos requeridos (Nombre, Código, Edición e Imagen)");
+                  return;
+                }
                 try {
-                  await createEquipo({
-                    nombre: formTeamName,
-                    bandera_emoji: formTeamEmoji,
-                    activo: formTeamActive
-                  });
+                  const formData = new FormData();
+                  formData.append("nombre", formTeamName);
+                  formData.append("codigo", formTeamCodigo);
+                  formData.append("edicion", formTeamEdicion);
+                  formData.append("bandera_emoji", formTeamEmoji || "");
+                  formData.append("activo", formTeamActive ? "true" : "false");
+                  // Asegurar que el archivo se añade correctamente
+                  if (formTeamBanderaImagen instanceof File) {
+                    formData.append("bandera_imagen", formTeamBanderaImagen);
+                  }
+                  
+                  await createEquipo(formData);
                   await reloadTeams();
                   setShowCreateTeamModal(false);
                   triggerSuccess("Equipo creado");
                 } catch (error) {
                   console.error("Error creando equipo:", error);
+                  alert("Error al crear el equipo. Revisa que la imagen sea válida.");
                 }
               }}>
                 Crear Equipo

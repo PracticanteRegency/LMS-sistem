@@ -174,11 +174,20 @@ class ConfiguracionPrediccionEspecial(models.Model):
 
     def esta_abierta(self):
         ahora = timezone.now()
-        return (
-            self.habilitada
-            and self.estado == EstadoPrediccionEspecial.ABIERTA
-            and ahora < self.fecha_cierre
-        )
+        # Verificar condiciones básicas
+        if not (self.habilitada and self.estado == EstadoPrediccionEspecial.ABIERTA and ahora < self.fecha_cierre):
+            return False
+        
+        # Verificar que no falten menos de 1 hora para el primer partido
+        if self.edicion:
+            fecha_hora_inicio = self.edicion.fecha_hora_inicio()
+            if fecha_hora_inicio:
+                # Si faltan menos de 1 hora para el primer partido, cerrar predicciones
+                una_hora_antes = fecha_hora_inicio - timedelta(hours=1)
+                if ahora >= una_hora_antes:
+                    return False
+        
+        return True
 
     def puede_editarse(self):
         return self.esta_abierta()

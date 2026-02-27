@@ -46,7 +46,6 @@
 
 /* ===== STICKY HEADER ===== */
 .stickyHeader {
-  position: sticky;
   top: 0;
   z-index: revert-layer;
   background: var(--background);

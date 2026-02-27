@@ -29,6 +29,12 @@ export default function MundialPartidos() {
   const [allMatches, setAllMatches] = useState<MatchData[]>([]);
   const [phases, setPhases] = useState<string[]>([]);
   const [groups, setGroups] = useState<string[]>([]);
+  const [stats, setStats] = useState<any>({
+    total_partidos: 0,
+    partidos_predichos: 0,
+    partidos_pendientes: 0,
+    total_equipos: 0
+  });
 
   // Helper function to normalize estado values (handle both Spanish and English)
   const isEstadoAbierto = (estado: string | undefined): boolean => {
@@ -77,9 +83,11 @@ export default function MundialPartidos() {
           date: m.fecha || m.date,
           time: m.hora || m.time,
           puede_predecir: m.puede_predecir !== undefined ? m.puede_predecir : true,
-          // Transform mi_prediccion to predictions format
+          // Keep full mi_prediccion object for loading penalty data later
+          // Also transform for predictions state compatibility
           ...(m.mi_prediccion && {
             mi_prediccion: {
+              ...m.mi_prediccion,
               home: m.mi_prediccion.goles_local,
               away: m.mi_prediccion.goles_visitante,
               winner: m.mi_prediccion.ganador === "local" ? "home" : m.mi_prediccion.ganador === "visitante" ? "away" : "draw",
@@ -99,6 +107,21 @@ export default function MundialPartidos() {
         setPhases(uniquePhases);
         const uniqueGroups = [...new Set(transformedData.filter((m: MatchData) => m.grupo || m.group).map((m: MatchData) => m.grupo || m.group))];
         setGroups(uniqueGroups as string[]);
+        
+        // Extract statistics from backend or calculate from data
+        const backendStats = res.data?.estadisticas;
+        const uniqueTeams = new Set<number>();
+        transformedData.forEach((m: any) => {
+          if (m.equipo_local) uniqueTeams.add(m.equipo_local);
+          if (m.equipo_visitante) uniqueTeams.add(m.equipo_visitante);
+        });
+        
+        setStats({
+          total_partidos: backendStats?.total_partidos || transformedData.length,
+          partidos_predichos: backendStats?.partidos_predichos || Object.keys(existingPredictions).length,
+          partidos_pendientes: backendStats?.partidos_pendientes || (transformedData.length - Object.keys(existingPredictions).length),
+          total_equipos: res.data?.equipos?.length || uniqueTeams.size
+        });
       })
       .catch((err: Error) => {
         console.error("Error cargando partidos:", err);
@@ -121,17 +144,15 @@ export default function MundialPartidos() {
     });
   }, [allMatches, activePhase, activeGroup, searchTerm]);
 
-  const totalPredictions = Object.keys(predictions).length;
-  const totalOpenMatches = allMatches.filter((m) => 
-    (m.puede_predecir !== false) && 
-    isEstadoAbierto(m.estado) && 
-    canPredictByTime(m.fecha, m.hora)
-  ).length;
 
   const openPredictionModal = (match: MatchData) => {
     if (!isEstadoAbierto(match.estado) || match.puede_predecir === false || !canPredictByTime(match.fecha, match.hora)) return;
     setSelectedMatch(match);
+    
+    // Check if there's an existing full prediction object with penalty data
+    const fullPrediction = (match as any).mi_prediccion;
     const existing = predictions[match.id];
+    
     if (existing) {
       setHomeScore(existing.home);
       setAwayScore(existing.away);
@@ -141,9 +162,15 @@ export default function MundialPartidos() {
       setAwayScore(0);
       setWinner(null);
     }
-    // Reset penaltis
-    setPenaltisHome(0);
-    setPenaltisAway(0);
+    
+    // Load penalty shootout data if it exists
+    if (fullPrediction && fullPrediction.predice_penaltis) {
+      setPenaltisHome(fullPrediction.penaltis_local || 0);
+      setPenaltisAway(fullPrediction.penaltis_visitante || 0);
+    } else {
+      setPenaltisHome(0);
+      setPenaltisAway(0);
+    }
   };
 
   const handleSavePrediction = async () => {
@@ -246,7 +273,7 @@ export default function MundialPartidos() {
           <div className={styles.predictionCounter}>
             <p className={styles.predictionCounterLabel}>Predicciones</p>
             <p className={styles.predictionCounterValue}>
-              {totalPredictions}/{totalOpenMatches}
+              {stats.partidos_predichos}/{stats.total_partidos}
             </p>
           </div>
         </div>
@@ -264,20 +291,20 @@ export default function MundialPartidos() {
         {/* Stats Grid */}
         <div className={styles.statsGrid}>
           <div className={styles.statCard}>
-            <p className={styles.statValue}>{allMatches.length}</p>
+            <p className={styles.statValue}>{stats.total_partidos}</p>
             <p className={styles.statLabel}>Total partidos</p>
           </div>
           <div className={styles.statCard}>
-            <p className={`${styles.statValue} ${styles.statPrimary}`}>{totalPredictions}</p>
+            <p className={`${styles.statValue} ${styles.statPrimary}`}>{stats.partidos_predichos}</p>
             <p className={styles.statLabel}>Predichos</p>
           </div>
           <div className={styles.statCard}>
-            <p className={`${styles.statValue} ${styles.statSecondary}`}>{totalOpenMatches - totalPredictions}</p>
+            <p className={`${styles.statValue} ${styles.statSecondary}`}>{stats.partidos_pendientes}</p>
             <p className={styles.statLabel}>Pendientes</p>
           </div>
           <div className={styles.statCard}>
-            <p className={styles.statValue}>48</p>
-            <p className={styles.statLabel}>Selecciones</p>
+            <p className={styles.statValue}>{stats.total_equipos}</p>
+            <p className={styles.statLabel}>Equipos</p>
           </div>
         </div>
 

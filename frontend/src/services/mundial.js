@@ -23,7 +23,11 @@ export const getEdicion = (id) => api.get(`${BASE}/ediciones/${id}/`);
 export const getEquipos = () => api.get(`${BASE}/equipos/`);
 
 /** Crear equipo */
-export const createEquipo = (data) => api.post(`${BASE}/equipos/`, data);
+export const createEquipo = (data) => api.post(`${BASE}/equipos/`, data, {
+  headers: {
+    'Content-Type': 'multipart/form-data'
+  }
+});
 
 /** Detalle de un equipo */
 export const getEquipo = (id) => api.get(`${BASE}/equipos/${id}/`);

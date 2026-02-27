@@ -882,6 +882,29 @@
   border-left: 3px solid #4CAF50;
 }
 
+/* Highlight current user's ranking */
+.rankingRowCurrentUser {
+  background: linear-gradient(135deg, #fff8f0 0%, #fffbf7 100%);
+  border-left: 4px solid #ff9500;
+  box-shadow: 0 2px 8px rgba(255, 149, 0, 0.15);
+  font-weight: 500;
+}
+
+.rankingRowCurrentUser:hover {
+  background: linear-gradient(135deg, #fff4e6 0%, #fffaf3 100%);
+}
+
+.userBadge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  background: #ff9500;
+  color: white;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .rankingRank {
   min-width: 28px;
   text-align: center;

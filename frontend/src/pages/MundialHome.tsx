@@ -165,41 +165,6 @@ function ScoringRulesGrid() {
   );
 }
 
-/* ===== SCORING RULES (STANDALONE VERSION FOR HOME) ===== */
-function ScoringRulesGridStandalone({ scoringRules = [], multiplierRules = [] }: { scoringRules?: any[], multiplierRules?: any[] }) {
-  return (
-    <div className={styles.scoringGrid}>
-      <div className={styles.scoringCard}>
-        <h3 className={styles.scoringCardTitle}>Sistema de Puntuación</h3>
-        {scoringRules.map((item, idx) => (
-          <div key={idx} className={styles.scoringItem}>
-            <div className={styles.scoringPoints}>
-              <span className={styles.scoringPointsValue}>{item.points}</span>
-              <span className={styles.scoringPointsLabel}>puntos</span>
-            </div>
-            <div>
-              <p className={styles.scoringCondition}>{item.condition}</p>
-              <p className={styles.scoringExample}>{item.example}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className={styles.scoringCard}>
-        <h3 className={styles.scoringCardTitle}>Multiplicadores por Fase</h3>
-        <p className={styles.scoringCardDesc}>
-          Los puntos base se multiplican según la fase del torneo. ¡Las predicciones en fases finales valen más!
-        </p>
-        {multiplierRules.map((item, idx) => (
-          <div key={idx} className={styles.multiplierItem}>
-            <span className={styles.multiplierPhase}>{item.phase}</span>
-            <span className={styles.multiplierValue}>{item.multiplier}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 /* ===== MATCHES ===== */
 function MatchesSection({ initialMatches = [] }: { initialMatches?: MatchData[] }) {
@@ -510,11 +475,34 @@ function SpecialPredictionsSection({ initialSpecialPredictions = [] }: { initial
   );
 }
 function RankingSection({ initialPlayers = [] }: { initialPlayers?: RankingEntry[] }) {
-  const [players, setPlayers] = useState<RankingEntry[]>(initialPlayers);
+  const [userRank, setUserRank] = useState<RankingEntry | null>(null);
+  const [topPlayers, setTopPlayers] = useState<RankingEntry[]>([]);
+  const [allSortedPlayers, setAllSortedPlayers] = useState<RankingEntry[]>([]);
 
   useEffect(() => {
-    setPlayers(initialPlayers);
+    // Procesar jugadores para separar al usuario del top 10
+    if (initialPlayers && initialPlayers.length > 0) {
+      // Ordenar de mayor a menor por puntos
+      const sortedPlayers = [...initialPlayers].sort((a, b) => b.points - a.points);
+      setAllSortedPlayers(sortedPlayers);
+      
+      // Buscar al usuario actual
+      const currentUserRank = sortedPlayers.find((p: any) => p.isCurrentUser);
+      
+      if (currentUserRank) {
+        setUserRank(currentUserRank);
+        // Mostrar top 10 del resto
+        const withoutUser = sortedPlayers.filter((p: any) => !p.isCurrentUser);
+        setTopPlayers(withoutUser.slice(0, 10));
+      } else {
+        // Si no hay usuario identificado, mostrar solo los top 10
+        setTopPlayers(sortedPlayers.slice(0, 10));
+      }
+    }
   }, [initialPlayers]);
+
+  // Construir la lista para mostrar: usuario primero (si existe) + top 10
+  const displayPlayers = userRank ? [userRank, ...topPlayers] : topPlayers;
 
   return (
     <section id="ranking" className={styles.rankingSection}>
@@ -527,48 +515,49 @@ function RankingSection({ initialPlayers = [] }: { initialPlayers?: RankingEntry
         </div>
 
         <div className={styles.rankingContainer}>
-          {/* Podium */}
+          {/* Podium - Always show top 3 (positions 1, 2, 3) regardless of user rank */}
           <div className={styles.podium}>
-            {/* 2nd */}
+            {/* 2nd Place (Left) */}
             <div className={styles.podiumEntry}>
-              <div className={styles.podiumAvatarSecond}>{players[1]?.avatar}</div>
-              <p className={styles.podiumName}>{players[1]?.name}</p>
-              <p className={styles.podiumPoints}>{players[1]?.points} pts</p>
+              <div className={styles.podiumAvatarSecond}>{allSortedPlayers[1]?.avatar}</div>
+              <p className={styles.podiumName}>{allSortedPlayers[1]?.name}</p>
+              <p className={styles.podiumPoints}>{allSortedPlayers[1]?.points} pts</p>
               <div className={styles.podiumBarSecond}>
                 <span className={styles.podiumBarNumberOther}>2</span>
               </div>
             </div>
-            {/* 1st */}
+            {/* 1st Place (Center) */}
             <div className={styles.podiumFirstWrapper}>
               <span className={styles.podiumTrophy}>🏆</span>
-              <div className={styles.podiumAvatarFirst}>{players[0]?.avatar}</div>
-              <p className={styles.podiumName}>{players[0]?.name}</p>
-              <p className={styles.podiumPoints}>{players[0]?.points} pts</p>
+              <div className={styles.podiumAvatarFirst}>{allSortedPlayers[0]?.avatar}</div>
+              <p className={styles.podiumName}>{allSortedPlayers[0]?.name}</p>
+              <p className={styles.podiumPoints}>{allSortedPlayers[0]?.points} pts</p>
               <div className={styles.podiumBarFirst}>
                 <span className={styles.podiumBarNumberFirst}>1</span>
               </div>
             </div>
-            {/* 3rd */}
+            {/* 3rd Place (Right) */}
             <div className={styles.podiumEntry}>
-              <div className={styles.podiumAvatarThird}>{players[2]?.avatar}</div>
-              <p className={styles.podiumName}>{players[2]?.name}</p>
-              <p className={styles.podiumPoints}>{players[2]?.points} pts</p>
+              <div className={styles.podiumAvatarThird}>{allSortedPlayers[2]?.avatar}</div>
+              <p className={styles.podiumName}>{allSortedPlayers[2]?.name}</p>
+              <p className={styles.podiumPoints}>{allSortedPlayers[2]?.points} pts</p>
               <div className={styles.podiumBarThird}>
                 <span className={styles.podiumBarNumberOther}>3</span>
               </div>
             </div>
           </div>
 
-          {/* Full Table */}
+          {/* Full Table - Top 10 + User */}
           <div className={styles.rankingTable}>
-            {players.map((player: RankingEntry) => {
+            {displayPlayers.slice(0, 11).map((player: RankingEntry, idx: number) => {
               const trendType = getTrendColor(player.trend);
               const rankEmoji = player.rank === 1 ? "🏆" : player.rank === 2 ? "🥈" : player.rank === 3 ? "🥉" : null;
+              const isCurrentUser = userRank?.rank === player.rank;
 
               return (
                 <div
-                  key={player.name}
-                  className={player.rank <= 3 ? styles.rankingRowTop : styles.rankingRow}
+                  key={`${player.name}-${idx}`}
+                  className={`${player.rank <= 3 ? styles.rankingRowTop : styles.rankingRow} ${isCurrentUser ? styles.rankingRowCurrentUser : ""}`}
                 >
                   <div className={styles.rankingRank}>
                     {rankEmoji ? (
@@ -579,7 +568,10 @@ function RankingSection({ initialPlayers = [] }: { initialPlayers?: RankingEntry
                   </div>
                   <div className={styles.rankingAvatar}>{player.avatar}</div>
                   <div className={styles.rankingInfo}>
-                    <p className={styles.rankingName}>{player.name}</p>
+                    <p className={styles.rankingName}>
+                      {player.name}
+                      {isCurrentUser && <span className={styles.userBadge}> (Tú)</span>}
+                    </p>
                     <p className={styles.rankingHits}>{player.exactHits} aciertos exactos</p>
                   </div>
                   <div className={styles.rankingRight}>
@@ -611,8 +603,6 @@ function RankingSection({ initialPlayers = [] }: { initialPlayers?: RankingEntry
 /* ===== PÁGINA PRINCIPAL — MICampeonato ===== */
 export default function MundialHome() {
   const [steps, setSteps] = useState<any[]>([]);
-  const [scoringRules, setScoringRules] = useState<any[]>([]);
-  const [multiplierRules, setMultiplierRules] = useState<any[]>([]);
   const [matches, setMatches] = useState<MatchData[]>([]);
   const [prizes, setPrizes] = useState<any[]>([]);
   const [specialPredictions, setSpecialPredictions] = useState<any[]>([]);
@@ -627,8 +617,6 @@ export default function MundialHome() {
         // CONFIGURACIÓN (from configuracion endpoint)
         // ============================================
         if (data.configuracion) {
-          if (data.configuracion?.scoring_rules) setScoringRules(data.configuracion.scoring_rules);
-          if (data.configuracion?.multiplier_rules) setMultiplierRules(data.configuracion.multiplier_rules);
           if (data.configuracion?.steps) setSteps(data.configuracion.steps);
           if (data.configuracion?.prizes) setPrizes(data.configuracion.prizes);
         }
@@ -687,6 +675,10 @@ export default function MundialHome() {
         // Transform backend formato to frontend RankingEntry format
         // ============================================
         if (data.ranking) {
+          // Get user's ranking info
+          const miPosicion = data.ranking?.mi_posicion;
+          
+          // Transform ranking data and mark current user by posicion (rank is unique)
           const rankingData = (data.ranking?.ranking || []).map((entry: any) => ({
             rank: entry.posicion,
             name: entry.nombre,
@@ -694,14 +686,15 @@ export default function MundialHome() {
             points: entry.puntos_totales,
             exactHits: entry.aciertos_exactos,
             trend: entry.tendencia_str || "0",
+            // Mark if this is the current user (compare by posicion, not email, since email may be duplicate in test data)
+            isCurrentUser: miPosicion && entry.posicion === miPosicion.posicion,
           }));
+          
           setPlayers(rankingData);
         }
       })
       .catch(() => {
         setSteps([]);
-        setScoringRules([]);
-        setMultiplierRules([]);
         setMatches([]);
         setPrizes([]);
         setSpecialPredictions([]);
@@ -717,7 +710,6 @@ export default function MundialHome() {
       <SpecialPredictionsSection initialSpecialPredictions={specialPredictions} />
       <PrizesSection initialPrizes={prizes} initialSpecialPredictions={specialPredictions} />
       <HowItWorks steps={steps} />
-      <ScoringRulesGridStandalone scoringRules={scoringRules} multiplierRules={multiplierRules} />
     </div>
   );
 }

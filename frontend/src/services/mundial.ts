@@ -62,6 +62,7 @@ export interface RankingEntry {
   points: number;
   exactHits: number;
   trend: string;
+  isCurrentUser?: boolean;
 }
 
 export interface Step {
