@@ -256,12 +256,11 @@ export default function Usuarios() {
         setSuccess(`Se registraron ${response.total_creados} usuarios correctamente`);
       }
       setUploadFile(null);
-      
-      // Recargar usuarios después de 2 segundos
+
+      // Recargar usuarios después de 2 segundos pero NO cerrar el modal automáticamente.
+      // El panel con la respuesta permanecerá visible hasta que el usuario pulse "Cerrar".
       setTimeout(() => {
         loadUsuarios(1);
-        setShowUploadModal(false);
-        setUploadResult(null);
       }, 2000);
     } catch (err: any) {
       const errorData = err?.response?.data;

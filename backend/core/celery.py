@@ -39,6 +39,14 @@ app.conf.beat_schedule = {
         'task': 'notificaciones.tasks.notificar_jefes_por_colaboradores_sin_progreso',
         'schedule': crontab(hour=9, minute=0, day_of_week='monday'),  # Lunes a las 09:00
     },
+    'limpiar-certificados-antiguos': {
+        'task': 'capacitaciones.tasks.limpiar_certificados_antiguos',
+        'schedule': crontab(hour='*/12'),  # Cada 12 horas
+    },
+    'limpiar-directorio-certificados': {
+        'task': 'capacitaciones.tasks.limpiar_directorio_certificados',
+        'schedule': crontab(hour='*/12'),  # Cada 12 horas
+    },
 }
 
 app.conf.timezone = 'America/Bogota'

@@ -19,7 +19,7 @@ interface CapListService {
   getCapacitacionDetalle(id: string | number): Promise<any>;
   updateCapacitacion(id: string | number, data: any): Promise<any>;
   postCapList(): Promise<any>;
-  certificadoDescargar(capacitacionId: string | number): Promise<Blob>;
+  certificadoDescargar(capacitacionId: string | number, colaboradorId): Promise<Blob>;
   postCargarColab(): Promise<any>;
   eliminarCapacitacion(capacitacionId: string | number): Promise<any>;
   getMiCapacitacion(): Promise<any>;

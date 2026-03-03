@@ -175,7 +175,8 @@ def notificar_capacitacion_por_vencer_7_dias():
     fecha_objetivo = hoy + timedelta(days=7)
 
     capacitaciones = Capacitaciones.objects.filter(
-        fecha_fin__date=fecha_objetivo
+        fecha_fin__date=fecha_objetivo,
+        estado=1  # FILTRO: Solo capacitaciones activas
     )
 
     for cap in capacitaciones:
@@ -279,7 +280,8 @@ def notificar_capacitacion_por_vencer_1_dia():
     fecha_objetivo = hoy + timedelta(days=1)
 
     capacitaciones = Capacitaciones.objects.filter(
-        fecha_fin__date=fecha_objetivo
+        fecha_fin__date=fecha_objetivo,
+        estado=1  # FILTRO: Solo capacitaciones activas
     )
 
     for cap in capacitaciones:
@@ -356,120 +358,250 @@ def notificar_capacitacion_por_vencer_1_dia():
 @shared_task
 def notificar_jefes_por_colaboradores_sin_progreso():
     """
-    Notifica a los jefes de proyecto sobre colaboradores sin avance en capacitaciones.
-    Se ejecuta cada lunes a las 09:00.
-    Usa batching automático para soportar múltiples notificaciones.
+    Notifica a los jefes de proyecto sobre el estado de capacitaciones de sus colaboradores.
+    Envía un archivo Excel adjunto personalizado por proyecto con las columnas:
+    Nombre Completo, Correo, Capacitación, Estado (Completado / No Completado).
     
-    IMPORTANTE: Filtra colaboradores DESACTIVADOS (estadocolaborador != 1)
+    Se ejecuta cada lunes a las 09:00.
+    
+    IMPORTANTE:
+    - Solo incluye colaboradores ACTIVOS (estadocolaborador = 1)
+    - Solo incluye capacitaciones activas (estado = 1)
+    - Solo notifica si hay al menos un colaborador con capacitación pendiente
+    - Cada jefe recibe su reporte personalizado con Excel adjunto
     """
-    # FILTRO: Solo colaboradores ACTIVOS (estadocolaborador=1)
-    registros = (
-        progresoCapacitaciones.objects
-        .select_related(
-            "capacitacion",
-            "colaborador",
-            "colaborador__centroop__id_proyecto__encargado_proyecto"
-        )
-        .filter(
-            capacitacion__estado=1,
-            completada=False,
-            progreso=0,
-            colaborador__estadocolaborador=1  # FILTRO: Solo activos
-        )
-    )
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from io import BytesIO
+    from django.core.mail import EmailMultiAlternatives
+    from analitica.models import Proyecto, Centroop
+    from usuarios.models import Colaboradores
 
-    notificaciones = {}
+    # Obtener capacitaciones activas
+    capacitaciones_activas = list(Capacitaciones.objects.filter(estado=1))
 
-    for r in registros:
-        colaborador = r.colaborador
-        centro = colaborador.centroop
+    if not capacitaciones_activas:
+        logger.info("notificar_jefes: No hay capacitaciones activas")
+        return
 
-        if not centro:
-            continue
+    # Obtener proyectos activos con jefe asignado
+    proyectos = Proyecto.objects.filter(
+        estadoproyecto=1,
+        idcolaborador__isnull=False
+    ).select_related('idcolaborador')
 
-        proyecto = centro.id_proyecto
-        if not proyecto:
-            continue
-
-        jefe = proyecto.encargado_proyecto
+    for proyecto in proyectos:
+        jefe = proyecto.idcolaborador
         if not jefe or not jefe.correocolaborador:
             continue
 
-        email_jefe = jefe.correocolaborador
+        # Obtener centros operativos activos del proyecto
+        centros = Centroop.objects.filter(
+            id_proyecto=proyecto,
+            estadocentrop=1
+        )
 
-        if email_jefe not in notificaciones:
-            notificaciones[email_jefe] = {
-                "jefe": jefe,
-                "proyecto": proyecto,
-                "items": []
-            }
+        if not centros.exists():
+            continue
 
-        notificaciones[email_jefe]["items"].append({
-            "colaborador": f"{colaborador.nombrecolaborador} {colaborador.apellidocolaborador}",
-            "capacitacion": r.capacitacion.titulo
-        })
+        # Obtener colaboradores activos de esos centros
+        colaboradores = Colaboradores.objects.filter(
+            centroop__in=centros,
+            estadocolaborador=1
+        ).order_by('nombrecolaborador', 'apellidocolaborador')
 
-    # Agrupar notificaciones por lotes de máximo 50 jefes por email
-    # y enviar masivamente
-    emails_jefes = list(notificaciones.keys())
-    
-    # Dividir en lotes de 50 correos BCC
-    lote_size = 50
-    for i in range(0, len(emails_jefes), lote_size):
-        lote_emails = emails_jefes[i:i+lote_size]
-        
-        # Construir cuerpo consolidado para este lote
-        html_consolidado = "<html><body style='font-family: Arial, sans-serif;'>"
-        
-        for email_jefe in lote_emails:
-            data = notificaciones[email_jefe]
-            jefe = data["jefe"]
-            proyecto = data["proyecto"]
-            items = data["items"]
-            
-            listado_html = "".join(
-                f"<li>{i['colaborador']} – <strong>{i['capacitacion']}</strong></li>"
-                for i in items
-            )
-            
-            html_consolidado += f"""
-            <p><strong>{jefe.nombrecolaborador},</strong></p>
+        if not colaboradores.exists():
+            continue
+
+        # Construir filas del Excel: una fila por cada combinación colaborador + capacitación
+        filas_excel = []
+        tiene_pendientes = False
+
+        for colaborador in colaboradores:
+            for cap in capacitaciones_activas:
+                progreso = progresoCapacitaciones.objects.filter(
+                    capacitacion=cap,
+                    colaborador=colaborador
+                ).first()
+
+                if progreso and progreso.completada:
+                    estado = "Completado"
+                else:
+                    estado = "No Completado"
+                    tiene_pendientes = True
+
+                nombre_completo = f"{colaborador.nombrecolaborador} {colaborador.apellidocolaborador}"
+                correo = colaborador.correocolaborador or "Sin correo"
+
+                filas_excel.append({
+                    "nombre": nombre_completo,
+                    "correo": correo,
+                    "capacitacion": cap.titulo,
+                    "estado": estado,
+                })
+
+        # Solo notificar si hay al menos un colaborador con capacitación pendiente
+        if not tiene_pendientes or not filas_excel:
+            continue
+
+        # ── Generar archivo Excel ──
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Reporte Capacitaciones"
+
+        # Estilos
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
+        header_alignment = Alignment(horizontal="center", vertical="center")
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin'),
+        )
+        completado_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+        completado_font = Font(color="006100")
+        no_completado_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+        no_completado_font = Font(color="9C0006")
+
+        # Encabezados
+        headers = ["Nombre Completo", "Correo", "Capacitación", "Estado"]
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_alignment
+            cell.border = thin_border
+
+        # Datos
+        for row_idx, fila in enumerate(filas_excel, 2):
+            ws.cell(row=row_idx, column=1, value=fila["nombre"]).border = thin_border
+            ws.cell(row=row_idx, column=2, value=fila["correo"]).border = thin_border
+            ws.cell(row=row_idx, column=3, value=fila["capacitacion"]).border = thin_border
+
+            estado_cell = ws.cell(row=row_idx, column=4, value=fila["estado"])
+            estado_cell.border = thin_border
+            estado_cell.alignment = Alignment(horizontal="center")
+
+            if fila["estado"] == "Completado":
+                estado_cell.fill = completado_fill
+                estado_cell.font = completado_font
+            else:
+                estado_cell.fill = no_completado_fill
+                estado_cell.font = no_completado_font
+
+        # Ancho de columnas
+        ws.column_dimensions['A'].width = 35
+        ws.column_dimensions['B'].width = 40
+        ws.column_dimensions['C'].width = 45
+        ws.column_dimensions['D'].width = 18
+
+        # Guardar en memoria
+        excel_buffer = BytesIO()
+        wb.save(excel_buffer)
+        excel_buffer.seek(0)
+
+        # ── Estadísticas para el cuerpo del correo ──
+        nombres_unicos = set(f["nombre"] for f in filas_excel)
+        total_colab = len(nombres_unicos)
+        total_pendientes = sum(1 for f in filas_excel if f["estado"] == "No Completado")
+        total_completados = sum(1 for f in filas_excel if f["estado"] == "Completado")
+
+        # ── Enviar correo con Excel adjunto ──
+        subject = f"📊 Reporte Semanal de Capacitaciones - Proyecto: {proyecto.nombreproyecto}"
+
+        text_message = (
+            f"Estimado/a {jefe.nombrecolaborador},\n\n"
+            f"Adjunto encontrará el reporte de capacitaciones del proyecto "
+            f"'{proyecto.nombreproyecto}'.\n\n"
+            f"Resumen:\n"
+            f"- Total colaboradores: {total_colab}\n"
+            f"- Capacitaciones completadas: {total_completados}\n"
+            f"- Capacitaciones pendientes: {total_pendientes}\n\n"
+            f"Le recomendamos realizar el seguimiento correspondiente para "
+            f"garantizar el cumplimiento del proceso de formación.\n\n"
+            f"Atentamente,\n"
+            f"Área de Formación Empresarial"
+        )
+
+        html_message = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; color: #333;">
+            <p>Estimado/a <strong>{jefe.nombrecolaborador}</strong>,</p>
             <p>
-                Se identificaron los siguientes colaboradores del proyecto
-                <strong>{proyecto.nombre_proyecto}</strong>
-                que no presentan avance en las capacitaciones asignadas:
+                Adjunto encontrará el reporte de capacitaciones del proyecto
+                <strong>{proyecto.nombreproyecto}</strong>.
             </p>
-            <ul>
-                {listado_html}
-            </ul>
+            <table style="border-collapse: collapse; margin: 15px 0;">
+                <tr>
+                    <td style="padding: 8px 15px; border: 1px solid #ddd; background: #f5f5f5;">
+                        <strong>Total colaboradores</strong>
+                    </td>
+                    <td style="padding: 8px 15px; border: 1px solid #ddd; text-align: center;">
+                        {total_colab}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 15px; border: 1px solid #ddd; background: #f5f5f5;">
+                        <strong>Capacitaciones completadas</strong>
+                    </td>
+                    <td style="padding: 8px 15px; border: 1px solid #ddd; text-align: center; color: #006100;">
+                        ✅ {total_completados}
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 15px; border: 1px solid #ddd; background: #f5f5f5;">
+                        <strong>Capacitaciones pendientes</strong>
+                    </td>
+                    <td style="padding: 8px 15px; border: 1px solid #ddd; text-align: center; color: #9C0006;">
+                        ❌ {total_pendientes}
+                    </td>
+                </tr>
+            </table>
             <p>
-                Le recomendamos realizar el seguimiento correspondiente
-                para garantizar el cumplimiento del proceso de formación.
+                Le recomendamos realizar el seguimiento correspondiente para
+                garantizar el cumplimiento del proceso de formación.
             </p>
-            <hr>
-            """
-        
-        html_consolidado += """
+            <p>
+                <em>El archivo Excel adjunto contiene el detalle por colaborador.</em>
+            </p>
             <p>
                 <strong>Atentamente,</strong><br>
-                Plataforma de Formación Empresarial
+                Área de Formación Empresarial
             </p>
         </body>
         </html>
         """
-        
-        subject = "⚠️ Colaboradores sin avance en capacitaciones - Reporte Semanal"
-        text_message = "Reporte de colaboradores sin avance en capacitaciones."
-        
-        # Usar batching para enviar a múltiples jefes
-        # Máximo 500 correos por email, con 2 segundos de espera
-        enviar_correos_por_lotes(
-            destinatarios_bcc=lote_emails,
-            subject=subject,
-            text_message=text_message,
-            html_message=html_consolidado,
-            delay=2
-        )
-        
-        # Esperar 1 segundo entre lotes
-        time.sleep(1)
+
+        # Crear email individual para cada jefe con Excel adjunto
+        nombre_archivo = f"Reporte_Capacitaciones_{proyecto.nombreproyecto.replace(' ', '_')}.xlsx"
+
+        try:
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=text_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                to=[jefe.correocolaborador],
+            )
+            email.attach_alternative(html_message, "text/html")
+            email.attach(
+                nombre_archivo,
+                excel_buffer.getvalue(),
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            email.send(fail_silently=False)
+
+            logger.info(
+                f"notificar_jefes: ✅ Reporte enviado a {jefe.correocolaborador} "
+                f"(Proyecto: {proyecto.nombreproyecto}, "
+                f"Colaboradores: {total_colab}, Pendientes: {total_pendientes})"
+            )
+        except Exception as e:
+            logger.error(
+                f"notificar_jefes: ❌ Error enviando a {jefe.correocolaborador} "
+                f"(Proyecto: {proyecto.nombreproyecto}): {str(e)}",
+                exc_info=True,
+            )
+
+        # Esperar entre envíos para evitar rate-limiting
+        time.sleep(2)

@@ -263,16 +263,19 @@ export async function updateColaboradores(capacitacionId, { add = [], remove = [
 //   para actualizar la lista mostrada en UI.
 // - Manejar errores HTTP 400/403/404 mostrando mensajes adecuados al usuario.
 
-const certificadoDescargar = async (capacitacionId) => {
-  return dedupe('cap:certificadoDescargar', { capacitacionId }, async () => {
-    const response = await api.get(
-      `capacitaciones/certificado/${capacitacionId}/`,
-      {
-        responseType: 'blob', // importante para archivos PDF
-      }
-    );
-    return response.data;
-  });
+const certificadoDescargar = async (capacitacionId, colaboradorId) => {
+  // Construir URL con el ID del colaborador para validación de seguridad
+  const url = colaboradorId 
+    ? `capacitaciones/certificado/${capacitacionId}/${colaboradorId}/`
+    : `capacitaciones/certificado/${capacitacionId}/`;
+  
+  const response = await api.get(
+    url,
+    {
+      responseType: 'blob',
+    }
+  );
+  return response.data;
 };
 
 // GET: Obtener solo los IDs de colaboradores asignados a una capacitación
