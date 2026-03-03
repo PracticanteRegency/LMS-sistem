@@ -58,11 +58,11 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  width: 200px;
-  height: 180px;
+  width: 300px;
+  height: 220px;
   border: none;
   border-radius: 8px;
-  background-color: #fafafa;
+  background-color: transparent;
   position: relative;
   padding: 12px;
   overflow: hidden;
@@ -75,6 +75,13 @@
   object-position: center;
   display: block;
   flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .logo-box {
+    width: 220px;
+    height: 160px;
+  }
 }
 
 .logo-text {
@@ -338,10 +345,6 @@
 
   .login_content h1 {
     color: #ffffff;
-  }
-
-  .logo-box {
-    background-color: #1a1a1a;
   }
 
   .form-control {

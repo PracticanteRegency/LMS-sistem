@@ -22,7 +22,7 @@
           <Link to="/perfil" className={styles.logoLink}>
             <div className="logo-placeholder">
               <img
-                src="/img/REGENCYL.png"
+                src="/img/logoMIC.png"
                 alt="Logo"
                 className="logo-img"
               />
