@@ -903,7 +903,7 @@ class DescargarCertificadoView(APIView):
         # Ajusta estas coordenadas según tu plantilla SVG específica
         posiciones_texto = {
             '{{NOMBRE}}': {
-                'x': '140.86',
+                'x': '150.86',
                 'y': '85',
                 'font-size': '8',
                 'text-anchor': 'middle',
