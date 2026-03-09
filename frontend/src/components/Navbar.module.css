@@ -211,6 +211,9 @@
   padding-bottom: 20px;
   border-bottom: 2px solid #C0281B;
   flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .logoLink {
@@ -220,7 +223,29 @@
   font-weight: bold;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
+  width: 100%;
+}
+
+.logo-placeholder {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.logo-placeholder .logo-box {
+  width: 120px;
+  height: 120px;
+  background-color: transparent;
+  border: none;
+  border-radius: 8px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 8px;
+  overflow: hidden;
 }
 
 .logoLink:hover {

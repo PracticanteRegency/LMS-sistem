@@ -1,8 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./Styles/perfil.module.css";
 // @ts-ignore
 import perfilService from "../services/perfil.js";
+// @ts-ignore
+import CapListService from "../services/Capacitaciones.js";
 
 interface Capacitacion {
   id_capacitacion: number;
@@ -38,6 +40,7 @@ export default function Perfil() {
   const [perfil, setPerfil] = useState<PerfilData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<Record<number, boolean>>({});
   const [activeTab, setActiveTab] = useState<"capacitaciones" | "certificados" | "informacion">("capacitaciones");
 
   useEffect(() => {
@@ -49,6 +52,25 @@ export default function Perfil() {
       setLoading(true);
       setError(null);
       const data = await perfilService.getPerfil();
+      
+      // Detectar y filtrar capacitaciones duplicadas
+      if (data.capacitaciones && Array.isArray(data.capacitaciones)) {
+        const seenIds = new Set();
+        const uniqueCapacitaciones = data.capacitaciones.filter((cap: Capacitacion) => {
+          if (seenIds.has(cap.id_capacitacion)) {
+            console.warn(`⚠️ Capacitación duplicada detectada - ID: ${cap.id_capacitacion}, Nombre: ${cap.nombre_capacitacion}`);
+            return false;
+          }
+          seenIds.add(cap.id_capacitacion);
+          return true;
+        });
+        
+        if (data.capacitaciones.length !== uniqueCapacitaciones.length) {
+          console.warn(`⚠️ Se encontraron ${data.capacitaciones.length - uniqueCapacitaciones.length} capacitaciones duplicadas y fueron removidas`);
+          data.capacitaciones = uniqueCapacitaciones;
+        }
+      }
+      
       setPerfil(data as PerfilData);
     } catch (err: any) {
       console.error("Error al cargar perfil:", err);
@@ -57,6 +79,104 @@ export default function Perfil() {
       setLoading(false);
     }
   };
+
+  // Función memoizada para descargar certificado
+  // Esto evita que se cree una nueva función en cada render
+  const handleDescargarCertificado = useCallback(
+    async (cap: Capacitacion) => {
+      const capId = cap.id_capacitacion;
+      
+      // Verificar que tenemos el ID del colaborador
+      if (!perfil || !perfil.id_colaborador) {
+        alert('Error: No se pudo obtener el ID del colaborador');
+        return;
+      }
+      
+      const colaboradorId = perfil.id_colaborador;
+      
+      try {
+        // Cambiar a descargando
+        console.log(`[${capId}] Iniciando descarga de certificado para colaborador ${colaboradorId}...`);
+        setDownloading((prev) => ({ ...prev, [capId]: true }));
+
+        // Hacer petición al backend CON el ID del colaborador
+        console.log(`[${capId}] Solicitando certificado al backend (capacitacion: ${capId}, colaborador: ${colaboradorId})...`);
+        const blob = await CapListService.certificadoDescargar(capId, colaboradorId);
+
+        // Verificar si es error JSON
+        if (blob.type === 'application/json') {
+          const text = await blob.text();
+          try {
+            const json = JSON.parse(text);
+            alert(json.error || json.detail || text);
+          } catch {
+            alert(text);
+          }
+          // Resetear estado incluso en error
+          setDownloading((prev) => ({ ...prev, [capId]: false }));
+          return;
+        }
+
+        // Solo aceptar PDF - rechazar cualquier otro tipo
+        if (blob.type !== 'application/pdf') {
+          console.error('Tipo de blob incorrecto:', {
+            esperado: 'application/pdf',
+            recibido: blob.type,
+            size: blob.size,
+            firstBytes: await blob.slice(0, 50).text().catch(() => 'error reading')
+          });
+          alert(`Error: El servidor retornó un tipo de archivo incorrecto.\n\nEsperado: application/pdf\nRecibido: ${blob.type}\n\nContacte al administrador si el problema persiste.`);
+          // Resetear estado incluso en error
+          setDownloading((prev) => ({ ...prev, [capId]: false }));
+          return;
+        }
+
+        // Crear descarga PDF con nombre basado en capacitación (sin cache)
+        console.log(`[${capId}] Creando descarga...`);
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        
+        // Nombre de archivo: certificado_[nombre_capacitacion].pdf
+        const nombreCapacitacion = cap.nombre_capacitacion
+          .toLowerCase()
+          .replace(/\s+/g, '_')
+          .replace(/[^a-z0-9_]/g, '');
+        a.download = `certificado_${nombreCapacitacion}.pdf`;
+        
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+
+        console.log(`✓ [${capId}] Certificado generado sin cache: certificado_${nombreCapacitacion}.pdf`);
+
+        // Resetear estado SIEMPRE al final de una descarga exitosa
+        setDownloading((prev) => ({ ...prev, [capId]: false }));
+        
+      } catch (err: any) {
+        console.error(`[${capId}] Error al descargar certificado:`, err);
+        
+        // Si la respuesta es un blob (error del backend), intenta leer el mensaje
+        if (err?.response?.data instanceof Blob) {
+          err.response.data.text().then((text: string) => {
+            try {
+              const json = JSON.parse(text);
+              alert(json.error || json.detail || text);
+            } catch {
+              alert(text);
+            }
+          });
+        } else {
+          alert(err?.message || 'Error al descargar el certificado');
+        }
+
+        // Resetear estado EN EL CATCH TAMBIÉN
+        setDownloading((prev) => ({ ...prev, [capId]: false }));
+      }
+    },
+    [perfil] // Agregar perfil como dependencia para acceder al valor actual
+  );
 
   if (loading) {
     return (
@@ -159,8 +279,8 @@ export default function Perfil() {
       <div className={styles.content}>
         {activeTab === "capacitaciones" && (
           <div className={styles.capacitacionesGrid}>
-            {perfil.capacitaciones.map((cap) => (
-              <div key={cap.id_capacitacion} className={styles.capacitacionCard}>
+            {perfil.capacitaciones.map((cap, idx) => (
+              <div key={`${cap.id_capacitacion}-${idx}`} className={styles.capacitacionCard}>
                 <div className={styles.cardHeader}>
                   <h3 className={styles.cardTitle}>{cap.nombre_capacitacion}</h3>
                 </div>
@@ -216,8 +336,8 @@ export default function Perfil() {
               <div className={styles.certificadosGrid}>
                 {perfil.capacitaciones
                   .filter((c) => c.completada)
-                  .map((cap) => (
-                    <div key={cap.id_capacitacion} className={styles.certCard}>
+                  .map((cap, idx) => (
+                    <div key={`${cap.id_capacitacion}-${idx}`} className={styles.certCard}>
                       <div className={styles.certTop}>
                         <div className={styles.certIcon}>🏅</div>
                         <div className={styles.certBadgeScore}>Puntuación: {cap.progreso}%</div>
@@ -231,55 +351,15 @@ export default function Perfil() {
                       <p className={styles.certNumber}>CERT-{String(cap.id_capacitacion).padStart(6, "0")}</p>
 
                       <div className={styles.certActions}>
-                        {/*
+                        {
                         <button
                           className={styles.buttonGenerar}
                           disabled={!!downloading[cap.id_capacitacion]}
-                          onClick={async () => {
-                            try {
-                              setDownloading((s) => ({ ...s, [cap.id_capacitacion]: true }));
-                              const blob = await CapListService.certificadoDescargar(cap.id_capacitacion);
-                              if (blob.type === 'application/json') {
-                                const text = await blob.text();
-                                try {
-                                  const json = JSON.parse(text);
-                                  alert(json.error || json.detail || text);
-                                } catch {
-                                  alert(text);
-                                }
-                                return;
-                              }
-                              const url = window.URL.createObjectURL(new Blob([blob], { type: blob.type || 'application/pdf' }));
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = `certificado-${cap.id_capacitacion}.pdf`;
-                              document.body.appendChild(a);
-                              a.click();
-                              a.remove();
-                              window.URL.revokeObjectURL(url);
-                            } catch (err: any) {
-                              // Si la respuesta es un blob (error del backend), intenta leer el mensaje
-                              if (err?.response?.data instanceof Blob) {
-                                err.response.data.text().then((text: string) => {
-                                  try {
-                                    const json = JSON.parse(text);
-                                    alert(json.error || json.detail || text);
-                                  } catch {
-                                    alert(text);
-                                  }
-                                });
-                              } else {
-                                alert(err?.message || 'Error al descargar el certificado');
-                              }
-                              console.error('Error al descargar certificado:', err);
-                            } finally {
-                              setDownloading((s) => ({ ...s, [cap.id_capacitacion]: false }));
-                            }
-                          }}
+                          onClick={() => handleDescargarCertificado(cap)}
                         >
                           {downloading[cap.id_capacitacion] ? 'Descargando...' : 'Generar PDF'}
                         </button>
-                        */}
+                        }
                       </div>
                     </div>
                   ))}

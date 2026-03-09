@@ -78,6 +78,30 @@ const EnviarCorreoMasivo = async (file, solicitante_extra_id) => {
   });
 };
 
+// POST: Reintentar envío de un correo fallido
+const ReintentarCorreo = async (correoId) => {
+  const response = await api.post('examenes/correo/reintentar/', {
+    correo_id: correoId
+  });
+  return response.data;
+};
+
+// GET: Listar correos fallidos que pueden ser reintentados
+const ObtenerCorreosFallidos = async () => {
+  return dedupe('exam:CorreosFallidos', null, async () => {
+    const response = await api.get('examenes/correo/reintentar/');
+    return response.data;
+  });
+};
+
+// GET: Diagnóstico de la configuración de email
+const DiagnosticoEmail = async () => {
+  return dedupe('exam:DiagnosticoEmail', null, async () => {
+    const response = await api.get('examenes/correo/diagnostico/');
+    return response.data;
+  });
+};
+
 // PATCH: Actualizar estado de trabajadores
 const ActualizarEstadoTrabajadores = async (payload) => {
   return dedupe('exam:ActualizarEstadoTrabajadores', payload, async () => {
@@ -170,16 +194,16 @@ const EliminarExamenesCargo = async (payload) => {
   return response.data;
 };
 
-const FiltrarExamenesPorUUID = async (uuid) => {
-  return dedupe(`examenes:FiltrarExamenesPorUUID:${uuid}`, uuid, async () => {
+const FiltrarExamenesPorUUID = async (uuid, page = 1, pageSize = 25) => {
+  return dedupe(`examenes:FiltrarExamenesPorUUID:${uuid}:page=${page}:size=${pageSize}`, uuid, async () => {
     try {
-      const url = `examenes/filtrar-examenes/?uuid=${encodeURIComponent(uuid)}`;
-      console.log('Buscando por UUID - URL:', url);
+      const url = `examenes/filtrar-examenes/?uuid=${encodeURIComponent(uuid)}&page=${page}&page_size=${pageSize}`;
+      console.log('Buscando por UUID o nombre - URL:', url);
       const response = await api.get(url);
       console.log('Respuesta del backend:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error fetching filtrar examenes por UUID:', error);
+      console.error('Error fetching filtrar examenes por UUID o nombre:', error);
       throw error;
     }
   });
@@ -203,6 +227,9 @@ const ExamenesService = {
   AgregarExamenesCargo,
   EliminarExamenesCargo,
   ObtenerTodosColaboradores,
+  ReintentarCorreo,
+  ObtenerCorreosFallidos,
+  DiagnosticoEmail,
 };
 
 export default ExamenesService;

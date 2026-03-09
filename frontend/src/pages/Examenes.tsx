@@ -533,7 +533,12 @@ export default function Examenes() {
                 type="text"
                 placeholder="Ej: Juan Pérez Gómez"
                 value={formData.nombre_trabajador}
-                onChange={(e) => setFormData({ ...formData, nombre_trabajador: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Solo permitir letras (incluyendo acentos) y espacios
+                  const filtered = value.replace(/[^a-záéíóúñüA-ZÁÉÍÓÚÑÜ\s]/g, "");
+                  setFormData({ ...formData, nombre_trabajador: filtered });
+                }}
                 disabled={sending}
                 required
               />
@@ -545,7 +550,12 @@ export default function Examenes() {
                 type="text"
                 placeholder="Ej: 1234567890"
                 value={formData.documento_trabajador}
-                onChange={(e) => setFormData({ ...formData, documento_trabajador: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Solo permitir números
+                  const filtered = value.replace(/[^0-9]/g, "");
+                  setFormData({ ...formData, documento_trabajador: filtered });
+                }}
                 disabled={sending}
                 required
               />

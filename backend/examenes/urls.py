@@ -18,5 +18,7 @@ urlpatterns = [
     path('validar-csv/', views.ValidarCSVExamenesView.as_view(), name='validar-csv'),
     # Endpoint para gestionar exámenes asignados a cargo/empresa
     path('gestionar-examenes-cargo/', views.GestionarExamenesCargoView.as_view(), name='gestionar-examenes-cargo'),
-    
+    # Endpoints de diagnóstico y reintento de correos
+    path('correo/reintentar/', views.ReintentarCorreoView.as_view(), name='reintentar-correo'),
+    path('correo/diagnostico/', views.DiagnosticoEmailView.as_view(), name='diagnostico-email'),    
 ]

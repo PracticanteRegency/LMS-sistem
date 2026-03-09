@@ -68,14 +68,12 @@ export default function EditarColaboradores() {
     try {
       setLoading(true);
       setError(null);
-      // setCsvPreview(null);
       setCsvWarnings(null);
 
       const response: any = await CapListService.cargarColaboradores(file);
       const encontrados = response.colaboradores_encontrados || response.colaboradores || (Array.isArray(response) ? response : []);
       const no_encontrados = response.colaboradores_no_encontrados || [];
 
-      // setCsvPreview(encontrados || []);
       if (no_encontrados && no_encontrados.length) {
         setCsvWarnings(`Advertencia: ${no_encontrados.length} colaboradores no encontrados: ${no_encontrados.join(', ')}`);
       }
@@ -83,10 +81,13 @@ export default function EditarColaboradores() {
       // Reemplazar la lista local de colaboradores por los encontrados en el CSV
       setColaboradores(encontrados || []);
       setColaboradoresIds((encontrados || []).map((c: any) => c.id));
-      // No ejecutar PUT, solo actualizar la vista local
+      
     } catch (err: any) {
       console.error('Error al procesar CSV:', err);
-      setError(err?.message || 'Error al procesar el archivo CSV');
+      
+      // Mostrar solo lo que el backend responde
+      const message = err.response?.data?.error || err.response?.data?.message || err.message || 'Error desconocido';
+      setError(message);
     } finally {
       setLoading(false);
       try { (e.target as HTMLInputElement).value = ''; } catch {}
@@ -149,7 +150,7 @@ export default function EditarColaboradores() {
             Subir CSV
             <input
               type="file"
-              accept=".csv, .xlsx"
+              accept=".csv"
               onChange={handleCsvUpload}
               style={{ display: "none" }}
             />
@@ -177,7 +178,7 @@ export default function EditarColaboradores() {
               </thead>
               <tbody>
                 {colaboradores.map((colab, index) => (
-                  <tr key={colab.id}>
+                  <tr key={`${colab.id}-${index}`}>
                     <td>{index + 1}</td>
                     <td><strong>{colab.nombre || "N/A"}</strong></td>
                     <td>{colab.apellido || "N/A"}</td>

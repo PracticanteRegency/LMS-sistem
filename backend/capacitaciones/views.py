@@ -2,6 +2,7 @@
 import csv
 import hashlib
 import io
+from io import BytesIO
 import os
 import shutil
 import tempfile
@@ -18,7 +19,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Count, Prefetch, OuterRef, Subquery
+from django.db.models import Count, Max, Prefetch, OuterRef, Subquery
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -152,80 +153,201 @@ class CrearCapacitacionView(APIView):
     @transaction.atomic
     def post(self, request, capacitacion_id=None, *args, **kwargs):
         """
-        Crear nueva capacitación y asignar colaboradores si se envían.
-        Espera un payload JSON con:
-        {
-            "titulo": "...",
-            "descripcion": "...",
-            "modulos": [...],
-            "colaboradores": [id1, id2, id3]  # IDs de colaboradores a asignar
-        }
+        Crear nueva capacitación con soporte para archivos multimedia en el mismo POST.
+        
+        Soporta multipart/form-data con archivos incrustados.
+        Los archivos se procesan durante la creación y se rollback en caso de error.
+        
+        Estructura del payload (multipart/form-data):
+        - titulo: string
+        - descripcion: string
+        - imagen: file (opcional)
+        - tipo: string
+        - fecha_inicio: datetime
+        - fecha_fin: datetime
+        - modulos: JSON string (con estructura de módulos, lecciones y archivos)
+        - colaboradores: JSON string (array de IDs)
+        - archivo_leccion_<modulo_idx>_<leccion_idx>: file (opcional)
+        - archivo_pregunta_<modulo_idx>_<leccion_idx>_<pregunta_idx>: file (opcional)
+        - archivo_respuesta_<modulo_idx>_<leccion_idx>_<pregunta_idx>_<respuesta_idx>: file (opcional)
         """
+        archivos_creados = []  # Rastrear archivos creados para limpiarlos en caso de error
+        
         try:
-            data = None
-            colaboradores_ids = []
+            from capacitaciones.utils import procesar_archivo_multimedia, limpiar_archivo, ALLOWED_IMAGE_EXTENSIONS, ALLOWED_PDF_EXTENSION
+            import json
+            
+            # Extraer datos del request
+            data = {}
             try:
-                data = request.data.copy()
+                # Usar POST data para campos simples
+                data = dict(request.POST.items())
             except Exception:
-                data = dict(request.data)
-
-            # Extraer colaboradores del request ANTES de remover
-            if 'colaboradores' in data:
-                colaboradores_ids = data.pop('colaboradores')
-                # Asegurar que sea una lista
-                if not isinstance(colaboradores_ids, list):
-                    colaboradores_ids = [colaboradores_ids]
-
-            serializer = CrearCapacitacionSerializer(data=data)
-            if serializer.is_valid():
-                capacitacion = serializer.save()
-                
-                # Procesar colaboradores si se proporcionaron
-                if colaboradores_ids:
-                    # Obtener colaboradores válidos
-                    colaboradores = Colaboradores.objects.filter(
-                        idcolaborador__in=colaboradores_ids,
-                        estadocolaborador=1  # Solo colaboradores activos
-                    )
-                    
-                    # Crear registros de progreso en bulk
-                    progreso_records = [
-                        progresoCapacitaciones(
-                            capacitacion=capacitacion,
-                            colaborador=colaborador,
-                            completada=0,
-                            progreso=0
-                        )
-                        for colaborador in colaboradores
-                    ]
-                    
-                    progresoCapacitaciones.objects.bulk_create(progreso_records, ignore_conflicts=True)
-                
-                # Enviar correos DESPUÉS de crear colaboradores
-                # Siempre enviar correo de bienvenida al crear (no solo si está activa)
-                if colaboradores_ids:
-                    try:
-                        from capacitaciones.utils import enviar_correo_capacitacion_creada_batch
-                        # Ejecutar de forma síncrona después de que la transacción se confirme
-                        transaction.on_commit(lambda: enviar_correo_capacitacion_creada_batch(capacitacion))
-                        logger.info(f"Correos programados para capacitación {capacitacion.id}")
-                    except Exception as e:
-                        logger.error(f"Error al programar envío de correos: {str(e)}", exc_info=True)
-                
-                # Invalidar cache de lista de capacitaciones
-                cache.delete('capacitaciones_list_admin')
-                
                 return Response(
-                    {
-                        'id': capacitacion.id,
-                        'titulo': capacitacion.titulo,
-                        'colaboradores_asignados': len(colaboradores_ids)
-                    },
-                    status=status.HTTP_201_CREATED
+                    {'error': 'Error al procesar datos del formulario'},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Extraer colaboradores
+            colaboradores_ids = []
+            if 'colaboradores' in data:
+                try:
+                    if isinstance(data['colaboradores'], str):
+                        colaboradores_ids = json.loads(data.pop('colaboradores'))
+                    else:
+                        colaboradores_ids = data.pop('colaboradores')
+                except (json.JSONDecodeError, ValueError):
+                    colaboradores_ids = []
+            
+            # Parsear modulos
+            modulos_data = []
+            if 'modulos' in data:
+                try:
+                    modulos_data = json.loads(data.pop('modulos'))
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.error(f"Error al parsear módulos: {str(e)}")
+                    return Response(
+                        {'error': 'Estructura de módulos inválida'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Procesar imagen principal
+            if 'imagen' in request.FILES:
+                imagen_file = request.FILES['imagen']
+                url_imagen, error = procesar_archivo_multimedia(
+                    imagen_file, 'imagen'
+                )
+                if error:
+                    return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+                data['imagen'] = url_imagen
+                archivos_creados.append(url_imagen)
+            
+            # Procesar archivos de lecciones y preguntas
+            for modulo_idx, modulo_data in enumerate(modulos_data):
+                lecciones = modulo_data.get('lecciones', [])
+                
+                for leccion_idx, leccion_data in enumerate(lecciones):
+                    # Procesar archivo de lección (video/PDF)
+                    leccion_tipo = leccion_data.get('tipo_leccion', '').lower()
+                    if leccion_tipo in ['video', 'pdf', 'imagen']:
+                        file_key = f'leccion_{modulo_idx}_{leccion_idx}'
+                        
+                        if file_key in request.FILES:
+                            tipo_archivo = 'video' if leccion_tipo == 'video' else leccion_tipo
+                            url_leccion, error = procesar_archivo_multimedia(
+                                request.FILES[file_key], tipo_archivo
+                            )
+                            if error:
+                                # Limpiar archivos creados antes del error
+                                for url in archivos_creados:
+                                    limpiar_archivo(url)
+                                return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+                            
+                            leccion_data['url'] = url_leccion
+                            archivos_creados.append(url_leccion)
+                    
+                    # Procesar preguntas
+                    preguntas = leccion_data.get('preguntas', [])
+                    for pregunta_idx, pregunta_data in enumerate(preguntas):
+                        # Procesar multimedia de pregunta
+                        file_key_pregunta = f'pregunta_{modulo_idx}_{leccion_idx}_{pregunta_idx}'
+                        if file_key_pregunta in request.FILES:
+                            url_pregunta, error = procesar_archivo_multimedia(
+                                request.FILES[file_key_pregunta], 'imagen'
+                            )
+                            if error:
+                                for url in archivos_creados:
+                                    limpiar_archivo(url)
+                                return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+                            
+                            pregunta_data['url_multimedia'] = url_pregunta
+                            archivos_creados.append(url_pregunta)
+                        
+                        # Procesar respuestas
+                        respuestas = pregunta_data.get('respuestas', [])
+                        for respuesta_idx, respuesta_data in enumerate(respuestas):
+                            file_key_respuesta = f'respuesta_{modulo_idx}_{leccion_idx}_{pregunta_idx}_{respuesta_idx}'
+                            if file_key_respuesta in request.FILES:
+                                url_respuesta, error = procesar_archivo_multimedia(
+                                    request.FILES[file_key_respuesta], 'imagen'
+                                )
+                                if error:
+                                    for url in archivos_creados:
+                                        limpiar_archivo(url)
+                                    return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+                                
+                                respuesta_data['url_imagen'] = url_respuesta
+                                archivos_creados.append(url_respuesta)
+            
+            # Agregar módulos nuevamente a los datos para el serializer
+            data['modulos'] = modulos_data
+            data['colaboradores'] = colaboradores_ids
+            
+            # Crear capacitación con transacción
+            serializer = CrearCapacitacionSerializer(data=data)
+            if not serializer.is_valid():
+                # Limpiar archivos si hay error en validación
+                for url in archivos_creados:
+                    limpiar_archivo(url)
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Guardar capacitación (la transacción atómica se maneja en el serializer)
+            capacitacion = serializer.save()
+            
+            # Procesar colaboradores si se proporcionaron
+            if colaboradores_ids:
+                colaboradores = Colaboradores.objects.filter(
+                    idcolaborador__in=colaboradores_ids,
+                    estadocolaborador=1
+                )
+                
+                progreso_records = [
+                    progresoCapacitaciones(
+                        capacitacion=capacitacion,
+                        colaborador=colaborador,
+                        completada=0,
+                        progreso=0
+                    )
+                    for colaborador in colaboradores
+                ]
+                
+                progresoCapacitaciones.objects.bulk_create(progreso_records, ignore_conflicts=True)
+                
+                # Enviar correos
+                try:
+                    from capacitaciones.utils import enviar_correo_capacitacion_creada_batch
+                    transaction.on_commit(lambda: enviar_correo_capacitacion_creada_batch(capacitacion))
+                    logger.info(f"Correos programados para capacitación {capacitacion.id}")
+                except Exception as e:
+                    logger.error(f"Error al programar correos: {str(e)}", exc_info=True)
+            
+            # Invalidar cache
+            cache.delete('capacitaciones_list_admin')
+            
+            return Response(
+                {
+                    'id': capacitacion.id,
+                    'titulo': capacitacion.titulo,
+                    'imagen': capacitacion.imagen,
+                    'colaboradores_asignados': len(colaboradores_ids),
+                    'archivos_procesados': len(archivos_creados)
+                },
+                status=status.HTTP_201_CREATED
+            )
+            
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            # En caso de excepción no controlada, limpiar archivos
+            logger.error(f"Error al crear capacitación: {str(e)}", exc_info=True)
+            for url in archivos_creados:
+                try:
+                    limpiar_archivo(url)
+                except Exception as cleanup_error:
+                    logger.error(f"Error al limpiar archivo {url}: {str(cleanup_error)}")
+            
+            return Response(
+                {'error': f'Error al crear capacitación: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class CapacitacionesView(APIView):
@@ -365,13 +487,21 @@ class RegistrarProgresoView(APIView):
             colaborador = request.user.idcolaboradoru
             leccion_id = request.data.get('leccion_id')
             progreso = request.data.get('progreso', 0)
-            completada = request.data.get('completada', False)
             
             if not leccion_id:
                 return Response(
                     {'error': 'leccion_id es requerido'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+            
+            # Validar que el progreso sea un número entre 0 y 100
+            try:
+                progreso = max(0, min(100, float(progreso)))
+            except (ValueError, TypeError):
+                progreso = 0
+            
+            # Determinar completada basado en el progreso real (no confiar en el frontend)
+            completada = progreso >= 100
             
             # Select_related para obtener módulo y capacitación en una query
             leccion = Lecciones.objects.select_related(
@@ -636,21 +766,44 @@ class PrevisualizarColaboradoresView(APIView):
     Optimización:
     - Búsqueda en bulk en lugar de consulta individual por cédula
     - Solo se cargan campos necesarios con only()
+    
+    Retorna errores detallados para mejor UX en el frontend
     """    
     def post(self, request, *args, **kwargs):
         try:
             archivo = request.FILES.get('archivo')
             if not archivo:
                 return Response(
-                    {'error': 'No se proporcionó archivo'},
+                    {
+                        'error': 'No se proporcionó archivo',
+                        'detalles': ['Por favor selecciona un archivo CSV']
+                    },
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
             # Validar que sea un archivo CSV
             if not archivo.name.endswith('.csv'):
                 return Response(
-                    {'error': 'El archivo debe ser un CSV'},
+                    {
+                        'error': f'El archivo debe ser un CSV. Recibido: {archivo.content_type}',
+                        'detalles': [
+                            'Extiende correctamente el archivo con .csv',
+                            f'Archivo recibido: {archivo.name}'
+                        ]
+                    },
                     status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validar tamaño del archivo
+            max_size = 5 * 1024 * 1024  # 5MB
+            if archivo.size > max_size:
+                size_mb = round(archivo.size / 1024 / 1024, 2)
+                return Response(
+                    {
+                        'error': f'El archivo supera el tamaño máximo permitido (5MB). Tamaño: {size_mb}MB',
+                        'detalles': ['Divide el archivo en partes más pequeñas']
+                    },
+                    status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
                 )
             
             # Leer el archivo CSV
@@ -675,18 +828,41 @@ class PrevisualizarColaboradoresView(APIView):
                 # Validar que tenga la columna 'cedula'
                 if 'cedula' not in normalized_fieldnames:
                     return Response(
-                        {'error': 'El archivo CSV debe contener la columna "cedula"'},
+                        {
+                            'error': 'El archivo CSV debe contener una columna "cedula"',
+                            'detalles': [
+                                f'Columnas encontradas: {", ".join(fieldnames)}',
+                                'Asegúrate de que una columna se llame "cedula"'
+                            ]
+                        },
                         status=status.HTTP_400_BAD_REQUEST
                     )
+                
                 # Mapear nombre real del campo para obtener los valores
                 cedula_field = fieldnames[normalized_fieldnames.index('cedula')]
                 
                 # Recolectar todas las cédulas primero
                 cedulas = []
-                for row in csv_reader:
+                filas_sin_cedula = 0
+                for idx, row in enumerate(csv_reader, start=2):  # start=2 porque fila 1 es header
                     cedula = row.get(cedula_field, '').strip()
                     if cedula:
                         cedulas.append(cedula)
+                    else:
+                        filas_sin_cedula += 1
+                
+                # Si no hay cédulas válidas
+                if not cedulas:
+                    return Response(
+                        {
+                            'error': 'No se encontraron cédulas válidas en el archivo',
+                            'detalles': [
+                                f'Filas sin cédula: {filas_sin_cedula}',
+                                'Verifica que la columna "cedula" contenga valores'
+                            ]
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
                 
                 # Búsqueda en bulk - una sola query para todas las cédulas
                 colaboradores_db = Colaboradores.objects.filter(
@@ -717,32 +893,71 @@ class PrevisualizarColaboradoresView(APIView):
                         # Solo almacenar las cédulas no encontradas (lista simple)
                         colaboradores_no_encontrados.append(cedula)
                 
+                # Determinar tipo de respuesta
+                respuesta = {
+                    'mensaje': 'Archivo procesado correctamente',
+                    'total_procesados': len(cedulas),
+                    'encontrados': len(colaboradores_encontrados),
+                    'no_encontrados': len(colaboradores_no_encontrados),
+                    'colaboradores': colaboradores_encontrados,
+                    'colaboradores_no_encontrados': colaboradores_no_encontrados
+                }
+                
+                # Si no se encontraron colaboradores
+                if not colaboradores_encontrados:
+                    respuesta['detalles'] = [
+                        'Ninguna de las cédulas fue encontrada en el sistema',
+                        'Verifica la ortografía de las cédulas',
+                        'Asegúrate de que los colaboradores estén registrados'
+                    ]
+                    return Response(respuesta, status=status.HTTP_200_OK)
+                
+                return Response(respuesta, status=status.HTTP_200_OK)
+                
+            except UnicodeDecodeError as e:
                 return Response(
                     {
-                        'mensaje': 'Archivo procesado correctamente',
-                        'total_procesados': len(colaboradores_encontrados) + len(colaboradores_no_encontrados),
-                        'encontrados': len(colaboradores_encontrados),
-                        'no_encontrados': len(colaboradores_no_encontrados),
-                        'colaboradores': colaboradores_encontrados,
-                        'colaboradores_no_encontrados': colaboradores_no_encontrados
+                        'error': 'Error al decodificar el archivo',
+                        'detalles': [
+                            'El archivo no está en formato UTF-8',
+                            'Codificación no soportada detectada',
+                            'Solución: Guarda el archivo en formato UTF-8 desde Excel o un editor de texto'
+                        ]
                     },
-                    status=status.HTTP_200_OK
-                )
-                
-            except UnicodeDecodeError:
-                return Response(
-                    {'error': 'Error al decodificar el archivo. Asegúrate de que esté en formato UTF-8'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             except csv.Error as e:
                 return Response(
-                    {'error': f'Error al procesar el archivo CSV: {str(e)}'},
+                    {
+                        'error': f'Error al procesar el archivo CSV: Fila con formato incorrecto',
+                        'detalles': [
+                            f'Detalle: {str(e)}',
+                            'Verifica que todas las filas tengan el mismo número de columnas',
+                            'Comprueba que no haya saltos de línea dentro de los campos'
+                        ]
+                    },
                     status=status.HTTP_400_BAD_REQUEST
+                )
+            except Exception as e:
+                logger.error(f"Error inesperado al procesar CSV: {str(e)}", exc_info=True)
+                return Response(
+                    {
+                        'error': 'Error inesperado al procesar el archivo',
+                        'detalles': [
+                            'Por favor intenta de nuevo',
+                            'Si el problema persiste, contacta al administrador'
+                        ]
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
                 
         except Exception as e:
+            logger.error(f"Error en PrevisualizarColaboradoresView: {str(e)}", exc_info=True)
             return Response(
-                {'error': f'Error al procesar archivo: {str(e)}'},
+                {
+                    'error': f'Error al procesar archivo: {str(e)}',
+                    'detalles': ['Por favor intenta de nuevo más tarde']
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -867,44 +1082,322 @@ class DescargarCertificadoView(APIView):
             logger.error(f"Error inesperado en conversión: {e}")
             return False
 
+    def _generar_certificado_desde_svg(self, svg_path, datos, output_dir, filename_base):
+        """
+        Genera un certificado SVG insertando texto dinámico con el fondo gráfico.
+        
+        - Inserta elementos <text> en posiciones específicas del SVG.
+        - Devuelve el SVG directamente (preserva todos los gráficos de fondo).
+        
+        - `svg_path`: ruta al archivo SVG base.
+        - `datos`: dict con llaves como '{{NOMBRE}}', '{{CEDULA}}', '{{CURSO}}', '{{FECHA}}'.
+        - `output_dir`: directorio donde escribir archivos temporales.
+        - `filename_base`: nombre base para el archivo generado (sin extensión).
+        
+        Retorna: (ruta_archivo_generado, extension, content_type)
+        
+        Guía de posiciones en el certificado (viewBox 0 0 255.72 182.57):
+        - "Felicitamos al señor(a)" → NOMBRE va debajo (y=~110)
+        - "Con documento de identidad CC" → CEDULA va a la derecha (x=~180, y=~118)
+        - "Por su aprobación de" → CURSO va debajo (y=~130)
+        - "En constancia de lo anterior se firma el" → FECHA va a la derecha (x=~180, y=~145)
+        """
+        import xml.etree.ElementTree as ET
+        logger = logging.getLogger("certificado_debug")
+        
+        # Registrar namespaces para SVG
+        ET.register_namespace('', 'http://www.w3.org/2000/svg')
+        ET.register_namespace('xlink', 'http://www.w3.org/1999/xlink')
+        
+        # Leer SVG
+        tree = ET.parse(svg_path)
+        root = tree.getroot()
+        
+        # Diccionario de posiciones para cada elemento de texto
+        # Ajusta estas coordenadas según tu plantilla SVG específica
+        posiciones_texto = {
+            '{{NOMBRE}}': {
+                'x': '150.86',
+                'y': '84',
+                'font-size': '8',
+                'text-anchor': 'middle',
+                'fill': '#000000',
+                'font-family': 'Montserrat-Light, Montserrat',
+                'font-weight': '400',
+                'letter-spacing': '0em',
+                'max-width': None
+            },
+            '{{CEDULA}}': {
+                'x': '174',
+                'y': '94.3',
+                'font-size': '3.41',
+                'text-anchor': 'start',
+                'fill': '#000000',
+                'font-family': 'Montserrat-Light, Montserrat',
+                'font-weight': '300',
+                'letter-spacing': '0em',
+                'max-width': None
+            },
+            '{{CURSO}}': {
+                'x': '156',
+                'y': '120.5',
+                'font-size': '6',
+                'text-anchor': 'middle',
+                'fill': '#000000',
+                'font-family': 'Montserrat-Light, Montserrat',
+                'font-weight': '400',
+                'letter-spacing': '0em',
+                'max-width': 35
+            },
+            '{{FECHA}}': {
+                'x': '170',
+                'y': '132.2',
+                'font-size': '3.41',
+                'text-anchor': 'start',
+                'fill': '#000000',
+                'font-family': 'Montserrat-Light, Montserrat',
+                'font-weight': '300',
+                'letter-spacing': '0em',
+                'max-width': None
+            }
+        }
+        # Ajustar posición Y de '{{CURSO}}' según la longitud del texto proporcionado
+        try:
+            curso_pos = posiciones_texto.get('{{CURSO}}', {})
+            # Si no se define max-width en la plantilla, usamos 35 como fallback
+            max_width = curso_pos.get('max-width') if curso_pos.get('max-width') is not None else 35
+            curso_text = datos.get('{{CURSO}}', '') if isinstance(datos, dict) else ''
+            if curso_text and len(str(curso_text)) > int(max_width):
+                # Texto largo: utilizar la Y para curso largo
+                curso_pos['y'] = '115.5'
+            else:
+                # Texto corto o vacío: usar la Y por defecto para curso corto
+                curso_pos['y'] = '118.5'
+            posiciones_texto['{{CURSO}}'] = curso_pos
+        except Exception as e:
+            logger.warning(f"Error al ajustar posición de CURSO: {e}")
+
+        # Crear grupo para textos
+        text_group = ET.Element('{http://www.w3.org/2000/svg}g')
+        text_group.set('id', 'dynamic_text_overlay')
+        text_group.set('class', 'dynamic-text')  # Usar la clase de texto del SVG
+        
+        # Función auxiliar para manejar textos largos con saltos de línea
+        def create_text_elements(key, val, pos, parent_group):
+            """Crea elementos de texto con saltos de línea si es necesario"""
+            max_width = pos.get('max-width', None)
+            text_val = str(val) if val else ""
+            
+            # Si el texto es muy largo y tiene max-width, hacer saltos de línea
+            if max_width and len(text_val) > max_width:
+                # Dividir el texto en palabras
+                palabras = text_val.split()
+                lineas = []
+                linea_actual = ""
+                
+                for palabra in palabras:
+                    if len(linea_actual) + len(palabra) + 1 <= max_width:
+                        linea_actual += (" " if linea_actual else "") + palabra
+                    else:
+                        if linea_actual:
+                            lineas.append(linea_actual)
+                        linea_actual = palabra
+                
+                if linea_actual:
+                    lineas.append(linea_actual)
+                
+                # Crear elemento de texto para cada línea
+                y_offset = float(pos.get('y', '0'))
+                line_height = float(pos.get('font-size', '4')) * 1.5  # 1.5x el tamaño de fuente
+                
+                for idx, linea in enumerate(lineas):
+                    # Crear un solo elemento de texto
+                    text_elem = ET.Element('{http://www.w3.org/2000/svg}text')
+                    text_elem.set('x', pos.get('x', '0'))
+                    text_elem.set('y', str(y_offset + (idx * line_height)))
+                    text_elem.set('font-size', pos.get('font-size', '4'))
+                    text_elem.set('text-anchor', pos.get('text-anchor', 'middle'))
+                    text_elem.set('fill', pos.get('fill', '#000000'))
+                    text_elem.set('font-family', pos.get('font-family', 'Montserrat-Light, Montserrat'))
+
+                    if 'font-weight' in pos:
+                        text_elem.set('font-weight', pos.get('font-weight'))
+
+                    text_elem.text = linea
+                    parent_group.append(text_elem)
+                    logger.warning(f"Línea {idx+1} de '{key}': '{linea}'")
+            else:
+                # Crear un solo elemento de texto
+                text_elem = ET.Element('{http://www.w3.org/2000/svg}text')
+                text_elem.set('x', pos.get('x', '0'))
+                text_elem.set('y', pos.get('y', '0'))
+                text_elem.set('font-size', pos.get('font-size', '4'))
+                text_elem.set('text-anchor', pos.get('text-anchor', 'middle'))
+                text_elem.set('fill', pos.get('fill', '#000000'))
+                text_elem.set('font-family', pos.get('font-family', 'montserrat light, Montserrat'))
+                text_elem.text = text_val
+                parent_group.append(text_elem)
+                logger.warning(f"Añadido elemento de texto '{key}': '{text_val}'")
+        
+        # Añadir elementos <text> para cada dato
+        for key, val in datos.items():
+            if key in posiciones_texto:
+                pos = posiciones_texto[key]
+                create_text_elements(key, val, pos, text_group)
+        
+        # Insertar el grupo de textos al final del SVG (para que esté encima)
+        root.append(text_group)
+
+                
+        # Agregar texto fijo "Con documento de identidad CC" antes de la fecha
+        fixed_text_group = ET.Element('{http://www.w3.org/2000/svg}g')
+        fixed_text_group.set('id', 'fixed_text_constancia')
+        
+        constancia_text = ET.Element('{http://www.w3.org/2000/svg}text')
+        constancia_text.set('x', '145')
+        constancia_text.set('y', '94.3')
+        constancia_text.set('font-size', '3.41')
+        constancia_text.set('text-anchor', 'middle')
+        constancia_text.set('fill', '#000000')
+        constancia_text.set('font-family', 'Montserrat-Light, Montserrat')
+        constancia_text.set('font-weight', '400')
+        constancia_text.text = 'Con documento de identidad CC'
+        fixed_text_group.append(constancia_text)
+        root.append(fixed_text_group)
+
+        
+        # Agregar texto fijo "En constancia de lo anterior se firma el" antes de la fecha
+        fixed_text_group = ET.Element('{http://www.w3.org/2000/svg}g')
+        fixed_text_group.set('id', 'fixed_text_constancia')
+        
+        constancia_text = ET.Element('{http://www.w3.org/2000/svg}text')
+        constancia_text.set('x', '135')
+        constancia_text.set('y', '132.2')
+        constancia_text.set('font-size', '3.41')
+        constancia_text.set('text-anchor', 'middle')
+        constancia_text.set('fill', '#000000')
+        constancia_text.set('font-family', 'Montserrat-Light, Montserrat')
+        constancia_text.set('font-weight', '400')
+        constancia_text.text = 'En constancia de lo anterior se firma el'
+        fixed_text_group.append(constancia_text)
+        root.append(fixed_text_group)
+        
+        # Guardar SVG temporal con encoding UTF-8 explícito
+        temp_svg = os.path.join(output_dir, f"{filename_base}.svg")
+        
+        # Escribir el SVG asegurando UTF-8
+        tree.write(temp_svg, encoding='utf-8', xml_declaration=True)
+        
+        # Leer y reescribir para garantizar UTF-8 correcto
+        with open(temp_svg, 'r', encoding='utf-8') as f:
+            svg_content = f.read()
+        
+        # Asegurar que la declaración XML especifique UTF-8
+        if "<?xml" not in svg_content:
+            svg_content = "<?xml version='1.0' encoding='utf-8'?>\n" + svg_content
+        elif "encoding=" not in svg_content:
+            svg_content = svg_content.replace("<?xml version='1.0'?>", "<?xml version='1.0' encoding='utf-8'?>")
+        
+        # Reescribir con UTF-8 garantizado
+        with open(temp_svg, 'w', encoding='utf-8') as f:
+            f.write(svg_content)
+        
+        logger.warning(f"SVG con texto dinámico guardado en: {temp_svg}")
+        logger.warning(f"SVG content preview (first 500 chars): {svg_content[:500]}")
+        
+        logger.warning(f"SVG con texto dinámico guardado en: {temp_svg}")
+        
+        # Convertir SVG a PDF usando weasyprint (preserva gráficos y tamaño)
+        try:
+            from weasyprint import HTML, CSS
+            from io import BytesIO
+            
+            pdf_output = os.path.join(output_dir, f"{filename_base}.pdf")
+            
+            # Crear CSS para asegurar que el PDF tenga el mismo tamaño que el SVG
+            # SVG viewBox: 0 0 255.72 182.57 ≈ 9.05" x 6.46" en 28.35 DPI (estándar SVG)
+            css_string = '''
+            @page {
+                size: 255.72mm 182.57mm;
+                margin: 0;
+            }
+            body {
+                margin: 0;
+                padding: 0;
+            }
+            svg {
+                width: 100%;
+                height: 100%;
+            }
+            '''
+            
+            # Leer el SVG como string con encoding UTF-8 explícito
+            with open(temp_svg, 'r', encoding='utf-8') as f:
+                svg_content = f.read()
+            
+            logger.warning(f"SVG a convertir contiene: {svg_content[200:400]}")
+            
+            # Usar HTML.from_string con encoding UTF-8 explícito
+            html_obj = HTML(string=svg_content, encoding='utf-8')
+            html_obj.write_pdf(pdf_output, stylesheets=[CSS(string=css_string)])
+            
+            logger.warning(f"✓ SVG convertido a PDF con tamaño correcto: {pdf_output}")
+            return (pdf_output, 'pdf', 'application/pdf')
+        except Exception as e:
+            logger.warning(f"Weasyprint falló ({e}), intentando con cairosvg...")
+            try:
+                import cairosvg
+                pdf_output = os.path.join(output_dir, f"{filename_base}.pdf")
+                cairosvg.svg2pdf(url=temp_svg, write_to=pdf_output)
+                logger.warning(f"✓ SVG convertido a PDF con cairosvg: {pdf_output}")
+                return (pdf_output, 'pdf', 'application/pdf')
+            except Exception as e2:
+                logger.error(f"❌ CRÍTICO: Ambas librerías de conversión PDF fallaron!")
+                logger.error(f"   Weasyprint error: {e}")
+                logger.error(f"   Cairosvg error: {e2}")
+                # NO retornar SVG, lanzar excepción para que se maneje en el endpoint
+                raise Exception(f"No se pudo convertir SVG a PDF. Weasyprint: {e}, Cairosvg: {e2}")
+
 
     
     def get(self, request, id_capacitacion, id_colaborador=None, *args, **kwargs):
         import logging
         logger = logging.getLogger("certificado_debug")
-        logger.warning(f"request.user type: {type(request.user)}")
+        logger.warning(f"=== DESCARGA DE CERTIFICADO ===")
         logger.warning(f"request.user: {request.user}")
-        logger.warning(f"request.user.__dict__: {getattr(request.user, '__dict__', 'no __dict__')}")
         logger.warning(f"request.user.id: {getattr(request.user, 'id', None)}")
-        logger.warning(f"request.user.idcolaboradoru: {getattr(request.user.idcolaboradoru, 'idcolaboradoru', None)}")
-        logger.warning(f"request.user.is_authenticated: {getattr(request.user, 'is_authenticated', None)}")
+        logger.warning(f"request.user.idcolaboradoru_id: {getattr(request.user, 'idcolaboradoru_id', None)}")
+        logger.warning(f"id_capacitacion (URL): {id_capacitacion}")
+        logger.warning(f"id_colaborador (URL): {id_colaborador}")
+        
         try:
-            # Si no se proporciona id_colaborador, obtenerlo del token
-            if id_colaborador is None:
-                # Obtener del token usando hasattr como en examenes/views.py
-                colaborador = (
-                    request.user.idcolaboradoru if hasattr(
-                        request.user, 'idcolaboradoru') else None
+            # VALIDACIÓN 1: Obtener el colaborador del usuario autenticado
+            user_colaborador_id = getattr(request.user, 'idcolaboradoru_id', None)
+            
+            if not user_colaborador_id:
+                logger.error(f"SEGURIDAD: Usuario {request.user.id} no tiene colaborador asociado")
+                return Response(
+                    {'error': 'El usuario no tiene un colaborador asociado'},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
-                logger.warning(f"colaborador obtenido: {colaborador}")
-                if not colaborador:
-                    return Response(
-                        {'error': 'El usuario no tiene un colaborador asociado'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                id_colaborador = colaborador.idcolaborador
-            else:
-                # Verificar que el usuario autenticado corresponde al colaborador solicitado
-                colaborador = (
-                    request.user.idcolaboradoru if hasattr(
-                        request.user, 'idcolaboradoru') else None
-                )
-                logger.warning(f"colaborador obtenido (con id): {colaborador}")
-                if not colaborador or colaborador.idcolaborador != id_colaborador:
+            
+            logger.warning(f"Colaborador del usuario autenticado: {user_colaborador_id}")
+            
+            # VALIDACIÓN 2: Si se proporciona id_colaborador en la URL, verificar que coincida
+            if id_colaborador:
+                logger.warning(f"Validando que id_colaborador ({id_colaborador}) coincida con usuario ({user_colaborador_id})")
+                if int(id_colaborador) != user_colaborador_id:
+                    logger.error(f"INTENTO DE ACCESO NO AUTORIZADO: Usuario {request.user.id} (col {user_colaborador_id}) intentó descargar certificado de col {id_colaborador}")
                     return Response(
                         {'error': 'No tienes permiso para descargar este certificado'},
                         status=status.HTTP_403_FORBIDDEN
                     )
+            else:
+                # Si no se proporciona, usar el del usuario autenticado
+                id_colaborador = user_colaborador_id
+                logger.warning(f"id_colaborador asignado del usuario autenticado: {id_colaborador}")
+            
+            logger.warning(f"VALIDACIÓN EXITOSA: Usuario {request.user.id} descargando certificado de colaborador {id_colaborador}")
             
             # Obtener colaborador con centro y cargo (necesarios para derivar empresa)
             colaborador = Colaboradores.objects.select_related(
@@ -914,6 +1407,58 @@ class DescargarCertificadoView(APIView):
                 'idcolaborador', 'cccolaborador', 'nombrecolaborador',
                 'apellidocolaborador', 'correocolaborador', 'cargocolaborador', 'centroop'
             ).get(idcolaborador=id_colaborador)
+            
+            # ======================================================================
+            # VALIDACIÓN: Verificar que la empresa del usuario está autorizada
+            # ======================================================================
+            empresa = None
+            try:
+                centro = getattr(colaborador, 'centroop', None)
+                if centro and getattr(centro, 'id_proyecto', None) and getattr(centro.id_proyecto, 'id_unidad', None):
+                    empresa = getattr(centro.id_proyecto.id_unidad, 'id_empresa', None)
+            except Exception as e:
+                logger.error(f"Error obtener empresa: {e}")
+                empresa = None
+
+            if not empresa:
+                return Response(
+                    {'error': 'El colaborador no tiene empresa asociada. No se puede descargar el certificado.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Lista de empresas autorizadas para descargar certificados
+            # Ajusta esta lista según tus necesidades
+            EMPRESAS_AUTORIZADAS = [
+                'CONSORCIO',
+                'PROTINCO',
+                'REGENCY HEALTH',
+                'REGENCY TECH',
+                'REGENCY',
+            ]
+
+            empresa_nombre = (empresa.nombre_empresa or '').upper().strip()
+
+            # Verificar si la empresa del usuario está en la lista autorizada
+            empresa_autorizada = False
+            for empresa_auth in EMPRESAS_AUTORIZADAS:
+                if empresa_auth in empresa_nombre:
+                    empresa_autorizada = True
+                    break
+
+            # Si no está autorizada, rechazar (a menos que sea admin)
+            if not empresa_autorizada:
+                user_role = getattr(request.user, 'tipousuario', None)
+                # Solo SuperAdmin (4) y Admin (1) pueden descargar de empresas no autorizadas
+                if user_role not in [1, 4]:
+                    return Response(
+                        {
+                            'error': f'La empresa "{empresa_nombre}" no está autorizada para descargar certificados. Por favor contacta con administración.',
+                            'empresa': empresa_nombre
+                        },
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+                logger.warning(f"Admin ({user_role}) descargando certificado de empresa no autorizada: {empresa_nombre}")
+
             capacitacion = get_object_or_404(Capacitaciones, id=id_capacitacion)
             
             # Verificar que el colaborador completó la capacitación
@@ -929,162 +1474,141 @@ class DescargarCertificadoView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Verificar si ya existe un certificado generado (caché de 1 mes)
-            certificado_existente = CertificadoGenerado.objects.filter(
-                colaborador_id=id_colaborador,
-                capacitacion_id=id_capacitacion
-            ).first()
+            # Siempre generar nuevo certificado - Sin cache
+            logger.warning(f"Generando certificado nuevo para colaborador {id_colaborador}, capacitación {id_capacitacion}")
             
-            # Si existe y tiene menos de 1 mes, retornarlo
-            if certificado_existente:
-                fecha_limite = timezone.now() - timezone.timedelta(days=30)
-                if certificado_existente.fecha_generacion > fecha_limite:
-                    # Certificado válido en caché
-                    archivo_path = certificado_existente.archivo_pdf.path
-                    if os.path.exists(archivo_path):
-                        # Detectar tipo real del archivo leyendo el encabezado
-                        cached_content_type = 'application/octet-stream'
-                        cached_ext = os.path.splitext(archivo_path)[1].lower().lstrip('.') or 'bin'
-                        try:
-                            with open(archivo_path, 'rb') as fh:
-                                header = fh.read(8)
-                                if header.startswith(b'%PDF'):
-                                    cached_content_type = 'application/pdf'
-                                    cached_ext = 'pdf'
-                                elif zipfile.is_zipfile(archivo_path):
-                                    # DOCX files are ZIP archives
-                                    cached_content_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-                                    cached_ext = 'docx'
-                                else:
-                                    # fallback by extension
-                                    ext = os.path.splitext(archivo_path)[1].lower()
-                                    if ext == '.pdf':
-                                        cached_content_type = 'application/pdf'
-                                        cached_ext = 'pdf'
-                                    elif ext == '.docx':
-                                        cached_content_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-                                        cached_ext = 'docx'
-                        except Exception:
-                            # keep defaults
-                            pass
-
-                        response = FileResponse(
-                            open(archivo_path, 'rb'),
-                            content_type=cached_content_type
-                        )
-                        response['Content-Disposition'] = f'attachment; filename="certificado_{colaborador.nombrecolaborador}_{colaborador.apellidocolaborador}.{cached_ext}"'
-                        response['Cache-Control'] = 'max-age=2592000'  # 30 días
-                        return response
+            # Buscar archivo SVG en el directorio de certificados
+            empresa_raw = getattr(empresa, 'nombre_empresa', None)
+            logger.warning(f"Empresa nombre (raw BD): {empresa_raw}")
             
-            # Determinar la plantilla según la empresa del colaborador
-            empresa = None
-            try:
-                centro = getattr(colaborador, 'centroop', None)
-                if centro and getattr(centro, 'id_proyecto', None) and getattr(centro.id_proyecto, 'id_unidad', None):
-                    empresa = getattr(centro.id_proyecto.id_unidad, 'id_empresa', None)
-            except Exception:
-                empresa = None
-
-            if not empresa:
-                return Response(
-                    {'error': 'El colaborador no tiene empresa asociada'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            # MAPEO EXPLÍCITO: Nombre de empresa en BD → Archivo SVG esperado
+            # Esto evita búsquedas difusas y usa la correspondencia directa
+            EMPRESA_SVG_MAPPING = {
+                'CONSORCIO PEAJES 2526': 'CONSORCIO.svg',
+                'PROTECCION DE INFRAESTRUCTURA COLOMBIA - PROTINCO LTDA': 'PROTINCO.svg',
+                'REGENCY HEALTH SERVICES S.A.S': 'REGENCY HEALTH.svg',
+                'REGENCY SERVICES DE COLOMBIA S.A.S': 'REGENCY.svg',
+            }
             
-            # Mapear nombre de empresa a archivo de plantilla (más tolerante)
-            empresa_nombre = (empresa.nombre_empresa or '').upper().strip()
-
-            def _normalize_name(s: str) -> str:
-                s = unicodedata.normalize('NFKD', s)
-                s = ''.join(ch for ch in s if not unicodedata.combining(ch))
-                s = re.sub(r'[^A-Z0-9\s]', ' ', s)
-                s = re.sub(r'\s+', ' ', s).strip()
-                return s
-
-            norm = _normalize_name(empresa_nombre)
-
-            # Lista de pares (keywords, plantilla) — se evalúa si alguna keyword está contenida
-            plantilla_candidates = [
-                (['CONSORCIO', 'PEAJES'], 'CONSORCIO.docx'),
-                (['PROTINCO', 'PROTECCION', 'INFRAESTRUCTURA'], 'PROTINCO.docx'),
-                (['REGENCY HEALTH', 'HEALTH'], 'REGENCY_HEALTH.docx'),
-                (['REGENCY TECH', 'TECH'], 'REGENC_TECH.docx'),
-                (['REGENCY', 'REGENCY SERVICES', 'SERVICES'], 'REGENCY.docx'),
-            ]
-
+            # Normalizar nombre de empresa para búsqueda en mapeo
+            empresa_normalizada_map = (empresa_raw or '').upper().strip() if empresa_raw else ''
+            svg_nombre_esperado = EMPRESA_SVG_MAPPING.get(empresa_normalizada_map)
+            
+            plantilla_path = None
             plantilla_nombre = None
-            for keys, fname in plantilla_candidates:
-                for k in keys:
-                    if k in norm:
-                        plantilla_nombre = fname
+            svg_files = []
+            
+            # Múltiples rutas posibles según el entorno (Docker, Local, etc)
+            posibles_dirs = [
+                os.path.join(settings.BASE_DIR, 'capacitaciones', 'templates', 'certificados'),
+                os.path.join(settings.BASE_DIR, '..', 'capacitaciones', 'templates', 'certificados'),
+                os.path.join(settings.BASE_DIR, 'plantillas'),
+                os.path.join(settings.MEDIA_ROOT, 'certificados'),
+                '/app/capacitaciones/templates/certificados',
+                'capacitaciones/templates/certificados',
+            ]
+            
+            # Buscar en todas las rutas posibles
+            for certificados_dir in posibles_dirs:
+                certificados_dir = os.path.normpath(certificados_dir)
+                logger.warning(f"Intentando directorio: {certificados_dir}")
+                
+                if not os.path.isdir(certificados_dir):
+                    logger.warning(f"   ✗ No existe o no es directorio")
+                    continue
+                
+                try:
+                    dir_files = os.listdir(certificados_dir)
+                    svg_files_in_dir = [f for f in dir_files if f.endswith('.svg')]
+                    
+                    if svg_files_in_dir:
+                        logger.warning(f"   ✓ Directorio contiene {len(svg_files_in_dir)} archivos SVG: {svg_files_in_dir}")
+                        svg_files.extend([(f, certificados_dir) for f in svg_files_in_dir])
+                    else:
+                        logger.warning(f"   ⚠️ Directorio existe pero no contiene SVG")
+                        logger.warning(f"   Archivos en dir: {dir_files[:10]}...")
+                        
+                except Exception as e:
+                    logger.warning(f"   ✗ Error al listar: {e}")
+                    continue
+            
+            logger.warning(f"Total de SVG encontrados en todas las rutas: {len(svg_files)}")
+            
+            # ESTRATEGIA 1: Usar mapeo explícito si existe
+            if svg_nombre_esperado:
+                logger.warning(f"Buscando SVG mapeado para '{empresa_normalizada_map}': {svg_nombre_esperado}")
+                for svg_file, svg_dir in svg_files:
+                    if svg_file.lower() == svg_nombre_esperado.lower():
+                        plantilla_nombre = svg_file
+                        plantilla_path = os.path.join(svg_dir, svg_file)
+                        logger.warning(f"✓✓✓ SVG encontrado (MAPEO EXPLÍCITO): {plantilla_nombre} en {svg_dir}")
                         break
-                if plantilla_nombre:
-                    break
-
-            # Valor por defecto si no matchea ninguna keyword
-            if not plantilla_nombre:
-                plantilla_nombre = 'REGENCY.docx'
-
-            logger.warning(f"Empresa nombre (raw): {getattr(empresa, 'nombre_empresa', None)}")
-            plantilla_path = os.path.join(settings.BASE_DIR, 'plantillas', plantilla_nombre)
-            logger.warning(f"Plantilla seleccionada: {plantilla_nombre}; ruta esperada: {plantilla_path}")
-
-            # Si no existe el archivo esperado, intentar un fallback tolerante
-            if not os.path.exists(plantilla_path):
-                # Probar varios posibles directorios de plantillas en el contenedor
-                tried_dirs = []
-                found = False
-                match = None
-                alt_dirs = [
-                    os.path.join(settings.BASE_DIR, 'plantillas'),
-                    os.path.join(settings.BASE_DIR, '..', 'plantillas'),
-                    os.path.join(settings.BASE_DIR, '..', '..', 'plantillas'),
-                    os.path.join(settings.BASE_DIR, 'backend', 'plantillas'),
-                ]
-                available = []
-                for plantillas_dir in alt_dirs:
-                    plantillas_dir = os.path.normpath(plantillas_dir)
-                    tried_dirs.append(plantillas_dir)
-                    if os.path.isdir(plantillas_dir):
-                        try:
-                            available = os.listdir(plantillas_dir)
-                        except Exception:
-                            available = []
-                        logger.warning(f"Plantillas en {plantillas_dir}: {available}")
-                        # Intentar match case-insensitive exacto
-                        for f in available:
-                            if f.lower() == plantilla_nombre.lower():
-                                match = f
-                                break
-                        if not match:
-                            for f in available:
-                                fnorm = _normalize_name(f.upper())
-                                for keys, _fname in plantilla_candidates:
-                                    for k in keys:
-                                        if k in fnorm:
-                                            match = f
-                                            break
-                                    if match:
-                                        break
-                                if match:
-                                    break
-                        if match:
-                            plantilla_nombre = match
-                            plantilla_path = os.path.join(plantillas_dir, plantilla_nombre)
-                            logger.warning(f"Fallback: usando plantilla {plantilla_nombre} encontrada en {plantilla_path}")
-                            found = True
+            
+            # ESTRATEGIA 2: Si no se encuentra por mapeo explícito, usar búsquedas progresivas como fallback
+            if not plantilla_path and svg_files:
+                logger.warning(f"SVG no encontrado por mapeo. Usando búsquedas progresivas como fallback...")
+                
+                # Búsqueda 1: Coincidencia EXACTA (case-insensitive)
+                for svg_file, svg_dir in svg_files:
+                    svg_name = svg_file.lower().replace('.svg', '')
+                    empresa_lower = empresa_normalizada_map.lower()
+                    if svg_name == empresa_lower:
+                        plantilla_nombre = svg_file
+                        plantilla_path = os.path.join(svg_dir, svg_file)
+                        logger.warning(f"✓✓ SVG encontrado (coincidencia EXACTA): {plantilla_nombre}")
+                        break
+                
+                # Búsqueda 2: Coincidencia de PALABRAS CLAVE
+                if not plantilla_path:
+                    empresa_keywords = empresa_normalizada_map.split()
+                    logger.warning(f"Palabras clave de empresa: {empresa_keywords}")
+                    for svg_file, svg_dir in svg_files:
+                        svg_normalized = svg_file.upper().replace('.SVG', '')
+                        matches = sum(1 for kw in empresa_keywords if kw in svg_normalized)
+                        if matches >= 2:
+                            plantilla_nombre = svg_file
+                            plantilla_path = os.path.join(svg_dir, svg_file)
+                            logger.warning(f"✓ SVG encontrado (coincidencia de {matches} keywords): {plantilla_nombre}")
                             break
+                
+                # Búsqueda 3: BÚSQUEDA PARCIAL
+                if not plantilla_path:
+                    for svg_file, svg_dir in svg_files:
+                        if empresa_normalizada_map in svg_file.upper():
+                            plantilla_nombre = svg_file
+                            plantilla_path = os.path.join(svg_dir, svg_file)
+                            logger.warning(f"✓ SVG encontrado (búsqueda parcial): {plantilla_nombre}")
+                            break
+                
+                # Búsqueda 4: PRIMERA PALABRA coincide
+                if not plantilla_path:
+                    primera_palabra = empresa_normalizada_map.split()[0] if empresa_normalizada_map.split() else ''
+                    if primera_palabra:
+                        for svg_file, svg_dir in svg_files:
+                            if primera_palabra in svg_file.upper():
+                                plantilla_nombre = svg_file
+                                plantilla_path = os.path.join(svg_dir, svg_file)
+                                logger.warning(f"✓ SVG encontrado (primera palabra): {plantilla_nombre}")
+                                break
 
-                if not found:
-                    logger.warning(f"No se encontraron plantillas en dirs probados: {tried_dirs}")
-                    return Response(
-                        {
-                            'error': f'No se encontró la plantilla para la empresa {empresa_nombre}',
-                            'plantillas_busquedas': tried_dirs,
-                            'plantillas_disponibles': available
-                        },
-                        status=status.HTTP_404_NOT_FOUND
-                    )
+            # Si no se encuentra SVG, retornar error detallado
+            if not plantilla_path:
+                plantillas_disp = [f"{fname} (en {dirname})" for fname, dirname in svg_files[:10]]
+                logger.warning(f"✗✗✗ No se encontró SVG para empresa: {empresa_nombre}")
+                logger.warning(f"Empresa normalizada: {empresa_normalizada}")
+                logger.warning(f"Plantillas disponibles: {plantillas_disp}")
+                
+                return Response(
+                    {
+                        'error': f'No se encontró plantilla SVG para la empresa "{empresa_nombre}"',
+                        'empresa_raw': empresa_raw,
+                        'empresa_normalizada': empresa_normalizada,
+                        'plantillas_disponibles': [f for f, _ in svg_files[:10]],
+                        'directorios_buscados': [os.path.normpath(d) for d in posibles_dirs],
+                        'total_plantillas_encontradas': len(svg_files)
+                    },
+                    status=status.HTTP_404_NOT_FOUND
+                )
             
             # Preparar datos para reemplazar en la plantilla
             fecha_completada = progreso.fecha_completada or timezone.now()
@@ -1103,143 +1627,84 @@ class DescargarCertificadoView(APIView):
             centro_nombre = ''
             try:
                 if colaborador.cargocolaborador:
-                    cargo_nombre = colaborador.cargocolaborador.nombrecargo
+                    cargo_nombre = str(colaborador.cargocolaborador.nombrecargo) if colaborador.cargocolaborador.nombrecargo else ''
             except Exception:
                 cargo_nombre = ''
             
             try:
                 if colaborador.centroop:
-                    centro_nombre = colaborador.centroop.nombre_centrop
+                    centro_nombre = str(colaborador.centroop.nombre_centrop) if colaborador.centroop.nombre_centrop else ''
             except Exception:
                 centro_nombre = ''
             
+            # Construir diccionario de datos con encoding UTF-8 explícito
             datos = {
-                '{{NOMBRE}}': f"{colaborador.nombrecolaborador} {colaborador.apellidocolaborador}",
-                '{{CEDULA}}': colaborador.cccolaborador,
-                '{{CURSO}}': capacitacion.titulo,
-                '{{FECHA}}': fecha_formateada,
-                '{{nombre_completo}}': f"{colaborador.nombrecolaborador} {colaborador.apellidocolaborador}",
-                '{{nombre}}': colaborador.nombrecolaborador,
-                '{{apellido}}': colaborador.apellidocolaborador,
-                '{{cedula}}': colaborador.cccolaborador,
-                '{{capacitacion}}': capacitacion.titulo,
-                '{{fecha}}': fecha_formateada,
-                '{{fecha_corta}}': fecha_completada.strftime('%d/%m/%Y'),
-                '{{empresa}}': empresa.nombre_empresa,
-                '{{cargo}}': cargo_nombre,
-                '{{centro}}': centro_nombre,
+                '{{NOMBRE}}': str(f"{colaborador.nombrecolaborador} {colaborador.apellidocolaborador}").encode('utf-8').decode('utf-8'),
+                '{{CEDULA}}': str(colaborador.cccolaborador).encode('utf-8').decode('utf-8'),
+                '{{CURSO}}': str(capacitacion.titulo).encode('utf-8').decode('utf-8'),
+                '{{FECHA}}': str(fecha_formateada).encode('utf-8').decode('utf-8'),
+                '{{nombre_completo}}': str(f"{colaborador.nombrecolaborador} {colaborador.apellidocolaborador}").encode('utf-8').decode('utf-8'),
+                '{{nombre}}': str(colaborador.nombrecolaborador).encode('utf-8').decode('utf-8'),
+                '{{apellido}}': str(colaborador.apellidocolaborador).encode('utf-8').decode('utf-8'),
+                '{{cedula}}': str(colaborador.cccolaborador).encode('utf-8').decode('utf-8'),
+                '{{capacitacion}}': str(capacitacion.titulo).encode('utf-8').decode('utf-8'),
+                '{{fecha}}': str(fecha_formateada).encode('utf-8').decode('utf-8'),
+                '{{fecha_corta}}': str(fecha_completada.strftime('%d/%m/%Y')).encode('utf-8').decode('utf-8'),
+                '{{empresa}}': str(empresa.nombre_empresa).encode('utf-8').decode('utf-8'),
+                '{{cargo}}': str(cargo_nombre).encode('utf-8').decode('utf-8'),
+                '{{centro}}': str(centro_nombre).encode('utf-8').decode('utf-8'),
             }
             
             # Crear directorio temporal
             temp_dir = tempfile.mkdtemp()
             try:
-                # Cargar plantilla Word
-                doc = Document(plantilla_path)
+                # Procesar el SVG (no DOCX) y generar el PDF
+                resultado = self._generar_certificado_desde_svg(
+                    svg_path=plantilla_path,
+                    datos=datos,
+                    output_dir=temp_dir,
+                    filename_base='certificado'
+                )
                 
-                # Función para reemplazar texto manteniendo formato
-                def replace_in_paragraph(paragraph, datos):
-                    # Concatenar todo el texto del párrafo
-                    full_text = ''.join(run.text for run in paragraph.runs)
-                    
-                    # Verificar si hay variables para reemplazar
-                    modificado = False
-                    for key, value in datos.items():
-                        if key in full_text:
-                            full_text = full_text.replace(key, value)
-                            modificado = True
-                    
-                    # Si hubo cambios, actualizar el párrafo
-                    if modificado:
-                        # Mantener el formato del primer run
-                        for i, run in enumerate(paragraph.runs):
-                            if i == 0:
-                                run.text = full_text
-                            else:
-                                run.text = ''
-                
-                # Reemplazar variables en párrafos
-                for paragraph in doc.paragraphs:
-                    replace_in_paragraph(paragraph, datos)
-                
-                # Reemplazar variables en tablas
-                for table in doc.tables:
-                    for row in table.rows:
-                        for cell in row.cells:
-                            for paragraph in cell.paragraphs:
-                                replace_in_paragraph(paragraph, datos)
-                
-                # Reemplazar en encabezados y pies de página
-                for section in doc.sections:
-                    # Encabezado
-                    for paragraph in section.header.paragraphs:
-                        replace_in_paragraph(paragraph, datos)
-                    
-                    # Pie de página
-                    for paragraph in section.footer.paragraphs:
-                        replace_in_paragraph(paragraph, datos)
-                
-                # Guardar Word modificado temporalmente
-                temp_docx = os.path.join(temp_dir, 'certificado_temp.docx')
-                doc.save(temp_docx)
-                
-                # Convertir a PDF
-                temp_pdf = os.path.join(temp_dir, 'certificado_temp.pdf')
-                
-                # Intentar conversión con herramientas disponibles
-                conversion_exitosa = self._convertir_docx_a_pdf(temp_docx, temp_pdf)
-                
-                # Guardar en media y crear registro en BD
-                fecha_str = timezone.now().strftime('%Y/%m/%d')
-                
-                # Si la conversión fue exitosa, usar PDF; si no, usar DOCX
-                if conversion_exitosa and os.path.exists(temp_pdf):
-                    archivo_generado = temp_pdf
-                    extension = 'pdf'
-                    content_type = 'application/pdf'
-                else:
-                    archivo_generado = temp_docx
-                    extension = 'docx'
-                    content_type = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-                
-                # Crear nombre del archivo
-                filename = f'certificado_{id_colaborador}_{id_capacitacion}_{timezone.now().strftime("%Y%m%d_%H%M%S")}.{extension}'
-                archivo_relative_path = os.path.join('certificados_generados', fecha_str, filename)
-                archivo_full_path = os.path.join(settings.MEDIA_ROOT, archivo_relative_path)
-                
-                # Crear directorio si no existe
-                os.makedirs(os.path.dirname(archivo_full_path), exist_ok=True)
-                
-                # Copiar archivo generado a media
-                shutil.copy2(archivo_generado, archivo_full_path)
-                
-                # Guardar o actualizar registro en BD
-                if certificado_existente:
-                    # Eliminar archivo anterior
-                    if certificado_existente.archivo_pdf and os.path.exists(certificado_existente.archivo_pdf.path):
-                        os.remove(certificado_existente.archivo_pdf.path)
-                    certificado_existente.archivo_pdf = archivo_relative_path
-                    certificado_existente.fecha_actualizacion = timezone.now()
-                    certificado_existente.save()
-                else:
-                    CertificadoGenerado.objects.create(
-                        colaborador_id=id_colaborador,
-                        capacitacion_id=id_capacitacion,
-                        archivo_pdf=archivo_relative_path
+                if resultado is None:
+                    return Response(
+                        {'error': 'Error al generar certificado desde SVG'},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
                     )
                 
-                # Retornar archivo (PDF o DOCX)
+                pdf_path, extension, content_type = resultado
+                
+                # Leer el archivo generado
+                with open(pdf_path, 'rb') as f:
+                    file_content = f.read()
+                
+                # Crear respuesta con el archivo
                 response = FileResponse(
-                    open(archivo_full_path, 'rb'),
+                    BytesIO(file_content),
                     content_type=content_type
                 )
-                response['Content-Disposition'] = f'attachment; filename="certificado_{colaborador.nombrecolaborador}_{colaborador.apellidocolaborador}.{extension}"'
-                response['Cache-Control'] = 'max-age=2592000'  # 30 días
                 
+                # Determinar nombre del archivo de descarga basado en capacitación
+                # Formato: certificado_[nombre_capacitacion].{extension}
+                nombre_capacitacion = str(capacitacion.titulo).lower().replace(' ', '_')
+                nombre_capacitacion = re.sub(r'[^a-z0-9_]', '', nombre_capacitacion)
+                nombre_archivo = f"certificado_{nombre_capacitacion}.{extension}"
+                response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
+                
+                # Deshabilitar cache - Siempre generar nuevo certificado
+                response['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+                response['Pragma'] = 'no-cache'
+                response['Expires'] = '0'
+                
+                logger.warning(f"✓ Certificado generado exitosamente: {nombre_archivo}")
                 return response
                 
             finally:
                 # Limpiar directorio temporal
-                shutil.rmtree(temp_dir, ignore_errors=True)
+                try:
+                    shutil.rmtree(temp_dir)
+                except Exception as e:
+                    logger.warning(f"Error al limpiar directorio temporal: {e}")
                 
         except Exception as e:
             return Response(
@@ -1624,11 +2089,22 @@ class ObtenerColaboradoresCapacitacionView(APIView):
             qs = progresoCapacitaciones.objects.filter(capacitacion_id=capacitacion_id)
             total = qs.count()
             
+            # FIX: Usar Max('id') + GROUP BY colaborador para obtener el registro más reciente
+            # Compatible con MySQL (no necesita DISTINCT ON ni LIMIT en subquery)
+            latest_ids = list(
+                qs.values('colaborador')
+                .annotate(max_id=Max('id'))
+                .values_list('max_id', flat=True)
+            )
+            
+            # Filtrar solo los registros más recientes por colaborador
+            qs_distinct = qs.filter(id__in=latest_ids).select_related('colaborador')
+            
             # Si no se especifica limit, devolver TODOS
             if limit_param is None:
-                progreso_qs = qs.select_related('colaborador').order_by('colaborador__nombrecolaborador')
-                limit = total
+                limit = qs_distinct.count()
                 offset = 0
+                progreso_qs = qs_distinct
             else:
                 # Si se especifica limit, aplicar paginación
                 limit = int(limit_param)
@@ -1642,7 +2118,7 @@ class ObtenerColaboradoresCapacitacionView(APIView):
                 if offset < 0:
                     offset = 0
                 
-                progreso_qs = qs.select_related('colaborador').order_by('colaborador__nombrecolaborador')[offset:offset+limit]
+                progreso_qs = qs_distinct[offset:offset+limit]
 
             data = list(
                 progreso_qs.values(
@@ -1659,8 +2135,8 @@ class ObtenerColaboradoresCapacitacionView(APIView):
             results = [
                 {
                     'id': d['colaborador__idcolaborador'],
-                    'nombre': d['colaborador__apellidocolaborador'],
-                    'apellido': d['colaborador__nombrecolaborador'],
+                    'nombre': d['colaborador__nombrecolaborador'],  # FIX: Nombre correcto
+                    'apellido': d['colaborador__apellidocolaborador'],  # FIX: Apellido correcto
                     'cedula': d['colaborador__cccolaborador'],
                     'progreso': float(d['progreso']),
                     'completada': bool(d['completada']),
@@ -1704,10 +2180,11 @@ class ReporteCapacitacionesView(APIView):
             capacitacion_id = request.GET.get('capacitacion_id')
             fecha_inicio = request.GET.get('fecha_inicio')
             fecha_fin = request.GET.get('fecha_fin')
+            include_questions = request.GET.get('include_questions', 'false').lower() == 'true'
             
             if capacitacion_id:
                 # CASO 1: Reporte de una capacitación específica
-                return self._generar_reporte_capacitacion(capacitacion_id)
+                return self._generar_reporte_capacitacion(capacitacion_id, include_questions)
             elif fecha_inicio and fecha_fin:
                 # CASO 2: Reporte de rango de fechas
                 return self._generar_reporte_rango_fechas(fecha_inicio, fecha_fin)
@@ -1722,9 +2199,10 @@ class ReporteCapacitacionesView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    def _generar_reporte_capacitacion(self, capacitacion_id):
+    def _generar_reporte_capacitacion(self, capacitacion_id, include_questions=False):
         """
         Genera reporte de una capacitación específica con todos sus colaboradores.
+        Si include_questions es True, incluye columnas de preguntas y respuestas por cada colaborador.
         """
         try:
             # Obtener capacitación
@@ -1782,6 +2260,22 @@ class ReporteCapacitacionesView(APIView):
                 "Estado Avance"
             ]
             
+            # Si se incluyen preguntas, obtener todas las preguntas de la capacitación
+            preguntas_dict = {}  # {pregunta_id: pregunta_texto}
+            if include_questions:
+                # Obtener todas las lecciones y preguntas de esta capacitación
+                modulos = Modulos.objects.filter(idcapacitacion=capacitacion)
+                lecciones = Lecciones.objects.filter(idmodulo__in=modulos)
+                preguntas = PreguntasLecciones.objects.filter(id_leccion__in=lecciones).order_by('id')
+                
+                for pregunta in preguntas:
+                    preguntas_dict[pregunta.id] = pregunta.pregunta
+                
+                # Agregar columnas de preguntas y respuestas
+                for pregunta_id, pregunta_texto in preguntas_dict.items():
+                    headers.append(f"Pregunta: {pregunta_texto[:50]}...")  # Truncar texto largo
+                    headers.append(f"Respuesta: {pregunta_texto[:50]}...")
+            
             for col, header in enumerate(headers, 1):
                 cell = ws.cell(row=6, column=col)
                 cell.value = header
@@ -1829,8 +2323,27 @@ class ReporteCapacitacionesView(APIView):
                     estado = "En Progreso"
                 ws.cell(row=row, column=13).value = estado
                 
+                # Si se incluyen preguntas, agregar respuestas del colaborador
+                if include_questions:
+                    col_offset = 13
+                    respuestas_colaborador = RespuestasColaboradores.objects.filter(
+                        idcolaborador=colaborador
+                    ).select_related('idpregunta', 'idrespuesta')
+                    
+                    # Crear diccionario de respuestas por pregunta_id
+                    respuestas_map = {r.idpregunta_id: r.idrespuesta.valor for r in respuestas_colaborador}
+                    
+                    for pregunta_id, pregunta_texto in preguntas_dict.items():
+                        # Columna de pregunta
+                        ws.cell(row=row, column=col_offset + 1).value = pregunta_texto
+                        # Columna de respuesta
+                        respuesta = respuestas_map.get(pregunta_id, '')
+                        ws.cell(row=row, column=col_offset + 2).value = respuesta
+                        col_offset += 2
+                
                 # Formato
-                for col in range(1, 14):
+                num_cols = len(headers)
+                for col in range(1, num_cols + 1):
                     cell = ws.cell(row=row, column=col)
                     cell.border = border
                     if col == 10:  # Porcentaje
@@ -1858,11 +2371,18 @@ class ReporteCapacitacionesView(APIView):
             ws.column_dimensions['L'].width = 18  # Fecha Completación
             ws.column_dimensions['M'].width = 14  # Estado Avance
             
-            # Habilitar filtros y congelar encabezado (facilita filtrado en Excel)
+            # Ajustar ancho para columnas de preguntas y respuestas
+            if include_questions:
+                for col_idx in range(14, len(headers) + 1):
+                    col_letter = chr(64 + col_idx) if col_idx <= 26 else chr(64 + col_idx // 26) + chr(64 + col_idx % 26)
+                    ws.column_dimensions[col_letter].width = 30
+            
+            # Habilitar filtros (facilita filtrado en Excel)
             try:
                 last_row = row - 1
-                ws.auto_filter.ref = f"A6:M{last_row}"
-                ws.freeze_panes = ws['A7']
+                last_col = len(headers)
+                last_col_letter = chr(64 + last_col) if last_col <= 26 else chr(64 + last_col // 26) + chr(64 + last_col % 26)
+                ws.auto_filter.ref = f"A6:{last_col_letter}{last_row}"
             except Exception:
                 pass
 
@@ -2076,11 +2596,10 @@ class ReporteCapacitacionesView(APIView):
             ws.column_dimensions['P'].width = 16  # % Completación
             ws.column_dimensions['Q'].width = 14  # Estado Avance
             
-            # Habilitar filtros y congelar encabezado (facilita filtrado en Excel)
+            # Habilitar filtros (facilita filtrado en Excel)
             try:
                 last_row = row - 1
                 ws.auto_filter.ref = f"A4:Q{last_row}"
-                ws.freeze_panes = ws['A5']
             except Exception:
                 pass
 

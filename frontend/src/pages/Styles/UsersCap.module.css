@@ -855,3 +855,199 @@
     color: #f0f0f0;
   }
 }
+
+/* ===== HEADER STYLES ===== */
+.headerTitle {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.headerActions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  position: relative;
+}
+
+.reportDropdownContainer {
+  position: relative;
+}
+
+.reportDropdownMenu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 220px;
+  margin-top: 4px;
+}
+
+.reportDropdownItem {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background-color: transparent;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+  border-bottom: 1px solid #eee;
+  transition: background-color 0.2s ease;
+  font-family: inherit;
+}
+
+.reportDropdownItem:last-child {
+  border-bottom: none;
+}
+
+.reportDropdownItem:hover {
+  background-color: #f5f5f5;
+}
+
+/* Responsive filters */
+.filterSection {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filterSelect {
+  min-width: 140px;
+}
+
+.filterInput {
+  min-width: 180px;
+}
+
+.filterCount {
+  font-size: 13px;
+  color: #666;
+  font-weight: 500;
+}
+
+.noCompletado {
+  color: #d32f2f;
+  font-style: italic;
+}
+
+.tdNombre,
+.tdApellido,
+.tdCedula,
+.tdFecha,
+.tdFechaCompletada {
+  padding: 12px 8px;
+}
+
+@media (max-width: 1200px) {
+  .headerActions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .filterSection {
+    gap: 12px;
+  }
+  
+  .filterSelect,
+  .filterInput {
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 768px) {
+  .headerTitle {
+    font-size: 1.5rem;
+  }
+  
+  .headerActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  
+  .filterSection {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .filterSelect,
+  .filterInput {
+    width: 100%;
+    min-width: 0;
+  }
+  
+  .filterCount {
+    width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .headerTitle {
+    font-size: 1.3rem;
+    margin-bottom: 12px;
+  }
+  
+  .headerActions {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .btnBack,
+  .btnReport {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .reportDropdownMenu {
+    min-width: calc(100% - 4px);
+    left: 0;
+    right: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .headerTitle {
+    font-size: 1.1rem;
+  }
+  
+  .filterSection {
+    gap: 8px;
+  }
+  
+  .reportDropdownMenu {
+    min-width: 100vw;
+    margin-left: -10px;
+  }
+}
+
+/* ===== DARK MODE - Report Dropdown ===== */
+@media (prefers-color-scheme: dark) {
+  .reportDropdownMenu {
+    background-color: #1e1e1e;
+    border-color: #444;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+  
+  .reportDropdownItem {
+    color: #e0e0e0;
+    border-bottom-color: #333;
+  }
+  
+  .reportDropdownItem:hover {
+    background-color: #2a2a2a;
+  }
+  
+  .filterCount {
+    color: #999;
+  }
+  
+  .noCompletado {
+    color: #ef5350;
+  }
+}

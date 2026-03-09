@@ -18,7 +18,7 @@ from analitica.models import Centroop, Proyecto, Unidadnegocio, Epresa
 from capacitaciones.models import Capacitaciones, progresoCapacitaciones, Modulos, Lecciones, progresolecciones
 from capacitaciones.serializers import CapacitacionProgresoSerializer
 from usuarios.serializers import ColaboradorListadoSerializer, cargosSerializer, nivelesSerializer, regionalesSerializer
-from django.db.models import Count, Q, Prefetch, OuterRef, Subquery, IntegerField, Case, When
+from django.db.models import Count, Q, Prefetch, OuterRef, Subquery, IntegerField, Case, When, Max
 from django.db.models.functions import Coalesce
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -63,18 +63,30 @@ class Perfil(APIView):
             )
 
         # Subquery para contar lecciones completadas por capacitación
+        # Contar lecciones donde el progreso está completado (completada=1)
         lecciones_completadas_subq = progresolecciones.objects.filter(
             idcolaborador=colaborador,
             idleccion__idmodulo__idcapacitacion=OuterRef('capacitacion_id'),
-            completada=1
+            completada=1  # Usar completada=1 como indicador de completación
         ).values('idleccion__idmodulo__idcapacitacion').annotate(
-            count=Count('id_progreso')
+            count=Count('id_progreso', distinct=True)
         ).values('count')
 
-        progresos = (
+        # FIX: Eliminar duplicados si un colaborador está múltiples veces en la misma capacitación
+        # Usar Max('id') + GROUP BY capacitacion (compatible con MySQL)
+        latest_ids = (
             progresoCapacitaciones.objects
             .filter(colaborador=colaborador)
             .exclude(capacitacion__estado=3)
+            .values('capacitacion')
+            .annotate(max_id=Max('id'))
+            .values_list('max_id', flat=True)
+        )
+        
+        # Filtrar solo los registros de progreso más recientes
+        progresos = (
+            progresoCapacitaciones.objects
+            .filter(id__in=list(latest_ids))
             .select_related('capacitacion')
             .annotate(
                 total_lecciones=Count(
@@ -85,13 +97,13 @@ class Perfil(APIView):
                     Subquery(lecciones_completadas_subq, output_field=IntegerField()),
                     0
                 ),
-                estado_orden=Case(
-                    When(capacitacion__estado=1, then=1),  # Estado 1 primero
-                    When(capacitacion__estado=2, then=2),  # Estado 2 después
+                completada_orden=Case(
+                    When(completada=0, then=0),  # Incompletas primero
+                    When(completada=1, then=1),  # Completadas después
                     output_field=IntegerField()
                 )
             )
-            .order_by('estado_orden', '-fecha_registro')
+            .order_by('completada_orden', '-fecha_registro')
         )
 
         capacitaciones_totales = progresos.count()
@@ -666,27 +678,30 @@ class CambiarEstadoUsuarioView(APIView):
         POST para desactivar/activar múltiples usuarios.
         POST /usuarios/cambiar-estado-usuario/
         Body: { "colaborador_ids": [1, 2, 3, ...], "estado": 1 o 0 }
+        o
+        Body: { "cedulas": ["1234567", "7654321", ...], "estado": 1 o 0 }
         
         Retorna:
         {
             "mensaje": "...",
             "total": 3,
             "actualizados": 3,
-            "errores": 0,
-            "detalles": [
-                {"colaborador_id": 1, "usuario_id": 10, "estado": 0, "success": true},
-                ...
+            "no_encontrados": 0,
+            "detalles_encontrados": [...],
+            "detalles_no_encontrados": [
+                {"identificador": "1234567", "tipo": "cedula", "error": "No encontrado"}
             ]
         }
         """
         try:
             colaborador_ids = request.data.get('colaborador_ids', [])
+            cedulas = request.data.get('cedulas', [])
             nuevo_estado = request.data.get('estado')
             
             # Validaciones
-            if not isinstance(colaborador_ids, list) or len(colaborador_ids) == 0:
+            if not (isinstance(colaborador_ids, list) or isinstance(cedulas, list)) or (len(colaborador_ids) == 0 and len(cedulas) == 0):
                 return Response(
-                    {"error": "El campo 'colaborador_ids' es requerido y debe ser una lista no vacía"},
+                    {"error": "El campo 'colaborador_ids' o 'cedulas' es requerido y debe ser una lista no vacía"},
                     status=400
                 )
             
@@ -703,26 +718,35 @@ class CambiarEstadoUsuarioView(APIView):
                 )
             
             # Procesar cada colaborador
-            resultados = []
+            encontrados = []
+            no_encontrados = []
             actualizados = 0
-            errores = 0
             
+            # Procesar por ID de colaborador
             for colaborador_id in colaborador_ids:
                 try:
-                    # Obtener usuario por colaborador
-                    usuario = Usuarios.objects.filter(
-                        idcolaboradoru__idcolaborador=colaborador_id
+                    # Obtener colaborador primero
+                    colaborador = Colaboradores.objects.filter(
+                        idcolaborador=colaborador_id
                     ).first()
                     
-                    if not usuario:
-                        resultados.append({
-                            "colaborador_id": colaborador_id,
-                            "usuario_id": None,
-                            "estado": None,
-                            "success": False,
-                            "error": "Usuario no encontrado"
+                    if not colaborador:
+                        no_encontrados.append({
+                            "identificador": colaborador_id,
+                            "tipo": "colaborador_id",
+                            "error": "Colaborador no encontrado"
                         })
-                        errores += 1
+                        continue
+                    
+                    # Obtener usuario del colaborador
+                    usuario = Usuarios.objects.filter(idcolaboradoru=colaborador).first()
+                    
+                    if not usuario:
+                        no_encontrados.append({
+                            "identificador": colaborador_id,
+                            "tipo": "colaborador_id",
+                            "error": "Usuario no encontrado para este colaborador"
+                        })
                         continue
                     
                     # Actualizar usuario
@@ -730,35 +754,89 @@ class CambiarEstadoUsuarioView(APIView):
                     usuario.save()
                     
                     # Sincronizar estado en colaborador
-                    colaborador = getattr(usuario, 'idcolaboradoru', None)
-                    if colaborador:
-                        colaborador.estadocolaborador = nuevo_estado
-                        colaborador.save()
+                    colaborador.estadocolaborador = nuevo_estado
+                    colaborador.save()
                     
-                    resultados.append({
+                    # Construir nombre completo
+                    nombre_completo = f"{colaborador.nombrecolaborador} {colaborador.apellidocolaborador}".strip()
+                    
+                    encontrados.append({
                         "colaborador_id": colaborador_id,
                         "usuario_id": usuario.id,
+                        "nombre": nombre_completo,
+                        "cedula": colaborador.cccolaborador,
                         "estado": nuevo_estado,
                         "success": True
                     })
                     actualizados += 1
                     
                 except Exception as e:
-                    resultados.append({
-                        "colaborador_id": colaborador_id,
-                        "usuario_id": None,
-                        "estado": None,
-                        "success": False,
+                    no_encontrados.append({
+                        "identificador": colaborador_id,
+                        "tipo": "colaborador_id",
                         "error": str(e)
                     })
-                    errores += 1
+            
+            # Procesar por cédula
+            for cedula in cedulas:
+                try:
+                    # Buscar colaborador por cédula (cccolaborador)
+                    colaborador = Colaboradores.objects.filter(cccolaborador=str(cedula)).first()
+                    
+                    if not colaborador:
+                        no_encontrados.append({
+                            "identificador": str(cedula),
+                            "tipo": "cedula",
+                            "error": "Cédula no encontrada"
+                        })
+                        continue
+                    
+                    # Obtener usuario del colaborador
+                    usuario = Usuarios.objects.filter(idcolaboradoru=colaborador).first()
+                    
+                    if not usuario:
+                        no_encontrados.append({
+                            "identificador": str(cedula),
+                            "tipo": "cedula",
+                            "error": "Usuario no encontrado para esta cédula"
+                        })
+                        continue
+                    
+                    # Actualizar usuario
+                    usuario.estadousuario = nuevo_estado
+                    usuario.save()
+                    
+                    # Sincronizar estado en colaborador
+                    colaborador.estadocolaborador = nuevo_estado
+                    colaborador.save()
+                    
+                    # Construir nombre completo
+                    nombre_completo = f"{colaborador.nombrecolaborador} {colaborador.apellidocolaborador}".strip()
+                    
+                    encontrados.append({
+                        "colaborador_id": colaborador.idcolaborador,
+                        "usuario_id": usuario.id,
+                        "nombre": nombre_completo,
+                        "cedula": str(cedula),
+                        "estado": nuevo_estado,
+                        "success": True
+                    })
+                    actualizados += 1
+                    
+                except Exception as e:
+                    no_encontrados.append({
+                        "identificador": str(cedula),
+                        "tipo": "cedula",
+                        "error": str(e)
+                    })
             
             return Response({
-                "mensaje": f"Procesamiento completado: {actualizados} actualizados, {errores} errores",
-                "total": len(colaborador_ids),
+                "mensaje": f"Procesamiento completado: {actualizados} activados/desactivados, {len(no_encontrados)} no encontrados",
+                "total": len(colaborador_ids) + len(cedulas),
                 "actualizados": actualizados,
-                "errores": errores,
-                "detalles": resultados
+                "no_encontrados": len(no_encontrados),
+                "detalles_encontrados": encontrados,
+                "detalles_no_encontrados": no_encontrados
             }, status=200)
             
         except Exception as e:
@@ -835,15 +913,15 @@ class ActualizarRolUsuarioView(APIView):
 class DatosCargoView(APIView):
     """
     CRUD para gestionar Cargos.
-    Solo SuperAdmin e IsUsuarioEspecial pueden manipular.
+    Administrador (1), Usuario Especial (3) y SuperAdmin (4) pueden manipular.
     """
-    permission_classes = [IsAuthenticated, IsSuperAdmin, IsUsuarioEspecial, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsSuperUserOrAdmin | IsUsuarioEspecial]
 
     def check_permission(self, request):
         """Verifica si el usuario tiene permisos para manipular cargos"""
         tipo_usuario = getattr(request.user, 'tipousuario', None)
-        # SuperAdmin (4) o Usuario Especial (3)
-        return tipo_usuario in [3, 4]
+        # Administrador (1), Usuario Especial (3) o SuperAdmin (4)
+        return tipo_usuario in [1, 3, 4]
 
     def get(self, request):
         """GET /usuarios/Cargo/ - Obtener todos los cargos activos"""
@@ -991,15 +1069,15 @@ class DatosCargoView(APIView):
 class DatosNivelView(APIView):
     """
     CRUD para gestionar Niveles.
-    Solo SuperAdmin e IsUsuarioEspecial pueden manipular.
+    Administrador (1), Usuario Especial (3) y SuperAdmin (4) pueden manipular.
     """
-    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdminUser, IsUsuarioEspecial]
+    permission_classes = [IsAuthenticated, IsSuperUserOrAdmin | IsUsuarioEspecial]
 
     def check_permission(self, request):
         """Verifica si el usuario tiene permisos para manipular niveles"""
         tipo_usuario = getattr(request.user, 'tipousuario', None)
-        # SuperAdmin (4) o Usuario Especial (3)
-        return tipo_usuario in [3, 4]
+        # Administrador (1), Usuario Especial (3) o SuperAdmin (4)
+        return tipo_usuario in [1, 3, 4]
 
     def get(self, request):
         """GET /usuarios/Nivel/ - Obtener todos los niveles activos"""
@@ -1147,9 +1225,15 @@ class DatosNivelView(APIView):
 class DatosRegionView(APIView):
     """
     CRUD para gestionar Regionales.
-    Solo SuperAdmin e IsUsuarioEspecial pueden manipular.
+    Administrador (1), Usuario Especial (3) y SuperAdmin (4) pueden manipular.
     """
-    permission_classes = [IsAuthenticated, IsSuperUserOrAdmin,  IsUsuarioEspecial]
+    permission_classes = [IsAuthenticated, IsSuperUserOrAdmin | IsUsuarioEspecial]
+
+    def check_permission(self, request):
+        """Verifica si el usuario tiene permisos para manipular regionales"""
+        tipo_usuario = getattr(request.user, 'tipousuario', None)
+        # Administrador (1), Usuario Especial (3) o SuperAdmin (4)
+        return tipo_usuario in [1, 3, 4]
 
     def get(self, request):
         """GET /usuarios/Region/ - Obtener todas las regionales activas"""
@@ -1332,34 +1416,29 @@ class RegistrarMasivoView(APIView):
 
     def _buscar_centro_op(self, empresa_nombre, unidad_nombre, unidad_descripcion, proyecto_nombre, centro_nombre):
         """
-        Busca el CentroOp filtrando por la jerarquía:
-        Empresa -> Unidad (busca por nombre O descripción) -> Proyecto -> Centro
+        Busca el CentroOp filtrando por la jerarquía completa:
+        Empresa -> Unidad (nombre Y descripción) -> Proyecto -> Centro
         
-        La búsqueda es flexible: puede encontrar la unidad por nombre O por descripción.
+        Cuando ambos nombre y descripción de unidad están presentes,
+        se usa AND para máxima precisión.
         """
         try:
             from django.db.models import Q
             
-            # Construir query para buscar la unidad
-            # Busca por: (nombre de unidad) O (descripción de unidad)
+            # Construir query para buscar la unidad de negocio
             unidad_query = Q(estadounidad=1)
             
-            nombre_check = Q()
-            desc_check = Q()
-            
-            if unidad_nombre:
-                nombre_check = Q(nombreunidad__iexact=unidad_nombre.strip())
-            
-            if unidad_descripcion:
-                desc_check = Q(descripcionunidad__iexact=unidad_descripcion.strip())
-            
-            # Si ambas están presentes, buscar por cualquiera
-            if nombre_check and desc_check:
-                unidad_query = unidad_query & (nombre_check | desc_check)
-            elif nombre_check:
-                unidad_query = unidad_query & nombre_check
-            elif desc_check:
-                unidad_query = unidad_query & desc_check
+            # Si ambas están presentes, usar AND para filtrado estricto
+            if unidad_nombre and unidad_descripcion:
+                unidad_query = unidad_query & Q(
+                    nombreunidad__iexact=unidad_nombre.strip()
+                ) & Q(
+                    descripcionunidad__iexact=unidad_descripcion.strip()
+                )
+            elif unidad_nombre:
+                unidad_query = unidad_query & Q(nombreunidad__iexact=unidad_nombre.strip())
+            elif unidad_descripcion:
+                unidad_query = unidad_query & Q(descripcionunidad__iexact=unidad_descripcion.strip())
             
             centro = Centroop.objects.filter(
                 nombrecentrop__iexact=centro_nombre.strip(),
@@ -1374,6 +1453,87 @@ class RegistrarMasivoView(APIView):
             return centro
         except Exception:
             return None
+
+    def _validar_jerarquia_centro_op(self, empresa_nombre, unidad_nombre, unidad_descripcion, proyecto_nombre, centro_nombre):
+        """
+        Valida cada nivel de la jerarquía por separado y retorna errores detallados.
+        Retorna (centro_op, error_detallado).
+        Si centro_op es None, error_detallado contiene qué falló exactamente.
+        """
+        from django.db.models import Q
+        errores = []
+
+        # 1. Validar Empresa
+        empresa = Epresa.objects.filter(
+            nombre_empresa__iexact=empresa_nombre.strip(),
+            estadoempresa=1
+        ).first()
+        if not empresa:
+            empresas_disponibles = list(
+                Epresa.objects.filter(estadoempresa=1)
+                .values_list('nombre_empresa', flat=True)[:10]
+            )
+            return None, f"Empresa '{empresa_nombre}' no encontrada. Disponibles: {', '.join(empresas_disponibles) if empresas_disponibles else 'ninguna'}"
+
+        # 2. Validar Unidad de Negocio (estricto: nombre Y descripción)
+        unidad_query = Q(estadounidad=1, id_empresa=empresa)
+        if unidad_nombre and unidad_descripcion:
+            unidad_query = unidad_query & Q(
+                nombreunidad__iexact=unidad_nombre.strip()
+            ) & Q(
+                descripcionunidad__iexact=unidad_descripcion.strip()
+            )
+        elif unidad_nombre:
+            unidad_query = unidad_query & Q(nombreunidad__iexact=unidad_nombre.strip())
+        elif unidad_descripcion:
+            unidad_query = unidad_query & Q(descripcionunidad__iexact=unidad_descripcion.strip())
+
+        unidad = Unidadnegocio.objects.filter(unidad_query).first()
+        if not unidad:
+            unidades_disponibles = list(
+                Unidadnegocio.objects.filter(estadounidad=1, id_empresa=empresa)
+                .values_list('nombreunidad', 'descripcionunidad')
+            )[:10]
+            unidades_str = '; '.join([f"{u[0]} ({u[1]})" for u in unidades_disponibles]) if unidades_disponibles else 'ninguna'
+            return None, (
+                f"Unidad de Negocio no encontrada para Empresa '{empresa_nombre}'. "
+                f"Buscando nombre='{unidad_nombre}', descripción='{unidad_descripcion}'. "
+                f"Unidades disponibles en esta empresa: {unidades_str}"
+            )
+
+        # 3. Validar Proyecto
+        proyecto = Proyecto.objects.filter(
+            nombreproyecto__iexact=proyecto_nombre.strip(),
+            estadoproyecto=1,
+            id_unidad=unidad
+        ).first()
+        if not proyecto:
+            proyectos_disponibles = list(
+                Proyecto.objects.filter(estadoproyecto=1, id_unidad=unidad)
+                .values_list('nombreproyecto', flat=True)[:10]
+            )
+            return None, (
+                f"Proyecto '{proyecto_nombre}' no encontrado para Unidad '{unidad.nombreunidad}' ({unidad.descripcionunidad}). "
+                f"Proyectos disponibles: {', '.join(proyectos_disponibles) if proyectos_disponibles else 'ninguno'}"
+            )
+
+        # 4. Validar Centro de Operación
+        centro = Centroop.objects.filter(
+            nombrecentrop__iexact=centro_nombre.strip(),
+            estadocentrop=1,
+            id_proyecto=proyecto
+        ).first()
+        if not centro:
+            centros_disponibles = list(
+                Centroop.objects.filter(estadocentrop=1, id_proyecto=proyecto)
+                .values_list('nombrecentrop', flat=True)[:10]
+            )
+            return None, (
+                f"Centro de operación '{centro_nombre}' no encontrado para Proyecto '{proyecto.nombreproyecto}'. "
+                f"Centros disponibles: {', '.join(centros_disponibles) if centros_disponibles else 'ninguno'}"
+            )
+
+        return centro, None
 
     def _buscar_cargo(self, nombre_cargo):
         return Cargo.objects.filter(
@@ -1497,6 +1657,7 @@ class RegistrarMasivoView(APIView):
             # =====================================================
             filas_datos = []
             errores_validacion = []
+            cedulas_en_csv = {}  # Para detectar duplicados dentro del CSV
 
             for num_fila, fila in enumerate(reader, start=2):
                 # Limpiar valores
@@ -1518,6 +1679,16 @@ class RegistrarMasivoView(APIView):
                 # Saltar filas vacías o incompletas (sin contar como error)
                 if not cedula or not nombre_completo:
                     continue
+
+                # Verificar cédula duplicada dentro del mismo CSV
+                if cedula in cedulas_en_csv:
+                    errores_validacion.append({
+                        "fila": num_fila,
+                        "cedula": cedula,
+                        "error": f"Cédula duplicada en el CSV: {cedula} ya aparece en la fila {cedulas_en_csv[cedula]}"
+                    })
+                    continue
+                cedulas_en_csv[cedula] = num_fila
 
                 # VALIDACIÓN TEMPRANA: Verificar existencia del usuario/colaborador ANTES de todo
                 # Verificar si el colaborador ya existe por cédula
@@ -1541,17 +1712,33 @@ class RegistrarMasivoView(APIView):
                 # Separar nombre: primeras 2 palabras = apellidos, resto = nombres
                 apellidos, nombres = self._separar_nombre(nombre_completo)
 
-                # Buscar CentroOp por jerarquía
+                # Validar que los campos de centro_op vengan completos (todos o ninguno)
+                campos_centro = [empresa_nombre, unidad_nombre, proyecto_nombre, centro_nombre]
+                campos_centro_presentes = [c for c in campos_centro if c]
+                if campos_centro_presentes and len(campos_centro_presentes) < 4:
+                    faltantes_centro = []
+                    if not empresa_nombre: faltantes_centro.append('Empresa')
+                    if not unidad_nombre: faltantes_centro.append('Unidad')
+                    if not proyecto_nombre: faltantes_centro.append('Proyecto')
+                    if not centro_nombre: faltantes_centro.append('Centro')
+                    errores_validacion.append({
+                        "fila": num_fila,
+                        "cedula": cedula,
+                        "error": f"Datos incompletos para Centro de Operación. Faltan: {', '.join(faltantes_centro)}. Debe proporcionar todos los campos (Empresa, Unidad, Proyecto, Centro) o ninguno."
+                    })
+                    continue
+
+                # Buscar CentroOp por jerarquía con validación detallada
                 centro_op = None
                 if empresa_nombre and unidad_nombre and proyecto_nombre and centro_nombre:
-                    centro_op = self._buscar_centro_op(
+                    centro_op, error_centro = self._validar_jerarquia_centro_op(
                         empresa_nombre, unidad_nombre, unidad_descripcion, proyecto_nombre, centro_nombre
                     )
-                    if not centro_op:
+                    if error_centro:
                         errores_validacion.append({
                             "fila": num_fila,
                             "cedula": cedula,
-                            "error": f"Centro de operación no encontrado: Empresa={empresa_nombre}, Unidad={unidad_nombre}, Descripción={unidad_descripcion}, Proyecto={proyecto_nombre}, Centro={centro_nombre}"
+                            "error": error_centro
                         })
                         continue
 
@@ -1695,6 +1882,9 @@ class RegistrarMasivoView(APIView):
         Busca al colaborador por cédula y actualiza sus datos.
         NO actualiza el estado del colaborador.
         
+        Validación estricta: los valores del CSV deben coincidir exactamente
+        con los registros existentes en la base de datos.
+        
         CSV esperado (mismo formato que POST):
         cédula;Nombre;Correo;Número;Región;Nivel;Empresa;Unidad;Descripción Unidad;Proyecto;Centro;Cargo
         """
@@ -1789,9 +1979,12 @@ class RegistrarMasivoView(APIView):
 
             # =====================================================
             # PASO 1: VALIDAR TODAS LAS FILAS
+            # Separa en: filas_existentes (actualizar) y filas_nuevas (crear)
             # =====================================================
-            filas_datos = []
+            filas_existentes = []
+            filas_nuevas = []
             errores_validacion = []
+            cedulas_en_csv = {}  # Para detectar duplicados dentro del CSV
 
             for num_fila, fila in enumerate(reader, start=2):
                 fila_limpia = {k.strip(): (v.strip() if v else '') for k, v in fila.items()}
@@ -1813,75 +2006,130 @@ class RegistrarMasivoView(APIView):
                 if not cedula:
                     continue
 
-                # Verificar que el colaborador EXISTE
-                colaborador = Colaboradores.objects.filter(cccolaborador=cedula).first()
-                if not colaborador:
+                # Verificar cédula duplicada dentro del mismo CSV
+                if cedula in cedulas_en_csv:
                     errores_validacion.append({
                         "fila": num_fila,
                         "cedula": cedula,
-                        "error": f"No se encontró colaborador con cédula {cedula}"
+                        "error": f"Cédula duplicada en el CSV: {cedula} ya aparece en la fila {cedulas_en_csv[cedula]}"
                     })
                     continue
+                cedulas_en_csv[cedula] = num_fila
 
                 # Separar nombre si viene
                 apellidos, nombres = None, None
                 if nombre_completo:
                     apellidos, nombres = self._separar_nombre(nombre_completo)
 
-                # Buscar CentroOp por jerarquía
-                centro_op = None
-                if empresa_nombre and unidad_nombre and proyecto_nombre and centro_nombre:
-                    centro_op = self._buscar_centro_op(
-                        empresa_nombre, unidad_nombre, unidad_descripcion, proyecto_nombre, centro_nombre
-                    )
-                    if not centro_op:
+                # Verificar si el colaborador existe
+                colaborador = Colaboradores.objects.filter(cccolaborador=cedula).first()
+                es_nuevo = colaborador is None
+
+                # Para colaboradores NUEVOS, nombre es requerido
+                if es_nuevo and not nombre_completo:
+                    errores_validacion.append({
+                        "fila": num_fila,
+                        "cedula": cedula,
+                        "error": f"El campo 'Nombre' es obligatorio para crear un nuevo colaborador con cedula {cedula}"
+                    })
+                    continue
+
+                # Verificar que tiene usuario asociado (solo para existentes)
+                usuario = None
+                if not es_nuevo:
+                    usuario = Usuarios.objects.filter(idcolaboradoru=colaborador).first()
+                    if not usuario:
                         errores_validacion.append({
                             "fila": num_fila,
                             "cedula": cedula,
-                            "error": f"Centro de operación no encontrado: Empresa={empresa_nombre}, Unidad={unidad_nombre}, Descripción={unidad_descripcion}, Proyecto={proyecto_nombre}, Centro={centro_nombre}"
+                            "error": f"El colaborador con cedula {cedula} no tiene usuario asociado en el sistema"
+                        })
+                        continue
+                if nombre_completo:
+                    apellidos, nombres = self._separar_nombre(nombre_completo)
+
+                # Validar que los campos de centro_op vengan completos (todos o ninguno)
+                campos_centro = [empresa_nombre, unidad_nombre, proyecto_nombre, centro_nombre]
+                campos_centro_presentes = [c for c in campos_centro if c]
+                if campos_centro_presentes and len(campos_centro_presentes) < 4:
+                    faltantes_centro = []
+                    if not empresa_nombre: faltantes_centro.append('Empresa')
+                    if not unidad_nombre: faltantes_centro.append('Unidad')
+                    if not proyecto_nombre: faltantes_centro.append('Proyecto')
+                    if not centro_nombre: faltantes_centro.append('Centro')
+                    errores_validacion.append({
+                        "fila": num_fila,
+                        "cedula": cedula,
+                        "error": f"Datos incompletos para Centro de Operación. Faltan: {', '.join(faltantes_centro)}. Debe proporcionar todos los campos (Empresa, Unidad, Proyecto, Centro) o ninguno."
+                    })
+                    continue
+
+                # Buscar CentroOp con validación estricta por jerarquía
+                centro_op = None
+                if empresa_nombre and unidad_nombre and proyecto_nombre and centro_nombre:
+                    centro_op, error_centro = self._validar_jerarquia_centro_op(
+                        empresa_nombre, unidad_nombre, unidad_descripcion, proyecto_nombre, centro_nombre
+                    )
+                    if error_centro:
+                        errores_validacion.append({
+                            "fila": num_fila,
+                            "cedula": cedula,
+                            "error": error_centro
                         })
                         continue
 
-                # Buscar Cargo
+                # Buscar Cargo (validación estricta)
                 cargo_obj = None
                 if cargo_nombre:
                     cargo_obj = self._buscar_cargo(cargo_nombre)
                     if not cargo_obj:
+                        cargos_disponibles = list(
+                            Cargo.objects.filter(estadocargo=1)
+                            .values_list('nombrecargo', flat=True)[:15]
+                        )
                         errores_validacion.append({
                             "fila": num_fila,
                             "cedula": cedula,
-                            "error": f"Cargo no encontrado: {cargo_nombre}"
+                            "error": f"Cargo '{cargo_nombre}' no encontrado en la BD. Cargos disponibles: {', '.join(cargos_disponibles) if cargos_disponibles else 'ninguno'}"
                         })
                         continue
 
-                # Buscar Nivel
+                # Buscar Nivel (validación estricta)
                 nivel_obj = None
                 if nivel_nombre:
                     nivel_obj = self._buscar_nivel(nivel_nombre)
                     if not nivel_obj:
+                        niveles_disponibles = list(
+                            Niveles.objects.filter(estadonivel=1)
+                            .values_list('nombrenivel', flat=True)[:15]
+                        )
                         errores_validacion.append({
                             "fila": num_fila,
                             "cedula": cedula,
-                            "error": f"Nivel no encontrado: {nivel_nombre}"
+                            "error": f"Nivel '{nivel_nombre}' no encontrado en la BD. Niveles disponibles: {', '.join(niveles_disponibles) if niveles_disponibles else 'ninguno'}"
                         })
                         continue
 
-                # Buscar Regional
+                # Buscar Regional (validación estricta)
                 regional_obj = None
                 if region_nombre:
                     regional_obj = self._buscar_regional(region_nombre)
                     if not regional_obj:
+                        regionales_disponibles = list(
+                            Regional.objects.filter(estadoregional=1)
+                            .values_list('nombreregional', flat=True)[:15]
+                        )
                         errores_validacion.append({
                             "fila": num_fila,
                             "cedula": cedula,
-                            "error": f"Regional no encontrada: {region_nombre}"
+                            "error": f"Regional '{region_nombre}' no encontrada en la BD. Regionales disponibles: {', '.join(regionales_disponibles) if regionales_disponibles else 'ninguna'}"
                         })
                         continue
 
-                filas_datos.append({
+                # Agregar a la lista correspondiente (nuevas o existentes)
+                fila_obj = {
                     "num_fila": num_fila,
                     "cedula": cedula,
-                    "colaborador": colaborador,
                     "nombre": nombres,
                     "apellido": apellidos,
                     "correo": correo,
@@ -1890,7 +2138,13 @@ class RegistrarMasivoView(APIView):
                     "cargo_obj": cargo_obj,
                     "nivel_obj": nivel_obj,
                     "regional_obj": regional_obj,
-                })
+                }
+
+                if es_nuevo:
+                    filas_nuevas.append(fila_obj)
+                else:
+                    fila_obj['colaborador'] = colaborador
+                    filas_existentes.append(fila_obj)
 
             # =====================================================
             # Si hay errores de validación, rechazar TODO
@@ -1902,50 +2156,99 @@ class RegistrarMasivoView(APIView):
                     "detalles_errores": errores_validacion
                 }, status=400)
 
-            if not filas_datos:
+            if not filas_nuevas and not filas_existentes:
                 return Response({
                     "error": "El archivo CSV no contiene filas válidas para procesar",
                     "total_filas": 0,
-                    "actualizados": 0
+                    "procesados": 0
                 }, status=400)
 
             # =====================================================
-            # PASO 2: ACTUALIZAR EN UNA TRANSACCIÓN
+            # PASO 2: ACTUALIZAR/CREAR EN UNA TRANSACCIÓN
             # =====================================================
             resultados = []
             try:
                 with transaction.atomic():
-                    for fila_data in filas_datos:
+                    # Procesar colaboradores NUEVOS (crear)
+                    for fila_data in filas_nuevas:
+                        try:
+                            colaborador = Colaboradores.objects.create(
+                                cccolaborador=fila_data['cedula'],
+                                nombrecolaborador=fila_data['nombre'],
+                                apellidocolaborador=fila_data['apellido'],
+                                centroop=fila_data['centro_op'],
+                                cargocolaborador=fila_data['cargo_obj'],
+                                correocolaborador=fila_data['correo'],
+                                telefocolaborador=fila_data['telefono'],
+                                nivelcolaborador=fila_data['nivel_obj'],
+                                regionalcolab=fila_data['regional_obj'],
+                                estadocolaborador=1,
+                            )
+
+                            usuario = Usuarios(
+                                usuario=fila_data['cedula'],
+                                tipousuario=0,
+                                idcolaboradoru=colaborador,
+                                estadousuario=1,
+                            )
+                            usuario.set_password(fila_data['cedula'])
+                            usuario.save()
+
+                            resultados.append({
+                                "fila": fila_data['num_fila'],
+                                "cedula": fila_data['cedula'],
+                                "nombre": colaborador.nombrecolaborador,
+                                "apellido": colaborador.apellidocolaborador,
+                                "usuario_id": usuario.id,
+                                "colaborador_id": colaborador.idcolaborador,
+                                "accion": "CREADO",
+                                "success": True
+                            })
+
+                        except Exception as e:
+                            raise Exception(f"Error creando fila {fila_data['num_fila']} (cedula {fila_data['cedula']}): {str(e)}")
+
+                    # Procesar colaboradores EXISTENTES (actualizar)
+                    for fila_data in filas_existentes:
                         try:
                             colaborador = fila_data['colaborador']
+                            cambios = []
 
                             # Actualizar nombre y apellido si vienen en el CSV
-                            if fila_data['nombre']:
+                            if fila_data['nombre'] and fila_data['nombre'] != colaborador.nombrecolaborador:
                                 colaborador.nombrecolaborador = fila_data['nombre']
-                            if fila_data['apellido']:
+                                cambios.append('nombre')
+                            if fila_data['apellido'] and fila_data['apellido'] != colaborador.apellidocolaborador:
                                 colaborador.apellidocolaborador = fila_data['apellido']
+                                cambios.append('apellido')
 
                             # Actualizar correo y teléfono si vienen
-                            if fila_data['correo']:
+                            if fila_data['correo'] and fila_data['correo'] != (colaborador.correocolaborador or ''):
                                 colaborador.correocolaborador = fila_data['correo']
-                            if fila_data['telefono']:
+                                cambios.append('correo')
+                            if fila_data['telefono'] and fila_data['telefono'] != (colaborador.telefocolaborador or ''):
                                 colaborador.telefocolaborador = fila_data['telefono']
+                                cambios.append('telefono')
 
                             # Actualizar centro de operación
-                            if fila_data['centro_op']:
+                            if fila_data['centro_op'] and fila_data['centro_op'] != colaborador.centroop:
                                 colaborador.centroop = fila_data['centro_op']
+                                cambios.append('centro_operacion')
 
                             # Actualizar cargo
-                            if fila_data['cargo_obj']:
+                            if fila_data['cargo_obj'] and fila_data['cargo_obj'] != colaborador.cargocolaborador:
                                 colaborador.cargocolaborador = fila_data['cargo_obj']
+                                cambios.append('cargo')
 
                             # Actualizar nivel
-                            if fila_data['nivel_obj']:
+                            if fila_data['nivel_obj'] and fila_data['nivel_obj'] != colaborador.nivelcolaborador:
                                 colaborador.nivelcolaborador = fila_data['nivel_obj']
+                                cambios.append('nivel')
 
                             # Actualizar regional
-                            if fila_data['regional_obj']:
+                            if fila_data['regional_obj'] and fila_data['regional_obj'] != colaborador.regionalcolab:
                                 colaborador.regionalcolab = fila_data['regional_obj']
+                                cambios.append('regional')
 
                             # NO se actualiza estadocolaborador
                             colaborador.save()
@@ -1956,22 +2259,31 @@ class RegistrarMasivoView(APIView):
                                 "nombre": colaborador.nombrecolaborador,
                                 "apellido": colaborador.apellidocolaborador,
                                 "colaborador_id": colaborador.idcolaborador,
+                                "campos_actualizados": cambios,
+                                "accion": "ACTUALIZADO",
                                 "success": True
                             })
 
                         except Exception as e:
                             raise Exception(f"Error en fila {fila_data['num_fila']} (cédula {fila_data['cedula']}): {str(e)}")
 
+                # Contar acciones
+                creados = len([r for r in resultados if r.get('accion') == 'CREADO'])
+                actualizados = len([r for r in resultados if r.get('accion') == 'ACTUALIZADO'])
+
                 return Response({
-                    "mensaje": f"Se actualizaron {len(resultados)} usuarios exitosamente",
-                    "total_actualizados": len(resultados),
+                    "mensaje": f"Procesamiento completado: {creados} creados, {actualizados} actualizados",
+                    "total_creados": creados,
+                    "total_actualizados": actualizados,
+                    "total_procesados": len(resultados),
                     "detalles": resultados
                 }, status=200)
 
             except Exception as e:
                 return Response({
-                    "error": f"Error durante la actualización. Ningún usuario fue modificado. Detalles: {str(e)}",
-                    "total_intentados": len(filas_datos),
+                    "error": f"Error durante el procesamiento. Ningun usuario fue modificado o creado. Detalles: {str(e)}",
+                    "total_intentados": len(filas_nuevas) + len(filas_existentes),
+                    "creados": 0,
                     "actualizados": 0
                 }, status=500)
 

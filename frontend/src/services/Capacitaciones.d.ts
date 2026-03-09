@@ -19,7 +19,7 @@ interface CapListService {
   getCapacitacionDetalle(id: string | number): Promise<any>;
   updateCapacitacion(id: string | number, data: any): Promise<any>;
   postCapList(): Promise<any>;
-  certificadoDescargar(capacitacionId: string | number): Promise<Blob>;
+  certificadoDescargar(capacitacionId: string | number, colaboradorId): Promise<Blob>;
   postCargarColab(): Promise<any>;
   eliminarCapacitacion(capacitacionId: string | number): Promise<any>;
   getMiCapacitacion(): Promise<any>;
@@ -31,7 +31,7 @@ interface CapListService {
   getEditarColaboradores(capacitacionId: string | number): Promise<any>;
   putEditarColaboradores(capacitacionId: string | number, data: any): Promise<any>;
   GetUsersCapacitacion(capacitacionId: string | number): Promise<any>;
-  descargarReporteCapacitacion(capacitacionId: string | number): Promise<Blob>;
+  descargarReporteCapacitacion(capacitacionId: string | number, includeQuestions?: boolean): Promise<Blob>;
   descargarReporteRangoFechas(fechaInicio: string, fechaFin: string): Promise<Blob>;
 }
 

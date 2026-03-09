@@ -58,7 +58,7 @@ const LoginPage: React.FC = () => {
             <div className="logo-placeholder">
               <div className="logo-box">
                 <img 
-                  src="img\REGENCYL.png" 
+                  src="/img/logoMIC.png" 
                   alt="Logo" 
                   className="logo-img"
                 />
