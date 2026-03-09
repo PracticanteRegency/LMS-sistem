@@ -279,9 +279,12 @@ export async function getCapacitacionDetalle(capacitacionId) {
 // Actualizar campos de la capacitación (sincronizar si envías `colaboradores` completo)
 export async function patchCapacitacion(capacitacionId, payload) {
   // Llama a: PATCH /capacitaciones/crear-capacitacion/<id>/
-  // Payload: campos a actualizar o { colaboradores: [ids...] } para sincronizar
+  // Payload: campos a actualizar, { colaboradores: [ids...] }, o FormData para multipart
   return dedupe('cap:patchCapacitacion', { capacitacionId, payload }, async () => {
-    const response = await api.patch(`capacitaciones/crear-capacitacion/${capacitacionId}/`, payload);
+    // Si es FormData, axios detecta automáticamente y usa multipart/form-data
+    // Si es objeto JSON, axios envía como application/json
+    const config = payload instanceof FormData ? {} : {};
+    const response = await api.patch(`capacitaciones/crear-capacitacion/${capacitacionId}/`, payload, config);
     return response.data;
   });
 }
