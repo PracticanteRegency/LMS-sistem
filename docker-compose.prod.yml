@@ -78,7 +78,7 @@ services:
     image: nginx:alpine
     container_name: nginx
     volumes:
-      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
       - ./certs:/etc/nginx/certs:ro
     ports:
       - "8080:8080"
