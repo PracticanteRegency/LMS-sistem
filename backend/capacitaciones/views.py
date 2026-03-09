@@ -119,36 +119,143 @@ class CrearCapacitacionView(APIView):
         # Obtener colaboradores actuales para invalidar cache
         current_collaborators = set(progresoCapacitaciones.objects.filter(capacitacion=capacitacion).values_list('colaborador_id', flat=True))
 
-        # Limpieza: si el front envía campos como imagen: '' quitarlos para evitar
-        # errores de validación sobre campos no permitidos en blanco.
-        data = None
+        archivos_creados = []
+        
         try:
-            data = request.data.copy()
-        except Exception:
-            data = dict(request.data)
+            from capacitaciones.utils import procesar_archivo_multimedia, limpiar_archivo
+            import json
+            
+            # Extraer datos del request - soporta tanto multipart como JSON
+            data = {}
+            try:
+                if hasattr(request, 'POST') and request.POST:
+                    # Si tiene multipart/form-data
+                    data = dict(request.POST.items())
+                else:
+                    # Si es JSON
+                    data = dict(request.data)
+            except Exception:
+                data = dict(request.data)
 
-        # Eliminar solo cadenas vacías; mantener False/0/None si es necesario
-        for k in list(data.keys()):
-            if isinstance(data.get(k), str) and data.get(k) == '':
-                data.pop(k)
+            # Eliminar solo cadenas vacías; mantener False/0/None si es necesario
+            for k in list(data.keys()):
+                if isinstance(data.get(k), str) and data.get(k) == '':
+                    data.pop(k)
 
-        # NO procesar colaboradores desde el request - se ignoran completamente
-        if 'colaboradores' in data:
-            data.pop('colaboradores')
+            # NO procesar colaboradores desde el request - se ignoran completamente
+            if 'colaboradores' in data:
+                data.pop('colaboradores')
+            
+            # Parsear modulos si vienen como JSON string
+            if 'modulos' in data:
+                try:
+                    if isinstance(data['modulos'], str):
+                        data['modulos'] = json.loads(data['modulos'])
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.error(f"Error al parsear módulos en PATCH: {str(e)}")
+                    return Response(
+                        {'error': 'Estructura de módulos inválida'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Procesar imagen principal si viene en request.FILES
+            if 'imagen' in request.FILES:
+                imagen_file = request.FILES['imagen']
+                url_imagen, error = procesar_archivo_multimedia(
+                    imagen_file, 'imagen'
+                )
+                if error:
+                    return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+                data['imagen'] = url_imagen
+                archivos_creados.append(url_imagen)
+            
+            # Procesar archivos de lecciones y preguntas si vienen en multipart
+            if request.FILES:
+                modulos_data = data.get('modulos', [])
+                if modulos_data and isinstance(modulos_data, list):
+                    for modulo_idx, modulo_data in enumerate(modulos_data):
+                        lecciones = modulo_data.get('lecciones', [])
+                        
+                        for leccion_idx, leccion_data in enumerate(lecciones):
+                            # Procesar archivo de lección (video/PDF)
+                            leccion_tipo = leccion_data.get('tipo_leccion', '').lower()
+                            if leccion_tipo in ['video', 'pdf', 'imagen']:
+                                file_key = f'leccion_{modulo_idx}_{leccion_idx}'
+                                
+                                if file_key in request.FILES:
+                                    tipo_archivo = 'video' if leccion_tipo == 'video' else leccion_tipo
+                                    url_leccion, error = procesar_archivo_multimedia(
+                                        request.FILES[file_key], tipo_archivo
+                                    )
+                                    if error:
+                                        for url in archivos_creados:
+                                            limpiar_archivo(url)
+                                        return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+                                    
+                                    leccion_data['url'] = url_leccion
+                                    archivos_creados.append(url_leccion)
+                            
+                            # Procesar preguntas
+                            preguntas = leccion_data.get('preguntas', [])
+                            for pregunta_idx, pregunta_data in enumerate(preguntas):
+                                # Procesar multimedia de pregunta
+                                file_key_pregunta = f'pregunta_{modulo_idx}_{leccion_idx}_{pregunta_idx}'
+                                if file_key_pregunta in request.FILES:
+                                    url_pregunta, error = procesar_archivo_multimedia(
+                                        request.FILES[file_key_pregunta], 'imagen'
+                                    )
+                                    if error:
+                                        for url in archivos_creados:
+                                            limpiar_archivo(url)
+                                        return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+                                    
+                                    pregunta_data['url_multimedia'] = url_pregunta
+                                    archivos_creados.append(url_pregunta)
+                                
+                                # Procesar respuestas
+                                respuestas = pregunta_data.get('respuestas', [])
+                                for respuesta_idx, respuesta_data in enumerate(respuestas):
+                                    file_key_respuesta = f'respuesta_{modulo_idx}_{leccion_idx}_{pregunta_idx}_{respuesta_idx}'
+                                    if file_key_respuesta in request.FILES:
+                                        url_respuesta, error = procesar_archivo_multimedia(
+                                            request.FILES[file_key_respuesta], 'imagen'
+                                        )
+                                        if error:
+                                            for url in archivos_creados:
+                                                limpiar_archivo(url)
+                                            return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+                                        
+                                        respuesta_data['url_imagen'] = url_respuesta
+                                        archivos_creados.append(url_respuesta)
 
-        serializer = CrearCapacitacionSerializer(capacitacion, data=data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
+            serializer = CrearCapacitacionSerializer(capacitacion, data=data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
 
-            # Invalidar cache para la capacitación y colaboradores afectados
-            invalidate_capacitacion_cache(capacitacion_id=capacitacion.id)
-            new_collaborators = set(progresoCapacitaciones.objects.filter(capacitacion=capacitacion).values_list('colaborador_id', flat=True))
-            affected = current_collaborators | new_collaborators
-            for cid in affected:
-                invalidate_capacitacion_cache(colaborador_id=cid)
+                # Invalidar cache para la capacitación y colaboradores afectados
+                invalidate_capacitacion_cache(capacitacion_id=capacitacion.id)
+                new_collaborators = set(progresoCapacitaciones.objects.filter(capacitacion=capacitacion).values_list('colaborador_id', flat=True))
+                affected = current_collaborators | new_collaborators
+                for cid in affected:
+                    invalidate_capacitacion_cache(colaborador_id=cid)
 
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            
+            # Limpiar archivos si hay error en validación
+            for url in archivos_creados:
+                limpiar_archivo(url)
+            
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+        except Exception as e:
+            # Limpiar archivos en caso de error
+            for url in archivos_creados:
+                limpiar_archivo(url)
+            logger.error(f"Error en PATCH capacitación: {str(e)}")
+            return Response(
+                {'error': f'Error al actualizar capacitación: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     @transaction.atomic
     def post(self, request, capacitacion_id=None, *args, **kwargs):
