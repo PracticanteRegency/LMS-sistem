@@ -57,8 +57,8 @@ services:
   frontend:
     container_name: frontend
     build: ./frontend
-    expose:
-      - "80"
+    ports:
+      - "5173:80"
     restart: always
     networks:
       - shared_net
@@ -81,7 +81,7 @@ services:
       - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
       - ./certs:/etc/nginx/certs:ro
     ports:
-      - "8080:80"
+      - "8080:8080"
       - "4443:443"
     depends_on:
       - backend
