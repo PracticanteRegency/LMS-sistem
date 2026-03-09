@@ -19,12 +19,61 @@ const getMisCapacitaciones = async () => {
   });
 };
 
-// POST: Crear una nueva capacitación con estructura completa (módulos, lecciones, preguntas, etc.)
-// payload debe contener: { titulo, descripcion, imagen, fecha_inicio, fecha_fin, modulos, colaboradores }
+// POST: Crear una nueva capacitación con estructura completa y soporte para archivos multimedia incrustados
+// Acepta tanto JSON puro como FormData con archivos
+// payload puede contener archivos en estructura: { modulos: [...], imagen: File, archivos: {...} }
 const crearCapacitacionCompleta = async (payload) => {
   return dedupe('cap:crearCapacitacionCompleta', payload, async () => {
-    const response = await api.post("capacitaciones/crear-capacitacion/", payload);
-    return response.data;
+    // Si el payload contiene archivos, usar FormData; si no, usar JSON puro
+    if (payload instanceof FormData || (payload.imagen instanceof File) || (payload.archivos && Object.values(payload.archivos).some(v => v instanceof File))) {
+      // Convertir a FormData si no lo es ya
+      let formData;
+      if (payload instanceof FormData) {
+        formData = payload;
+      } else {
+        formData = new FormData();
+        
+        // Agregar campos simples
+        formData.append('titulo', payload.titulo || '');
+        formData.append('descripcion', payload.descripcion || '');
+        formData.append('tipo', payload.tipo || '');
+        if (payload.fecha_inicio) formData.append('fecha_inicio', payload.fecha_inicio);
+        if (payload.fecha_fin) formData.append('fecha_fin', payload.fecha_fin);
+        
+        // Agregar módulos como JSON string
+        if (payload.modulos) {
+          formData.append('modulos', JSON.stringify(payload.modulos));
+        }
+        
+        // Agregar colaboradores como JSON string
+        if (payload.colaboradores) {
+          formData.append('colaboradores', JSON.stringify(payload.colaboradores));
+        }
+        
+        // Agregar imagen principal si existe
+        if (payload.imagen instanceof File) {
+          formData.append('imagen', payload.imagen);
+        }
+        
+        // Agregar archivos multimedia incrustados
+        if (payload.archivos && typeof payload.archivos === 'object') {
+          Object.entries(payload.archivos).forEach(([key, file]) => {
+            if (file instanceof File) {
+              formData.append(key, file);
+            }
+          });
+        }
+      }
+      
+      const response = await api.post("capacitaciones/crear-capacitacion/", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return response.data;
+    } else {
+      // Sin archivos: usar JSON puro (compatibilidad hacia atrás)
+      const response = await api.post("capacitaciones/crear-capacitacion/", payload);
+      return response.data;
+    }
   });
 };
 
@@ -302,10 +351,11 @@ const GetUsersCapacitacion = async (capacitacionId) => {
   });
 };
 
-const descargarReporteCapacitacion = async (capacitacionId) => {
-  return dedupe('cap:descargarReporteCapacitacion', capacitacionId, async () => {
+const descargarReporteCapacitacion = async (capacitacionId, includeQuestions) => {
+  const include = includeQuestions === true ? 'true' : 'false';
+  return dedupe('cap:descargarReporteCapacitacion', { capacitacionId, includeQuestions }, async () => {
     const response = await api.get(
-      `capacitaciones/reporte-capacitaciones/?capacitacion_id=${capacitacionId}`,
+      `capacitaciones/reporte-capacitaciones/?capacitacion_id=${capacitacionId}&include_questions=${include}`,
       {
         responseType: 'blob',
       }

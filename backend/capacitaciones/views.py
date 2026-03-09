@@ -19,7 +19,7 @@ from pathlib import Path
 from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import Count, Prefetch, OuterRef, Subquery
+from django.db.models import Count, Max, Prefetch, OuterRef, Subquery
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -153,80 +153,201 @@ class CrearCapacitacionView(APIView):
     @transaction.atomic
     def post(self, request, capacitacion_id=None, *args, **kwargs):
         """
-        Crear nueva capacitación y asignar colaboradores si se envían.
-        Espera un payload JSON con:
-        {
-            "titulo": "...",
-            "descripcion": "...",
-            "modulos": [...],
-            "colaboradores": [id1, id2, id3]  # IDs de colaboradores a asignar
-        }
+        Crear nueva capacitación con soporte para archivos multimedia en el mismo POST.
+        
+        Soporta multipart/form-data con archivos incrustados.
+        Los archivos se procesan durante la creación y se rollback en caso de error.
+        
+        Estructura del payload (multipart/form-data):
+        - titulo: string
+        - descripcion: string
+        - imagen: file (opcional)
+        - tipo: string
+        - fecha_inicio: datetime
+        - fecha_fin: datetime
+        - modulos: JSON string (con estructura de módulos, lecciones y archivos)
+        - colaboradores: JSON string (array de IDs)
+        - archivo_leccion_<modulo_idx>_<leccion_idx>: file (opcional)
+        - archivo_pregunta_<modulo_idx>_<leccion_idx>_<pregunta_idx>: file (opcional)
+        - archivo_respuesta_<modulo_idx>_<leccion_idx>_<pregunta_idx>_<respuesta_idx>: file (opcional)
         """
+        archivos_creados = []  # Rastrear archivos creados para limpiarlos en caso de error
+        
         try:
-            data = None
-            colaboradores_ids = []
+            from capacitaciones.utils import procesar_archivo_multimedia, limpiar_archivo, ALLOWED_IMAGE_EXTENSIONS, ALLOWED_PDF_EXTENSION
+            import json
+            
+            # Extraer datos del request
+            data = {}
             try:
-                data = request.data.copy()
+                # Usar POST data para campos simples
+                data = dict(request.POST.items())
             except Exception:
-                data = dict(request.data)
-
-            # Extraer colaboradores del request ANTES de remover
-            if 'colaboradores' in data:
-                colaboradores_ids = data.pop('colaboradores')
-                # Asegurar que sea una lista
-                if not isinstance(colaboradores_ids, list):
-                    colaboradores_ids = [colaboradores_ids]
-
-            serializer = CrearCapacitacionSerializer(data=data)
-            if serializer.is_valid():
-                capacitacion = serializer.save()
-                
-                # Procesar colaboradores si se proporcionaron
-                if colaboradores_ids:
-                    # Obtener colaboradores válidos
-                    colaboradores = Colaboradores.objects.filter(
-                        idcolaborador__in=colaboradores_ids,
-                        estadocolaborador=1  # Solo colaboradores activos
-                    )
-                    
-                    # Crear registros de progreso en bulk
-                    progreso_records = [
-                        progresoCapacitaciones(
-                            capacitacion=capacitacion,
-                            colaborador=colaborador,
-                            completada=0,
-                            progreso=0
-                        )
-                        for colaborador in colaboradores
-                    ]
-                    
-                    progresoCapacitaciones.objects.bulk_create(progreso_records, ignore_conflicts=True)
-                
-                # Enviar correos DESPUÉS de crear colaboradores
-                # Siempre enviar correo de bienvenida al crear (no solo si está activa)
-                if colaboradores_ids:
-                    try:
-                        from capacitaciones.utils import enviar_correo_capacitacion_creada_batch
-                        # Ejecutar de forma síncrona después de que la transacción se confirme
-                        transaction.on_commit(lambda: enviar_correo_capacitacion_creada_batch(capacitacion))
-                        logger.info(f"Correos programados para capacitación {capacitacion.id}")
-                    except Exception as e:
-                        logger.error(f"Error al programar envío de correos: {str(e)}", exc_info=True)
-                
-                # Invalidar cache de lista de capacitaciones
-                cache.delete('capacitaciones_list_admin')
-                
                 return Response(
-                    {
-                        'id': capacitacion.id,
-                        'titulo': capacitacion.titulo,
-                        'colaboradores_asignados': len(colaboradores_ids)
-                    },
-                    status=status.HTTP_201_CREATED
+                    {'error': 'Error al procesar datos del formulario'},
+                    status=status.HTTP_400_BAD_REQUEST
                 )
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Extraer colaboradores
+            colaboradores_ids = []
+            if 'colaboradores' in data:
+                try:
+                    if isinstance(data['colaboradores'], str):
+                        colaboradores_ids = json.loads(data.pop('colaboradores'))
+                    else:
+                        colaboradores_ids = data.pop('colaboradores')
+                except (json.JSONDecodeError, ValueError):
+                    colaboradores_ids = []
+            
+            # Parsear modulos
+            modulos_data = []
+            if 'modulos' in data:
+                try:
+                    modulos_data = json.loads(data.pop('modulos'))
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.error(f"Error al parsear módulos: {str(e)}")
+                    return Response(
+                        {'error': 'Estructura de módulos inválida'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Procesar imagen principal
+            if 'imagen' in request.FILES:
+                imagen_file = request.FILES['imagen']
+                url_imagen, error = procesar_archivo_multimedia(
+                    imagen_file, 'imagen'
+                )
+                if error:
+                    return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+                data['imagen'] = url_imagen
+                archivos_creados.append(url_imagen)
+            
+            # Procesar archivos de lecciones y preguntas
+            for modulo_idx, modulo_data in enumerate(modulos_data):
+                lecciones = modulo_data.get('lecciones', [])
+                
+                for leccion_idx, leccion_data in enumerate(lecciones):
+                    # Procesar archivo de lección (video/PDF)
+                    leccion_tipo = leccion_data.get('tipo_leccion', '').lower()
+                    if leccion_tipo in ['video', 'pdf', 'imagen']:
+                        file_key = f'leccion_{modulo_idx}_{leccion_idx}'
+                        
+                        if file_key in request.FILES:
+                            tipo_archivo = 'video' if leccion_tipo == 'video' else leccion_tipo
+                            url_leccion, error = procesar_archivo_multimedia(
+                                request.FILES[file_key], tipo_archivo
+                            )
+                            if error:
+                                # Limpiar archivos creados antes del error
+                                for url in archivos_creados:
+                                    limpiar_archivo(url)
+                                return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+                            
+                            leccion_data['url'] = url_leccion
+                            archivos_creados.append(url_leccion)
+                    
+                    # Procesar preguntas
+                    preguntas = leccion_data.get('preguntas', [])
+                    for pregunta_idx, pregunta_data in enumerate(preguntas):
+                        # Procesar multimedia de pregunta
+                        file_key_pregunta = f'pregunta_{modulo_idx}_{leccion_idx}_{pregunta_idx}'
+                        if file_key_pregunta in request.FILES:
+                            url_pregunta, error = procesar_archivo_multimedia(
+                                request.FILES[file_key_pregunta], 'imagen'
+                            )
+                            if error:
+                                for url in archivos_creados:
+                                    limpiar_archivo(url)
+                                return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+                            
+                            pregunta_data['url_multimedia'] = url_pregunta
+                            archivos_creados.append(url_pregunta)
+                        
+                        # Procesar respuestas
+                        respuestas = pregunta_data.get('respuestas', [])
+                        for respuesta_idx, respuesta_data in enumerate(respuestas):
+                            file_key_respuesta = f'respuesta_{modulo_idx}_{leccion_idx}_{pregunta_idx}_{respuesta_idx}'
+                            if file_key_respuesta in request.FILES:
+                                url_respuesta, error = procesar_archivo_multimedia(
+                                    request.FILES[file_key_respuesta], 'imagen'
+                                )
+                                if error:
+                                    for url in archivos_creados:
+                                        limpiar_archivo(url)
+                                    return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+                                
+                                respuesta_data['url_imagen'] = url_respuesta
+                                archivos_creados.append(url_respuesta)
+            
+            # Agregar módulos nuevamente a los datos para el serializer
+            data['modulos'] = modulos_data
+            data['colaboradores'] = colaboradores_ids
+            
+            # Crear capacitación con transacción
+            serializer = CrearCapacitacionSerializer(data=data)
+            if not serializer.is_valid():
+                # Limpiar archivos si hay error en validación
+                for url in archivos_creados:
+                    limpiar_archivo(url)
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Guardar capacitación (la transacción atómica se maneja en el serializer)
+            capacitacion = serializer.save()
+            
+            # Procesar colaboradores si se proporcionaron
+            if colaboradores_ids:
+                colaboradores = Colaboradores.objects.filter(
+                    idcolaborador__in=colaboradores_ids,
+                    estadocolaborador=1
+                )
+                
+                progreso_records = [
+                    progresoCapacitaciones(
+                        capacitacion=capacitacion,
+                        colaborador=colaborador,
+                        completada=0,
+                        progreso=0
+                    )
+                    for colaborador in colaboradores
+                ]
+                
+                progresoCapacitaciones.objects.bulk_create(progreso_records, ignore_conflicts=True)
+                
+                # Enviar correos
+                try:
+                    from capacitaciones.utils import enviar_correo_capacitacion_creada_batch
+                    transaction.on_commit(lambda: enviar_correo_capacitacion_creada_batch(capacitacion))
+                    logger.info(f"Correos programados para capacitación {capacitacion.id}")
+                except Exception as e:
+                    logger.error(f"Error al programar correos: {str(e)}", exc_info=True)
+            
+            # Invalidar cache
+            cache.delete('capacitaciones_list_admin')
+            
+            return Response(
+                {
+                    'id': capacitacion.id,
+                    'titulo': capacitacion.titulo,
+                    'imagen': capacitacion.imagen,
+                    'colaboradores_asignados': len(colaboradores_ids),
+                    'archivos_procesados': len(archivos_creados)
+                },
+                status=status.HTTP_201_CREATED
+            )
+            
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            # En caso de excepción no controlada, limpiar archivos
+            logger.error(f"Error al crear capacitación: {str(e)}", exc_info=True)
+            for url in archivos_creados:
+                try:
+                    limpiar_archivo(url)
+                except Exception as cleanup_error:
+                    logger.error(f"Error al limpiar archivo {url}: {str(cleanup_error)}")
+            
+            return Response(
+                {'error': f'Error al crear capacitación: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class CapacitacionesView(APIView):
@@ -366,13 +487,21 @@ class RegistrarProgresoView(APIView):
             colaborador = request.user.idcolaboradoru
             leccion_id = request.data.get('leccion_id')
             progreso = request.data.get('progreso', 0)
-            completada = request.data.get('completada', False)
             
             if not leccion_id:
                 return Response(
                     {'error': 'leccion_id es requerido'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+            
+            # Validar que el progreso sea un número entre 0 y 100
+            try:
+                progreso = max(0, min(100, float(progreso)))
+            except (ValueError, TypeError):
+                progreso = 0
+            
+            # Determinar completada basado en el progreso real (no confiar en el frontend)
+            completada = progreso >= 100
             
             # Select_related para obtener módulo y capacitación en una query
             leccion = Lecciones.objects.select_related(
@@ -637,21 +766,44 @@ class PrevisualizarColaboradoresView(APIView):
     Optimización:
     - Búsqueda en bulk en lugar de consulta individual por cédula
     - Solo se cargan campos necesarios con only()
+    
+    Retorna errores detallados para mejor UX en el frontend
     """    
     def post(self, request, *args, **kwargs):
         try:
             archivo = request.FILES.get('archivo')
             if not archivo:
                 return Response(
-                    {'error': 'No se proporcionó archivo'},
+                    {
+                        'error': 'No se proporcionó archivo',
+                        'detalles': ['Por favor selecciona un archivo CSV']
+                    },
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
             # Validar que sea un archivo CSV
             if not archivo.name.endswith('.csv'):
                 return Response(
-                    {'error': 'El archivo debe ser un CSV'},
+                    {
+                        'error': f'El archivo debe ser un CSV. Recibido: {archivo.content_type}',
+                        'detalles': [
+                            'Extiende correctamente el archivo con .csv',
+                            f'Archivo recibido: {archivo.name}'
+                        ]
+                    },
                     status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validar tamaño del archivo
+            max_size = 5 * 1024 * 1024  # 5MB
+            if archivo.size > max_size:
+                size_mb = round(archivo.size / 1024 / 1024, 2)
+                return Response(
+                    {
+                        'error': f'El archivo supera el tamaño máximo permitido (5MB). Tamaño: {size_mb}MB',
+                        'detalles': ['Divide el archivo en partes más pequeñas']
+                    },
+                    status=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
                 )
             
             # Leer el archivo CSV
@@ -676,18 +828,41 @@ class PrevisualizarColaboradoresView(APIView):
                 # Validar que tenga la columna 'cedula'
                 if 'cedula' not in normalized_fieldnames:
                     return Response(
-                        {'error': 'El archivo CSV debe contener la columna "cedula"'},
+                        {
+                            'error': 'El archivo CSV debe contener una columna "cedula"',
+                            'detalles': [
+                                f'Columnas encontradas: {", ".join(fieldnames)}',
+                                'Asegúrate de que una columna se llame "cedula"'
+                            ]
+                        },
                         status=status.HTTP_400_BAD_REQUEST
                     )
+                
                 # Mapear nombre real del campo para obtener los valores
                 cedula_field = fieldnames[normalized_fieldnames.index('cedula')]
                 
                 # Recolectar todas las cédulas primero
                 cedulas = []
-                for row in csv_reader:
+                filas_sin_cedula = 0
+                for idx, row in enumerate(csv_reader, start=2):  # start=2 porque fila 1 es header
                     cedula = row.get(cedula_field, '').strip()
                     if cedula:
                         cedulas.append(cedula)
+                    else:
+                        filas_sin_cedula += 1
+                
+                # Si no hay cédulas válidas
+                if not cedulas:
+                    return Response(
+                        {
+                            'error': 'No se encontraron cédulas válidas en el archivo',
+                            'detalles': [
+                                f'Filas sin cédula: {filas_sin_cedula}',
+                                'Verifica que la columna "cedula" contenga valores'
+                            ]
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
                 
                 # Búsqueda en bulk - una sola query para todas las cédulas
                 colaboradores_db = Colaboradores.objects.filter(
@@ -718,32 +893,71 @@ class PrevisualizarColaboradoresView(APIView):
                         # Solo almacenar las cédulas no encontradas (lista simple)
                         colaboradores_no_encontrados.append(cedula)
                 
+                # Determinar tipo de respuesta
+                respuesta = {
+                    'mensaje': 'Archivo procesado correctamente',
+                    'total_procesados': len(cedulas),
+                    'encontrados': len(colaboradores_encontrados),
+                    'no_encontrados': len(colaboradores_no_encontrados),
+                    'colaboradores': colaboradores_encontrados,
+                    'colaboradores_no_encontrados': colaboradores_no_encontrados
+                }
+                
+                # Si no se encontraron colaboradores
+                if not colaboradores_encontrados:
+                    respuesta['detalles'] = [
+                        'Ninguna de las cédulas fue encontrada en el sistema',
+                        'Verifica la ortografía de las cédulas',
+                        'Asegúrate de que los colaboradores estén registrados'
+                    ]
+                    return Response(respuesta, status=status.HTTP_200_OK)
+                
+                return Response(respuesta, status=status.HTTP_200_OK)
+                
+            except UnicodeDecodeError as e:
                 return Response(
                     {
-                        'mensaje': 'Archivo procesado correctamente',
-                        'total_procesados': len(colaboradores_encontrados) + len(colaboradores_no_encontrados),
-                        'encontrados': len(colaboradores_encontrados),
-                        'no_encontrados': len(colaboradores_no_encontrados),
-                        'colaboradores': colaboradores_encontrados,
-                        'colaboradores_no_encontrados': colaboradores_no_encontrados
+                        'error': 'Error al decodificar el archivo',
+                        'detalles': [
+                            'El archivo no está en formato UTF-8',
+                            'Codificación no soportada detectada',
+                            'Solución: Guarda el archivo en formato UTF-8 desde Excel o un editor de texto'
+                        ]
                     },
-                    status=status.HTTP_200_OK
-                )
-                
-            except UnicodeDecodeError:
-                return Response(
-                    {'error': 'Error al decodificar el archivo. Asegúrate de que esté en formato UTF-8'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             except csv.Error as e:
                 return Response(
-                    {'error': f'Error al procesar el archivo CSV: {str(e)}'},
+                    {
+                        'error': f'Error al procesar el archivo CSV: Fila con formato incorrecto',
+                        'detalles': [
+                            f'Detalle: {str(e)}',
+                            'Verifica que todas las filas tengan el mismo número de columnas',
+                            'Comprueba que no haya saltos de línea dentro de los campos'
+                        ]
+                    },
                     status=status.HTTP_400_BAD_REQUEST
+                )
+            except Exception as e:
+                logger.error(f"Error inesperado al procesar CSV: {str(e)}", exc_info=True)
+                return Response(
+                    {
+                        'error': 'Error inesperado al procesar el archivo',
+                        'detalles': [
+                            'Por favor intenta de nuevo',
+                            'Si el problema persiste, contacta al administrador'
+                        ]
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
                 
         except Exception as e:
+            logger.error(f"Error en PrevisualizarColaboradoresView: {str(e)}", exc_info=True)
             return Response(
-                {'error': f'Error al procesar archivo: {str(e)}'},
+                {
+                    'error': f'Error al procesar archivo: {str(e)}',
+                    'detalles': ['Por favor intenta de nuevo más tarde']
+                },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -904,46 +1118,69 @@ class DescargarCertificadoView(APIView):
         posiciones_texto = {
             '{{NOMBRE}}': {
                 'x': '150.86',
-                'y': '85',
+                'y': '84',
                 'font-size': '8',
                 'text-anchor': 'middle',
                 'fill': '#000000',
-                'font-family': 'Arial, sans-serif',
-                'max-width': None  # Sin límite
+                'font-family': 'Montserrat-Light, Montserrat',
+                'font-weight': '400',
+                'letter-spacing': '0em',
+                'max-width': None
             },
             '{{CEDULA}}': {
-                'x': '175',
-                'y': '96.8',
-                'font-size': '4',
+                'x': '174',
+                'y': '94.3',
+                'font-size': '3.41',
                 'text-anchor': 'start',
                 'fill': '#000000',
-                'font-family': 'Arial, sans-serif',
+                'font-family': 'Montserrat-Light, Montserrat',
+                'font-weight': '300',
+                'letter-spacing': '0em',
                 'max-width': None
             },
             '{{CURSO}}': {
-                'x': '145',
-                'y': '112',
-                'font-size': '6',  # Reducido de 6 a 4.5
+                'x': '156',
+                'y': '120.5',
+                'font-size': '6',
                 'text-anchor': 'middle',
                 'fill': '#000000',
-                'font-family': 'Arial, sans-serif',
-                'max-width': 35  # Ancho máximo antes de salto de línea
+                'font-family': 'Montserrat-Light, Montserrat',
+                'font-weight': '400',
+                'letter-spacing': '0em',
+                'max-width': 35
             },
             '{{FECHA}}': {
-                'x': '173',
-                'y': '125.9',
-                'font-size': '3.5',
+                'x': '170',
+                'y': '132.2',
+                'font-size': '3.41',
                 'text-anchor': 'start',
                 'fill': '#000000',
-                'font-family': 'Arial, sans-serif',
+                'font-family': 'Montserrat-Light, Montserrat',
+                'font-weight': '300',
+                'letter-spacing': '0em',
                 'max-width': None
-            },
+            }
         }
-        
+        # Ajustar posición Y de '{{CURSO}}' según la longitud del texto proporcionado
+        try:
+            curso_pos = posiciones_texto.get('{{CURSO}}', {})
+            # Si no se define max-width en la plantilla, usamos 35 como fallback
+            max_width = curso_pos.get('max-width') if curso_pos.get('max-width') is not None else 35
+            curso_text = datos.get('{{CURSO}}', '') if isinstance(datos, dict) else ''
+            if curso_text and len(str(curso_text)) > int(max_width):
+                # Texto largo: utilizar la Y para curso largo
+                curso_pos['y'] = '115.5'
+            else:
+                # Texto corto o vacío: usar la Y por defecto para curso corto
+                curso_pos['y'] = '118.5'
+            posiciones_texto['{{CURSO}}'] = curso_pos
+        except Exception as e:
+            logger.warning(f"Error al ajustar posición de CURSO: {e}")
+
         # Crear grupo para textos
         text_group = ET.Element('{http://www.w3.org/2000/svg}g')
         text_group.set('id', 'dynamic_text_overlay')
-        text_group.set('class', 'cls-3')  # Usar la clase de texto del SVG
+        text_group.set('class', 'dynamic-text')  # Usar la clase de texto del SVG
         
         # Función auxiliar para manejar textos largos con saltos de línea
         def create_text_elements(key, val, pos, parent_group):
@@ -974,13 +1211,18 @@ class DescargarCertificadoView(APIView):
                 line_height = float(pos.get('font-size', '4')) * 1.5  # 1.5x el tamaño de fuente
                 
                 for idx, linea in enumerate(lineas):
+                    # Crear un solo elemento de texto
                     text_elem = ET.Element('{http://www.w3.org/2000/svg}text')
                     text_elem.set('x', pos.get('x', '0'))
                     text_elem.set('y', str(y_offset + (idx * line_height)))
                     text_elem.set('font-size', pos.get('font-size', '4'))
                     text_elem.set('text-anchor', pos.get('text-anchor', 'middle'))
                     text_elem.set('fill', pos.get('fill', '#000000'))
-                    text_elem.set('font-family', pos.get('font-family', 'Arial, sans-serif'))
+                    text_elem.set('font-family', pos.get('font-family', 'Montserrat-Light, Montserrat'))
+
+                    if 'font-weight' in pos:
+                        text_elem.set('font-weight', pos.get('font-weight'))
+
                     text_elem.text = linea
                     parent_group.append(text_elem)
                     logger.warning(f"Línea {idx+1} de '{key}': '{linea}'")
@@ -992,7 +1234,7 @@ class DescargarCertificadoView(APIView):
                 text_elem.set('font-size', pos.get('font-size', '4'))
                 text_elem.set('text-anchor', pos.get('text-anchor', 'middle'))
                 text_elem.set('fill', pos.get('fill', '#000000'))
-                text_elem.set('font-family', pos.get('font-family', 'Arial, sans-serif'))
+                text_elem.set('font-family', pos.get('font-family', 'montserrat light, Montserrat'))
                 text_elem.text = text_val
                 parent_group.append(text_elem)
                 logger.warning(f"Añadido elemento de texto '{key}': '{text_val}'")
@@ -1005,6 +1247,40 @@ class DescargarCertificadoView(APIView):
         
         # Insertar el grupo de textos al final del SVG (para que esté encima)
         root.append(text_group)
+
+                
+        # Agregar texto fijo "Con documento de identidad CC" antes de la fecha
+        fixed_text_group = ET.Element('{http://www.w3.org/2000/svg}g')
+        fixed_text_group.set('id', 'fixed_text_constancia')
+        
+        constancia_text = ET.Element('{http://www.w3.org/2000/svg}text')
+        constancia_text.set('x', '145')
+        constancia_text.set('y', '94.3')
+        constancia_text.set('font-size', '3.41')
+        constancia_text.set('text-anchor', 'middle')
+        constancia_text.set('fill', '#000000')
+        constancia_text.set('font-family', 'Montserrat-Light, Montserrat')
+        constancia_text.set('font-weight', '400')
+        constancia_text.text = 'Con documento de identidad CC'
+        fixed_text_group.append(constancia_text)
+        root.append(fixed_text_group)
+
+        
+        # Agregar texto fijo "En constancia de lo anterior se firma el" antes de la fecha
+        fixed_text_group = ET.Element('{http://www.w3.org/2000/svg}g')
+        fixed_text_group.set('id', 'fixed_text_constancia')
+        
+        constancia_text = ET.Element('{http://www.w3.org/2000/svg}text')
+        constancia_text.set('x', '135')
+        constancia_text.set('y', '132.2')
+        constancia_text.set('font-size', '3.41')
+        constancia_text.set('text-anchor', 'middle')
+        constancia_text.set('fill', '#000000')
+        constancia_text.set('font-family', 'Montserrat-Light, Montserrat')
+        constancia_text.set('font-weight', '400')
+        constancia_text.text = 'En constancia de lo anterior se firma el'
+        fixed_text_group.append(constancia_text)
+        root.append(fixed_text_group)
         
         # Guardar SVG temporal con encoding UTF-8 explícito
         temp_svg = os.path.join(output_dir, f"{filename_base}.svg")
@@ -1165,7 +1441,7 @@ class DescargarCertificadoView(APIView):
             # Verificar si la empresa del usuario está en la lista autorizada
             empresa_autorizada = False
             for empresa_auth in EMPRESAS_AUTORIZADAS:
-                if empresa_auth in empresa_normalizada:
+                if empresa_auth in empresa_nombre:
                     empresa_autorizada = True
                     break
 
@@ -1813,11 +2089,22 @@ class ObtenerColaboradoresCapacitacionView(APIView):
             qs = progresoCapacitaciones.objects.filter(capacitacion_id=capacitacion_id)
             total = qs.count()
             
+            # FIX: Usar Max('id') + GROUP BY colaborador para obtener el registro más reciente
+            # Compatible con MySQL (no necesita DISTINCT ON ni LIMIT en subquery)
+            latest_ids = list(
+                qs.values('colaborador')
+                .annotate(max_id=Max('id'))
+                .values_list('max_id', flat=True)
+            )
+            
+            # Filtrar solo los registros más recientes por colaborador
+            qs_distinct = qs.filter(id__in=latest_ids).select_related('colaborador')
+            
             # Si no se especifica limit, devolver TODOS
             if limit_param is None:
-                progreso_qs = qs.select_related('colaborador').order_by('colaborador__nombrecolaborador')
-                limit = total
+                limit = qs_distinct.count()
                 offset = 0
+                progreso_qs = qs_distinct
             else:
                 # Si se especifica limit, aplicar paginación
                 limit = int(limit_param)
@@ -1831,7 +2118,7 @@ class ObtenerColaboradoresCapacitacionView(APIView):
                 if offset < 0:
                     offset = 0
                 
-                progreso_qs = qs.select_related('colaborador').order_by('colaborador__nombrecolaborador')[offset:offset+limit]
+                progreso_qs = qs_distinct[offset:offset+limit]
 
             data = list(
                 progreso_qs.values(
@@ -1848,8 +2135,8 @@ class ObtenerColaboradoresCapacitacionView(APIView):
             results = [
                 {
                     'id': d['colaborador__idcolaborador'],
-                    'nombre': d['colaborador__apellidocolaborador'],
-                    'apellido': d['colaborador__nombrecolaborador'],
+                    'nombre': d['colaborador__nombrecolaborador'],  # FIX: Nombre correcto
+                    'apellido': d['colaborador__apellidocolaborador'],  # FIX: Apellido correcto
                     'cedula': d['colaborador__cccolaborador'],
                     'progreso': float(d['progreso']),
                     'completada': bool(d['completada']),
@@ -1893,10 +2180,11 @@ class ReporteCapacitacionesView(APIView):
             capacitacion_id = request.GET.get('capacitacion_id')
             fecha_inicio = request.GET.get('fecha_inicio')
             fecha_fin = request.GET.get('fecha_fin')
+            include_questions = request.GET.get('include_questions', 'false').lower() == 'true'
             
             if capacitacion_id:
                 # CASO 1: Reporte de una capacitación específica
-                return self._generar_reporte_capacitacion(capacitacion_id)
+                return self._generar_reporte_capacitacion(capacitacion_id, include_questions)
             elif fecha_inicio and fecha_fin:
                 # CASO 2: Reporte de rango de fechas
                 return self._generar_reporte_rango_fechas(fecha_inicio, fecha_fin)
@@ -1911,9 +2199,10 @@ class ReporteCapacitacionesView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
-    def _generar_reporte_capacitacion(self, capacitacion_id):
+    def _generar_reporte_capacitacion(self, capacitacion_id, include_questions=False):
         """
         Genera reporte de una capacitación específica con todos sus colaboradores.
+        Si include_questions es True, incluye columnas de preguntas y respuestas por cada colaborador.
         """
         try:
             # Obtener capacitación
@@ -1971,6 +2260,22 @@ class ReporteCapacitacionesView(APIView):
                 "Estado Avance"
             ]
             
+            # Si se incluyen preguntas, obtener todas las preguntas de la capacitación
+            preguntas_dict = {}  # {pregunta_id: pregunta_texto}
+            if include_questions:
+                # Obtener todas las lecciones y preguntas de esta capacitación
+                modulos = Modulos.objects.filter(idcapacitacion=capacitacion)
+                lecciones = Lecciones.objects.filter(idmodulo__in=modulos)
+                preguntas = PreguntasLecciones.objects.filter(id_leccion__in=lecciones).order_by('id')
+                
+                for pregunta in preguntas:
+                    preguntas_dict[pregunta.id] = pregunta.pregunta
+                
+                # Agregar columnas de preguntas y respuestas
+                for pregunta_id, pregunta_texto in preguntas_dict.items():
+                    headers.append(f"Pregunta: {pregunta_texto[:50]}...")  # Truncar texto largo
+                    headers.append(f"Respuesta: {pregunta_texto[:50]}...")
+            
             for col, header in enumerate(headers, 1):
                 cell = ws.cell(row=6, column=col)
                 cell.value = header
@@ -2018,8 +2323,27 @@ class ReporteCapacitacionesView(APIView):
                     estado = "En Progreso"
                 ws.cell(row=row, column=13).value = estado
                 
+                # Si se incluyen preguntas, agregar respuestas del colaborador
+                if include_questions:
+                    col_offset = 13
+                    respuestas_colaborador = RespuestasColaboradores.objects.filter(
+                        idcolaborador=colaborador
+                    ).select_related('idpregunta', 'idrespuesta')
+                    
+                    # Crear diccionario de respuestas por pregunta_id
+                    respuestas_map = {r.idpregunta_id: r.idrespuesta.valor for r in respuestas_colaborador}
+                    
+                    for pregunta_id, pregunta_texto in preguntas_dict.items():
+                        # Columna de pregunta
+                        ws.cell(row=row, column=col_offset + 1).value = pregunta_texto
+                        # Columna de respuesta
+                        respuesta = respuestas_map.get(pregunta_id, '')
+                        ws.cell(row=row, column=col_offset + 2).value = respuesta
+                        col_offset += 2
+                
                 # Formato
-                for col in range(1, 14):
+                num_cols = len(headers)
+                for col in range(1, num_cols + 1):
                     cell = ws.cell(row=row, column=col)
                     cell.border = border
                     if col == 10:  # Porcentaje
@@ -2047,11 +2371,18 @@ class ReporteCapacitacionesView(APIView):
             ws.column_dimensions['L'].width = 18  # Fecha Completación
             ws.column_dimensions['M'].width = 14  # Estado Avance
             
-            # Habilitar filtros y congelar encabezado (facilita filtrado en Excel)
+            # Ajustar ancho para columnas de preguntas y respuestas
+            if include_questions:
+                for col_idx in range(14, len(headers) + 1):
+                    col_letter = chr(64 + col_idx) if col_idx <= 26 else chr(64 + col_idx // 26) + chr(64 + col_idx % 26)
+                    ws.column_dimensions[col_letter].width = 30
+            
+            # Habilitar filtros (facilita filtrado en Excel)
             try:
                 last_row = row - 1
-                ws.auto_filter.ref = f"A6:M{last_row}"
-                ws.freeze_panes = ws['A7']
+                last_col = len(headers)
+                last_col_letter = chr(64 + last_col) if last_col <= 26 else chr(64 + last_col // 26) + chr(64 + last_col % 26)
+                ws.auto_filter.ref = f"A6:{last_col_letter}{last_row}"
             except Exception:
                 pass
 
@@ -2265,11 +2596,10 @@ class ReporteCapacitacionesView(APIView):
             ws.column_dimensions['P'].width = 16  # % Completación
             ws.column_dimensions['Q'].width = 14  # Estado Avance
             
-            # Habilitar filtros y congelar encabezado (facilita filtrado en Excel)
+            # Habilitar filtros (facilita filtrado en Excel)
             try:
                 last_row = row - 1
                 ws.auto_filter.ref = f"A4:Q{last_row}"
-                ws.freeze_panes = ws['A5']
             except Exception:
                 pass
 

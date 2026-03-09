@@ -89,7 +89,23 @@ export default function Usuarios() {
       }
       const list: Usuario[] = Array.isArray(data) ? data : data?.results ?? [];
       const count: number = Array.isArray(data) ? list.length : (data?.count ?? list.length);
-      setUsuarios(list);
+      
+      // Detectar y filtrar IDs duplicados
+      const seenIds = new Set();
+      const uniqueUsers = list.filter((u: Usuario) => {
+        if (seenIds.has(u.id_colaborador)) {
+          console.warn(`⚠️ Usuario duplicado detectado - ID: ${u.id_colaborador}, Nombre: ${u.nombre_colaborador}`);
+          return false;
+        }
+        seenIds.add(u.id_colaborador);
+        return true;
+      });
+      
+      if (list.length !== uniqueUsers.length) {
+        console.warn(`⚠️ Se encontraron ${list.length - uniqueUsers.length} usuarios duplicados y fueron removidos`);
+      }
+      
+      setUsuarios(uniqueUsers);
       setTotalCount(count);
     } catch (err) {
       setError("Error al cargar los usuarios");
@@ -385,8 +401,8 @@ export default function Usuarios() {
                 </tr>
               </thead>
               <tbody className={styles.tbody}>
-                {usuariosMostrados.map((u) => (
-                  <tr key={u.id_colaborador} className={styles.row}>
+                {usuariosMostrados.map((u, idx) => (
+                  <tr key={`${u.id_colaborador}-${idx}`} className={styles.row}>
                     <td>{u.cc_colaborador}</td>
                     <td>{u.nombre_colaborador}</td>
                     <td>{u.apellido_colaborador}</td>

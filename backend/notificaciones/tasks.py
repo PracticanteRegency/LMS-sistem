@@ -11,28 +11,29 @@ logger = logging.getLogger(__name__)
 
 
 
-def enviar_correos_por_lotes(destinatarios_bcc, subject, text_message, html_message, delay=2):
+def enviar_correos_por_lotes(destinatarios_bcc, subject, text_message, html_message, delay=None):
     """
-    Función auxiliar para enviar correos masivos dividiendo en lotes de máximo 500 destinatarios.
-    Usa la función mejorada de capacitaciones.utils.enviar_correo_batch
-    
+    Función auxiliar para enviar correos masivos respetando el límite de GoDaddy.
+    Usa la función mejorada de capacitaciones.utils.enviar_correo_batch con
+    rate-limiting automático (450 emails/hora).
+
     Args:
         destinatarios_bcc (list): Lista de correos a enviar
         subject (str): Asunto del correo
         text_message (str): Contenido de texto
         html_message (str): Contenido HTML
-        delay (int): Segundos de espera entre lotes (default: 2)
-    
+        delay (int|None): Segundos entre lotes (None = calculado automático por rate-limit)
+
     Returns:
         dict: Estadísticas de envío {enviados, fallidos, total, tasa_exito}
     """
     if not destinatarios_bcc:
         logger.warning(f"enviar_correos_por_lotes: Lista de correos vacía")
         return {"enviados": 0, "fallidos": 0, "total": 0, "tasa_exito": 0}
-    
+
     try:
         logger.info(f"enviar_correos_por_lotes: Enviando a {len(destinatarios_bcc)} colaboradores")
-        # Usar la función de batching mejorada de utils.py
+        # Usa rate-limiting automático para respetar 500 emails/hora de GoDaddy
         enviados, fallidos, errores = enviar_correo_batch(
             correos=destinatarios_bcc,
             subject=subject,
@@ -148,26 +149,24 @@ def enviar_correo_capacitaciones_activas_y_activar():
         </html>
         """
 
-        # Usar batching automático para soportar 1500+ colaboradores
-        # Máximo 500 correos por email, con 2 segundos de espera entre lotes
+        # Batching con rate-limiting automático (respeta 450 emails/hora de GoDaddy)
         enviar_correos_por_lotes(
             destinatarios_bcc=correos,
             subject=subject,
             text_message=text_message,
-            html_message=html_message,
-            delay=2
+            html_message=html_message
         )
-        
-        # Esperar 2 segundo entre capacitaciones
-        time.sleep(2)
+
+        # Esperar 60s entre capacitaciones como buffer adicional
+        time.sleep(60)
 
 
 @shared_task
 def notificar_capacitacion_por_vencer_7_dias():
     """
-    Notifica sobre capacitaciones que vencen en 7 días. 
-    Usa batching automático para soportar 1500+ colaboradores.
-    Se ejecuta cada día a las 07:00.
+    Notifica sobre capacitaciones que vencen en 7 días.
+    Usa batching automático con rate-limiting (450 emails/hora GoDaddy).
+    Se ejecuta cada día a las 10:00.
     
     IMPORTANTE: Filtra colaboradores DESACTIVADOS (estadocolaborador != 1)
     """
@@ -237,18 +236,16 @@ def notificar_capacitacion_por_vencer_7_dias():
         </html>
         """
 
-        # Usar batching automático para soportar 1500+ colaboradores
-        # Máximo 500 correos por email
+        # Batching con rate-limiting automático (respeta 450 emails/hora de GoDaddy)
         enviar_correos_por_lotes(
             destinatarios_bcc=correos,
             subject=subject,
             text_message=text_message,
-            html_message=html_message,
-            delay=2
+            html_message=html_message
         )
-        
-        # Esperar 1 segundo entre capacitaciones
-        time.sleep(1)
+
+        # Esperar 60s entre capacitaciones como buffer adicional
+        time.sleep(60)
 
 @shared_task
 def desactivar_capacitaciones():
@@ -341,18 +338,16 @@ def notificar_capacitacion_por_vencer_1_dia():
         </html>
         """
 
-        # Usar batching automático para soportar 1500+ colaboradores
-        # Máximo 500 correos por email
+        # Batching con rate-limiting automático (respeta 450 emails/hora de GoDaddy)
         enviar_correos_por_lotes(
             destinatarios_bcc=correos,
             subject=subject,
             text_message=text_message,
-            html_message=html_message,
-            delay=2
+            html_message=html_message
         )
-        
-        # Esperar 1 segundo entre capacitaciones
-        time.sleep(1)
+
+        # Esperar 60s entre capacitaciones como buffer adicional
+        time.sleep(60)
 
 
 @shared_task

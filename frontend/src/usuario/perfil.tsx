@@ -52,6 +52,25 @@ export default function Perfil() {
       setLoading(true);
       setError(null);
       const data = await perfilService.getPerfil();
+      
+      // Detectar y filtrar capacitaciones duplicadas
+      if (data.capacitaciones && Array.isArray(data.capacitaciones)) {
+        const seenIds = new Set();
+        const uniqueCapacitaciones = data.capacitaciones.filter((cap: Capacitacion) => {
+          if (seenIds.has(cap.id_capacitacion)) {
+            console.warn(`⚠️ Capacitación duplicada detectada - ID: ${cap.id_capacitacion}, Nombre: ${cap.nombre_capacitacion}`);
+            return false;
+          }
+          seenIds.add(cap.id_capacitacion);
+          return true;
+        });
+        
+        if (data.capacitaciones.length !== uniqueCapacitaciones.length) {
+          console.warn(`⚠️ Se encontraron ${data.capacitaciones.length - uniqueCapacitaciones.length} capacitaciones duplicadas y fueron removidas`);
+          data.capacitaciones = uniqueCapacitaciones;
+        }
+      }
+      
       setPerfil(data as PerfilData);
     } catch (err: any) {
       console.error("Error al cargar perfil:", err);
@@ -260,8 +279,8 @@ export default function Perfil() {
       <div className={styles.content}>
         {activeTab === "capacitaciones" && (
           <div className={styles.capacitacionesGrid}>
-            {perfil.capacitaciones.map((cap) => (
-              <div key={cap.id_capacitacion} className={styles.capacitacionCard}>
+            {perfil.capacitaciones.map((cap, idx) => (
+              <div key={`${cap.id_capacitacion}-${idx}`} className={styles.capacitacionCard}>
                 <div className={styles.cardHeader}>
                   <h3 className={styles.cardTitle}>{cap.nombre_capacitacion}</h3>
                 </div>
@@ -317,8 +336,8 @@ export default function Perfil() {
               <div className={styles.certificadosGrid}>
                 {perfil.capacitaciones
                   .filter((c) => c.completada)
-                  .map((cap) => (
-                    <div key={cap.id_capacitacion} className={styles.certCard}>
+                  .map((cap, idx) => (
+                    <div key={`${cap.id_capacitacion}-${idx}`} className={styles.certCard}>
                       <div className={styles.certTop}>
                         <div className={styles.certIcon}>🏅</div>
                         <div className={styles.certBadgeScore}>Puntuación: {cap.progreso}%</div>

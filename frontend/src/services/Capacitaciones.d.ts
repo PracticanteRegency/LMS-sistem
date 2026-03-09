@@ -31,7 +31,7 @@ interface CapListService {
   getEditarColaboradores(capacitacionId: string | number): Promise<any>;
   putEditarColaboradores(capacitacionId: string | number, data: any): Promise<any>;
   GetUsersCapacitacion(capacitacionId: string | number): Promise<any>;
-  descargarReporteCapacitacion(capacitacionId: string | number): Promise<Blob>;
+  descargarReporteCapacitacion(capacitacionId: string | number, includeQuestions?: boolean): Promise<Blob>;
   descargarReporteRangoFechas(fechaInicio: string, fechaFin: string): Promise<Blob>;
 }
 

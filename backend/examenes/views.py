@@ -79,9 +79,17 @@ class ReporteCorreosEnviadosView(APIView):
         return Response(data, status=status.HTTP_200_OK, headers={'X-Cache': 'MISS'})
 
     def _get_correos_queryset(self):
-        """Construye queryset optimizado de correos."""
-        return CorreoExamenEnviado.objects.select_related(
+        """Construye queryset optimizado de correos.
+        
+        NOTA: Filtra solo correos enviados correctamente (enviado_correctamente=True).
+        Los correos fallidos NO aparecen en el reporte hasta que se corrijan.
+        """
+        return CorreoExamenEnviado.objects.filter(
+            enviado_correctamente=True
+        ).select_related(
             'enviado_por'
+        ).prefetch_related(
+            'trabajadores'
         ).order_by('-fecha_envio')
 
     def _paginate_correos(self, correos, request):
@@ -172,6 +180,115 @@ class DetalleCorreoEnviadoView(APIView):
         return Response(data, status=status.HTTP_200_OK, headers={'X-Cache': 'MISS'})
 
 
+# ──────────────────────────────────────────────────────────────
+#  Funciones auxiliares para emails de Exámenes Médicos
+# ──────────────────────────────────────────────────────────────
+
+def crear_email_medico(subject, body, destinatarios, html_body=None):
+    """
+    Crea un email usando las credenciales de Exámenes Médicos (360 CloudRegency).
+    
+    Args:
+        subject: Asunto del email
+        body: Cuerpo en texto plano
+        destinatarios: List o tuple de direcciones de email
+        html_body: Cuerpo en HTML (opcional)
+    
+    Returns:
+        EmailMultiAlternatives: Email listo para enviar con config médica
+    """
+    email = EmailMultiAlternatives(
+        subject=subject,
+        body=body,
+        from_email=settings.EMAIL_MEDICAL_FROM_EMAIL,
+        to=destinatarios if isinstance(destinatarios, (list, tuple)) else [destinatarios]
+    )
+    
+    if html_body:
+        email.attach_alternative(html_body, "text/html")
+    
+    return email
+
+
+def enviar_email_medico(subject, body, destinatarios, html_body=None, fail_silently=False):
+    """
+    Envía un email usando las credenciales de Exámenes Médicos (360 CloudRegency).
+    
+    Nota: Esta función usa smtplib directamente para aplicar las credenciales médicas.
+    
+    Args:
+        subject: Asunto del email
+        body: Cuerpo en texto plano
+        destinatarios: List, tuple o string de direcciones de email
+        html_body: Cuerpo en HTML (opcional)
+        fail_silently: Si True, silencia excepciones
+    
+    Returns:
+        int: Número de emails enviados exitosamente
+        
+    Raises:
+        Exception: Si fail_silently=False y hay error
+    """
+    import smtplib
+    import ssl
+    
+    logger = logging.getLogger(__name__)
+    
+    # Asegurar que destinatarios sea una lista
+    if isinstance(destinatarios, str):
+        destinatarios = [destinatarios]
+    else:
+        destinatarios = list(destinatarios)
+    
+    if not destinatarios:
+        logger.warning("enviar_email_medico: Lista de destinatarios vacía")
+        return 0
+    
+    try:
+        # Crear email con configuración médica
+        email = crear_email_medico(subject, body, destinatarios, html_body)
+        
+        # Enviar usando las credenciales médicas
+        timeout = getattr(settings, 'EMAIL_MEDICAL_TIMEOUT', 30)
+        
+        if settings.EMAIL_MEDICAL_USE_SSL:
+            context = ssl.create_default_context()
+            server = smtplib.SMTP_SSL(
+                settings.EMAIL_MEDICAL_HOST,
+                settings.EMAIL_MEDICAL_PORT,
+                timeout=timeout,
+                context=context
+            )
+        else:
+            server = smtplib.SMTP(
+                settings.EMAIL_MEDICAL_HOST,
+                settings.EMAIL_MEDICAL_PORT,
+                timeout=timeout
+            )
+            if settings.EMAIL_MEDICAL_USE_TLS:
+                server.starttls()
+        
+        server.login(settings.EMAIL_MEDICAL_HOST_USER, settings.EMAIL_MEDICAL_HOST_PASSWORD)
+        server.send_message(email.message())
+        server.quit()
+        
+        logger.info(
+            f"enviar_email_medico: Email enviado exitosamente a {len(destinatarios)} "
+            f"destinatarios (asunto: {subject})"
+        )
+        
+        return len(destinatarios)
+        
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        logger.error(f"enviar_email_medico: Error enviando email: {error_msg}", exc_info=True)
+        
+        if not fail_silently:
+            raise
+        
+        return 0
+
+
 class EnviarCorreoView(APIView):
     """
     Vista para enviar correo individual de convocatoria a exámenes médicos.
@@ -242,7 +359,12 @@ class EnviarCorreoView(APIView):
             "operativo@servicompetentes.com,"
             "administrativo@servicompetentes.com"  
         )
-        correos_list_fixed = [e.strip() for e in correos_destino_fixed.split(',') if e.strip()]
+        # Limpiar agresivamente: remover espacios, newlines, tabs
+        correos_list_fixed = [
+            e.strip().replace('\r', '').replace('\n', '').replace('\t', '')
+            for e in correos_destino_fixed.split(',') 
+            if e and e.strip()
+        ]
         
         # Agregar solicitante y solicitante extra a la lista de destinatarios
         correos_con_solicitantes = correos_list_fixed.copy()
@@ -282,7 +404,8 @@ class EnviarCorreoView(APIView):
             tipo_examen=tipo_examen,
             examenes=examenes,
             colaborador=enviado_por,
-            correos_solicitantes={'principal': correo_solicitante, 'extra': solicitante_extra}
+            correos_solicitantes={'principal': correo_solicitante, 'extra': solicitante_extra},
+            es_masivo=False  # EnviarCorreoView siempre es individual
         )
 
         # Enviar correo a la lista completa (fijos + solicitante + solicitante extra)
@@ -334,6 +457,26 @@ class EnviarCorreoView(APIView):
         except Exception as e:
             logger.warning(f"Error al limpiar cache: {str(e)}")
 
+    def _get_medical_email_backend(self):
+        """
+        Retorna una conexión SMTP configurada con credenciales de Exámenes Médicos.
+        
+        Returns:
+            SMTPConnection: Conexión SMTP con configuración médica (360 CloudRegency)
+        """
+        from django.core.mail.backends.smtp import EmailBackend
+        
+        return EmailBackend(
+            host=settings.EMAIL_MEDICAL_HOST,
+            port=settings.EMAIL_MEDICAL_PORT,
+            username=settings.EMAIL_MEDICAL_HOST_USER,
+            password=settings.EMAIL_MEDICAL_HOST_PASSWORD,
+            use_ssl=settings.EMAIL_MEDICAL_USE_SSL,
+            use_tls=settings.EMAIL_MEDICAL_USE_TLS,
+            timeout=settings.EMAIL_MEDICAL_TIMEOUT,
+            fail_silently=False
+        )
+
     def _get_examenes_por_ids(self, examenes_ids):
         """Obtiene exámenes activos por lista de IDs."""
         return list(Examen.objects.filter(
@@ -342,7 +485,7 @@ class EnviarCorreoView(APIView):
         ))
 
     def _crear_registros_completos(
-            self, enviado_por, data, empresa, cargo, centro, tipo_examen, examenes, colaborador=None, correos_solicitantes=None):
+            self, enviado_por, data, empresa, cargo, centro, tipo_examen, examenes, colaborador=None, correos_solicitantes=None, es_masivo=False):
         """
         Crea todos los registros necesarios en la base de datos:
         1. CorreoExamenEnviado (lote)
@@ -406,7 +549,8 @@ class EnviarCorreoView(APIView):
             uuid_trabajador=registro_trabajador.uuid_trabajador,
             fecha_envio=correo_obj.fecha_envio,
             colaborador=colaborador,
-            correos_solicitantes=correos_solicitantes
+            correos_solicitantes=correos_solicitantes,
+            es_masivo=es_masivo  # Pasar el parámetro es_masivo
         )
 
         # 6. Actualizar correo con cuerpo completo
@@ -416,8 +560,13 @@ class EnviarCorreoView(APIView):
         return correo_obj, registro_trabajador
 
     def _construir_cuerpo_correo(
-            self, data, cargo, empresa, centro, tipo_examen, examenes, uuid_correo, uuid_trabajador, fecha_envio, colaborador=None, correos_solicitantes=None):
-        """Construye el cuerpo del correo con toda la información incluyendo tipo de examen y datos del colaborador."""
+            self, data, cargo, empresa, centro, tipo_examen, examenes, uuid_correo, uuid_trabajador, fecha_envio, colaborador=None, correos_solicitantes=None, es_masivo=False):
+        """
+        Construye el cuerpo del correo según si es individual o masivo.
+        
+        Args:
+            es_masivo: bool - True si hay >1 trabajador, False si es individual
+        """
         # Construir lista de exámenes
         lista_examenes = "\n".join([f"- {e.nombre}" for e in examenes])
 
@@ -456,23 +605,36 @@ class EnviarCorreoView(APIView):
             if correos_adicionales:
                 correos_solicitantes_text = f"{correo_colaborador}, {', '.join(correos_adicionales)}"
 
-        cuerpo = (
-            f"Cordial Saludo.\n\n"
-            f"Se han programado los siguientes exámenes médicos para el trabajador:\n\n"
-            f"Nombre: {data['nombre_trabajador']}\n"
-            f"Documento: {data['documento_trabajador']}\n"
-            f"Ciudad: {data.get('ciudad', 'No disponible')}\n"
-            f"Cargo: {cargo.nombrecargo}\n"
-            f"Empresa: {empresa.nombre_empresa}\n"
-            f"Centro Operativo: {getattr(centro, 'nombrecentrop', str(centro))}\n"
-            f"Tipo de Examen: {tipo_legible}\n\n"
-            f"Exámenes requeridos:\n{lista_examenes}\n\n"
-            f"---\n"
-            f"ID de Lote: {uuid_correo}\n"
-            f"ID de Trabajador: {uuid_trabajador}\n"
-            f"Solicitante: {nombre_colaborador}\n"
-            f"Correo del solicitante: {correos_solicitantes_text}"
-        )
+        # DIFERENTE SEGÚN SI ES INDIVIDUAL O MASIVO
+        if es_masivo:
+            # Cuerpo para correo masivo (múltiples trabajadores)
+            cuerpo = (
+                f"Cordial Saludo.\n\n"
+                f"Se han programado los siguientes exámenes médicos para los trabajadores en el excel adjunto.\n\n"
+                f"---\n"
+                f"ID de Seguimiento: {uuid_correo}\n"
+                f"Solicitante: {nombre_colaborador}\n"
+                f"Correo del solicitante: {correos_solicitantes_text}"
+            )
+        else:
+            # Cuerpo para correo individual (1 trabajador)
+            cuerpo = (
+                f"Cordial Saludo.\n\n"
+                f"Se han programado los siguientes exámenes médicos para el trabajador:\n\n"
+                f"Nombre: {data['nombre_trabajador']}\n"
+                f"Documento: {data['documento_trabajador']}\n"
+                f"Ciudad: {data.get('ciudad', 'No disponible')}\n"
+                f"Cargo: {cargo.nombrecargo}\n"
+                f"Empresa: {empresa.nombre_empresa}\n"
+                f"Centro Operativo: {getattr(centro, 'nombrecentrop', str(centro))}\n"
+                f"Tipo de Examen: {tipo_legible}\n\n"
+                f"Exámenes requeridos:\n{lista_examenes}\n\n"
+                f"---\n"
+                f"ID de Lote: {uuid_correo}\n"
+                f"ID de Trabajador: {uuid_trabajador}\n"
+                f"Solicitante: {nombre_colaborador}\n"
+                f"Correo del solicitante: {correos_solicitantes_text}"
+            )
         return cuerpo
 
     def _enviar_correo(self, correo_obj, destinatario, nombre_trabajador, registro_trabajador, ciudad=None, correos_solicitantes=None):
@@ -482,38 +644,121 @@ class EnviarCorreoView(APIView):
         (no se guarda en `RegistroExamenes`).
         
         `correos_solicitantes` es un dict con 'principal' y 'extra' para incluir en logs.
+        
+        Si el envío SMTP falla, programa un reintento automático vía Celery.
         """
         logger = logging.getLogger(__name__)
         try:
             # `destinatario` puede ser un string o una lista de emails
             recipient_list = destinatario if isinstance(destinatario, (list, tuple)) else [destinatario]
 
+            # Filtrar emails vacíos o inválidos y limpiar agresivamente espacios/newlines
+            recipient_list = [
+                e.strip().replace('\r', '').replace('\n', '').replace('\t', '')
+                for e in recipient_list 
+                if e and e.strip()
+            ]
+            if not recipient_list:
+                correo_obj.enviado_correctamente = False
+                correo_obj.error_envio = "Lista de destinatarios vacía después de filtrar"
+                correo_obj.save(update_fields=['enviado_correctamente', 'error_envio'])
+                logger.error(f"Enviar correo - Sin destinatarios válidos para UUID: {correo_obj.uuid_correo}")
+                return Response(
+                    {"error": "No hay destinatarios válidos para enviar el correo",
+                     "uuid_lote": correo_obj.uuid_correo},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
             # Log del cuerpo para verificación
             logger.info(f"Enviar correo - UUID lote: {correo_obj.uuid_correo}")
             logger.info(f"Enviar correo - Ciudad (desde JSON): {ciudad}")
-            logger.info(f"Enviar correo - Destinatarios: {recipient_list}")
+            logger.info(f"Enviar correo - Destinatarios ({len(recipient_list)}): {recipient_list}")
             if correos_solicitantes:
                 logger.info(f"Enviar correo - Solicitante principal: {correos_solicitantes.get('principal')}")
                 logger.info(f"Enviar correo - Solicitante extra: {correos_solicitantes.get('extra')}")
-            logger.info(f"Enviar correo - Cuerpo:\n{correo_obj.cuerpo_correo}")
 
-            send_mail(
+            # Verificar conexión SMTP antes de intentar enviar
+            from examenes.tasks import verificar_conexion_smtp
+            smtp_ok, smtp_error = verificar_conexion_smtp()
+            if not smtp_ok:
+                logger.warning(
+                    f"Enviar correo - SMTP no disponible: {smtp_error}. "
+                    f"Programando reintento vía Celery para correo id={correo_obj.id}"
+                )
+                correo_obj.enviado_correctamente = False
+                correo_obj.error_envio = f"SMTP no disponible: {smtp_error}. Reintento programado."
+                correo_obj.save(update_fields=['enviado_correctamente', 'error_envio'])
+
+                # Programar reintento automático vía Celery (en 60 segundos)
+                from examenes.tasks import enviar_correo_examen_task
+                enviar_correo_examen_task.apply_async(
+                    args=[correo_obj.id],
+                    countdown=60
+                )
+
+                total_examenes = registro_trabajador.examenes.count()
+                return Response(
+                    {
+                        "mensaje": "Correo registrado. El servidor de correo no está disponible temporalmente, se reintentará automáticamente.",
+                        "uuid_lote": correo_obj.uuid_correo,
+                        "uuid_trabajador": registro_trabajador.uuid_trabajador,
+                        "trabajador": nombre_trabajador,
+                        "destinatario": recipient_list,
+                        "tipo_examen": correo_obj.tipo_examen,
+                        "examenes_asignados": total_examenes,
+                        "registro_id": registro_trabajador.id,
+                        "ciudad": ciudad,
+                        "reintento_programado": True,
+                        "advertencia": "El correo se enviará automáticamente cuando el servidor de correo esté disponible."
+                    },
+                    status=status.HTTP_202_ACCEPTED
+                )
+
+            # Generar Excel si hay múltiples trabajadores
+            excel_buffer = None
+            cantidad_trabajadores = correo_obj.trabajadores.count()
+            if cantidad_trabajadores > 1:
+                excel_buffer = self._generar_excel_simple(correo_obj)
+            
+            # Enviar usando EmailMultiAlternatives con credenciales médicas
+            email = EmailMultiAlternatives(
                 subject=correo_obj.asunto,
-                message=correo_obj.cuerpo_correo,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=recipient_list,
-                fail_silently=False
+                body=correo_obj.cuerpo_correo,
+                from_email=settings.EMAIL_MEDICAL_FROM_EMAIL,
+                to=recipient_list
             )
+            
+            # Adjuntar HTML como alternativa
+            if '<html' in correo_obj.cuerpo_correo.lower() or '<p>' in correo_obj.cuerpo_correo.lower():
+                email.attach_alternative(correo_obj.cuerpo_correo, "text/html")
+            
+            # Adjuntar Excel si existe
+            if excel_buffer:
+                email.attach(
+                    'Trabajadores_Examenes.xlsx',
+                    excel_buffer.getvalue(),
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                )
+            
+            # Usar backend médico para enviar
+            email.connection = self._get_medical_email_backend()
+            email.send(fail_silently=False)
 
             # Marcar como enviado correctamente
             correo_obj.enviado_correctamente = True
-            correo_obj.save()
+            correo_obj.error_envio = None
+            correo_obj.save(update_fields=['enviado_correctamente', 'error_envio'])
 
             # Contar exámenes asignados
             total_examenes = registro_trabajador.examenes.count()
 
             # Limpiar cache de reportes de correos y datos de empresas
             self._clear_cache()
+
+            logger.info(
+                f"Enviar correo - ÉXITO - UUID: {correo_obj.uuid_correo}, "
+                f"Destinatarios: {len(recipient_list)}, Exámenes: {total_examenes}"
+            )
 
             return Response(
                 {
@@ -537,19 +782,171 @@ class EnviarCorreoView(APIView):
         except Exception as e:
             # Registrar error
             correo_obj.enviado_correctamente = False
-            correo_obj.error_envio = str(e)
-            correo_obj.save()
+            correo_obj.error_envio = f"{type(e).__name__}: {str(e)}"
+            correo_obj.save(update_fields=['enviado_correctamente', 'error_envio'])
 
-            logger.error(f"Error enviando correo: {str(e)}", exc_info=True)
+            logger.error(f"Error enviando correo UUID={correo_obj.uuid_correo}: {str(e)}", exc_info=True)
+
+            # Programar reintento automático vía Celery
+            try:
+                from examenes.tasks import enviar_correo_examen_task
+                enviar_correo_examen_task.apply_async(
+                    args=[correo_obj.id],
+                    countdown=120  # Reintentar en 2 minutos
+                )
+                logger.info(f"Reintento programado vía Celery para correo id={correo_obj.id}")
+                reintento_msg = " Se reintentará automáticamente en 2 minutos."
+            except Exception as celery_err:
+                logger.error(f"No se pudo programar reintento Celery: {str(celery_err)}")
+                reintento_msg = " No se pudo programar reintento automático."
 
             return Response(
                 {
-                    "error": f"Error al enviar el correo: {str(e)}",
+                    "error": f"Error al enviar el correo: {str(e)}.{reintento_msg}",
                     "uuid_lote": correo_obj.uuid_correo,
-                    "uuid_trabajador": registro_trabajador.uuid_trabajador
+                    "uuid_trabajador": registro_trabajador.uuid_trabajador,
+                    "reintento_programado": "Se reintentará" in reintento_msg
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+    def _generar_excel_simple(self, correo_obj):
+        """
+        Genera Excel con los trabajadores del correo en el mismo formato que masivo.
+        
+        Args:
+            correo_obj: instancia de CorreoExamenEnviado
+            
+        Returns:
+            BytesIO: buffer del Excel generado
+        """
+        from openpyxl import Workbook
+        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.utils import get_column_letter
+        
+        # Obtener trabajadores del lote
+        registros = correo_obj.trabajadores.select_related(
+            'empresa', 'cargo', 'centro'
+        ).prefetch_related('examenes__examen').all()
+        
+        if not registros.exists():
+            return None
+        
+        # Recopilar todos los exámenes únicos
+        examenes_unicos = set()
+        trabajadores_data = []
+        
+        for reg in registros:
+            examenes_del_trabajador = []
+            for et in reg.examenes.all():
+                examenes_del_trabajador.append(et.examen.nombre)
+                examenes_unicos.add(et.examen.nombre)
+            
+            trabajadores_data.append({
+                'uuid': reg.uuid_trabajador,
+                'nombre': reg.nombre_trabajador,
+                'documento': reg.documento_trabajador,
+                'empresa': reg.empresa.nombre_empresa if reg.empresa else '',
+                'unidad': getattr(reg.empresa, 'id_unidad', None),  # relación si existe
+                'proyecto': getattr(reg.centro, 'id_proyecto', None) if reg.centro else None,
+                'centro': reg.centro.nombrecentrop if reg.centro else '',
+                'ciudad': reg.ciudad or '',
+                'cargo': reg.cargo.nombrecargo if reg.cargo else '',
+                'tipo_examen': reg.tipo_examen,
+                'examenes': examenes_del_trabajador,
+            })
+        
+        # Crear Excel
+        nombres_examenes = sorted(list(examenes_unicos))
+        
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Trabajadores Examenes"
+        
+        # Estilos
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=11)
+        center_alignment = Alignment(horizontal="center", vertical="center")
+        border_style = Border(
+            left=Side(style='thin'), right=Side(style='thin'),
+            top=Side(style='thin'), bottom=Side(style='thin')
+        )
+        
+        # Encabezados (igual que masivo)
+        headers = [
+            "UUID",
+            "Empresa",
+            "Unidad",
+            "Proyecto",
+            "Centro",
+            "Ciudad",
+            "Cargo",
+            "Nombre",
+            "Documento",
+            "Tipo Examen"
+        ] + nombres_examenes
+        ws.append(headers)
+        
+        # Aplicar estilos a encabezados
+        for col_num, header in enumerate(headers, start=1):
+            cell = ws.cell(row=1, column=col_num)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = center_alignment
+            cell.border = border_style
+        
+        # Agregar datos (intentar obtener unidad y proyecto)
+        for trab in trabajadores_data:
+            unidad_nombre = ''
+            proyecto_nombre = ''
+            
+            # Intentar obtener unidad desde proyecto del centro
+            if trab['proyecto']:
+                proyecto_nombre = trab['proyecto'].nombreproyecto
+                if hasattr(trab['proyecto'], 'id_unidad'):
+                    unidad_nombre = trab['proyecto'].id_unidad.nombreunidad
+            
+            row_data = [
+                trab['uuid'],
+                trab['empresa'],
+                unidad_nombre,
+                proyecto_nombre,
+                trab['centro'],
+                trab['ciudad'],
+                trab['cargo'],
+                trab['nombre'],
+                trab['documento'],
+                trab['tipo_examen']
+            ]
+            
+            # Exámenes con X donde aplica
+            examenes_trabajador = set(trab['examenes'])
+            for nombre_examen in nombres_examenes:
+                row_data.append("X" if nombre_examen in examenes_trabajador else "")
+            
+            ws.append(row_data)
+        
+        # Ajustar anchos de columna
+        ws.column_dimensions['A'].width = 20  # UUID
+        ws.column_dimensions['B'].width = 25  # Empresa
+        ws.column_dimensions['C'].width = 20  # Unidad
+        ws.column_dimensions['D'].width = 25  # Proyecto
+        ws.column_dimensions['E'].width = 20  # Centro
+        ws.column_dimensions['F'].width = 15  # Ciudad
+        ws.column_dimensions['G'].width = 25  # Cargo
+        ws.column_dimensions['H'].width = 25  # Nombre
+        ws.column_dimensions['I'].width = 15  # Documento
+        ws.column_dimensions['J'].width = 15  # Tipo Examen
+        
+        # Ajustar ancho de columnas de exámenes (más pequeñas)
+        for col_num in range(11, 11 + len(nombres_examenes)):
+            col_letter = get_column_letter(col_num)
+            ws.column_dimensions[col_letter].width = 5
+        
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+        return buffer
 
 
 class CargoEmpresaConExamenesView(APIView):
@@ -751,6 +1148,377 @@ class CargoEmpresaConExamenesView(APIView):
             resultado.append(emp_dict)
 
         return resultado
+
+
+# ──────────────────────────────────────────────────────────────
+#  Funciones sincrónicas para reenvío de correos (sin Celery/Redis)
+# ──────────────────────────────────────────────────────────────
+
+def _generar_excel_reenvio(correo_obj):
+    """
+    Genera Excel con los trabajadores del correo para reenvío.
+    Usa el mismo formato que EnviarCorreoView._generar_excel_simple().
+
+    Args:
+        correo_obj: instancia de CorreoExamenEnviado
+
+    Returns:
+        BytesIO: buffer del Excel generado, o None si no hay trabajadores
+    """
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    registros = correo_obj.trabajadores.select_related(
+        'empresa', 'cargo', 'centro'
+    ).prefetch_related('examenes__examen').all()
+
+    if not registros.exists():
+        return None
+
+    # Recopilar exámenes únicos y datos de trabajadores
+    examenes_unicos = set()
+    trabajadores_data = []
+
+    for reg in registros:
+        examenes_del_trabajador = []
+        for et in reg.examenes.all():
+            examenes_del_trabajador.append(et.examen.nombre)
+            examenes_unicos.add(et.examen.nombre)
+
+        trabajadores_data.append({
+            'uuid': reg.uuid_trabajador,
+            'nombre': reg.nombre_trabajador,
+            'documento': reg.documento_trabajador,
+            'empresa': reg.empresa.nombre_empresa if reg.empresa else '',
+            'unidad': getattr(reg.empresa, 'id_unidad', None),
+            'proyecto': getattr(reg.centro, 'id_proyecto', None) if reg.centro else None,
+            'centro': reg.centro.nombrecentrop if reg.centro else '',
+            'ciudad': reg.ciudad or '',
+            'cargo': reg.cargo.nombrecargo if reg.cargo else '',
+            'tipo_examen': reg.tipo_examen,
+            'examenes': examenes_del_trabajador,
+        })
+
+    # Crear Excel
+    nombres_examenes = sorted(list(examenes_unicos))
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Trabajadores Examenes"
+
+    # Estilos
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    center_alignment = Alignment(horizontal="center", vertical="center")
+    border_style = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin')
+    )
+
+    # Encabezados (mismo formato que EnviarCorreoView._generar_excel_simple)
+    headers = [
+        "UUID", "Empresa", "Unidad", "Proyecto", "Centro",
+        "Ciudad", "Cargo", "Nombre", "Documento", "Tipo Examen"
+    ] + nombres_examenes
+    ws.append(headers)
+
+    for col_num, header in enumerate(headers, start=1):
+        cell = ws.cell(row=1, column=col_num)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = center_alignment
+        cell.border = border_style
+
+    # Datos
+    for trab in trabajadores_data:
+        unidad_nombre = ''
+        proyecto_nombre = ''
+
+        if trab['proyecto']:
+            proyecto_nombre = trab['proyecto'].nombreproyecto
+            if hasattr(trab['proyecto'], 'id_unidad'):
+                unidad_nombre = trab['proyecto'].id_unidad.nombreunidad
+
+        row_data = [
+            trab['uuid'], trab['empresa'], unidad_nombre, proyecto_nombre,
+            trab['centro'], trab['ciudad'], trab['cargo'],
+            trab['nombre'], trab['documento'], trab['tipo_examen']
+        ]
+
+        examenes_trabajador = set(trab['examenes'])
+        for nombre_examen in nombres_examenes:
+            row_data.append("X" if nombre_examen in examenes_trabajador else "")
+
+        ws.append(row_data)
+
+    # Ajustar anchos de columna
+    ws.column_dimensions['A'].width = 20   # UUID
+    ws.column_dimensions['B'].width = 25   # Empresa
+    ws.column_dimensions['C'].width = 20   # Unidad
+    ws.column_dimensions['D'].width = 25   # Proyecto
+    ws.column_dimensions['E'].width = 20   # Centro
+    ws.column_dimensions['F'].width = 15   # Ciudad
+    ws.column_dimensions['G'].width = 25   # Cargo
+    ws.column_dimensions['H'].width = 25   # Nombre
+    ws.column_dimensions['I'].width = 15   # Documento
+    ws.column_dimensions['J'].width = 15   # Tipo Examen
+
+    for col_num in range(11, 11 + len(nombres_examenes)):
+        col_letter = get_column_letter(col_num)
+        ws.column_dimensions[col_letter].width = 5
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+
+def reenviar_correo(correo_obj):
+    """
+    Función sincrónica para reenviar un correo de exámenes.
+    Usa los mismos datos almacenados en BD (cuerpo, destinatarios, asunto).
+    Si hay >1 trabajador registrado, regenera y adjunta el Excel.
+
+    No usa Celery, Redis ni cache.
+
+    Args:
+        correo_obj: instancia de CorreoExamenEnviado
+
+    Returns:
+        dict: resultado con claves 'status', 'mensaje', 'correo_id', etc.
+    """
+    logger = logging.getLogger(__name__)
+    logger.info(
+        f"[REENVIO] Iniciando reenvío de correo id={correo_obj.id}, "
+        f"UUID={correo_obj.uuid_correo}"
+    )
+
+    # 1. Obtener destinatarios desde BD y limpiar agresivamente
+    destinatarios = [
+        e.strip().replace('\r', '').replace('\n', '').replace('\t', '')
+        for e in correo_obj.correos_destino.split(',')
+        if e and e.strip()
+    ]
+
+    if not destinatarios:
+        error_msg = "Sin destinatarios válidos en el registro"
+        correo_obj.enviado_correctamente = False
+        correo_obj.error_envio = error_msg
+        correo_obj.save(update_fields=['enviado_correctamente', 'error_envio'])
+        logger.error(f"[REENVIO] Correo id={correo_obj.id}: {error_msg}")
+        return {'status': 'error', 'mensaje': error_msg}
+
+    # 2. Verificar conexión SMTP
+    from examenes.tasks import verificar_conexion_smtp
+    smtp_ok, smtp_error = verificar_conexion_smtp()
+    if not smtp_ok:
+        error_msg = f"SMTP no disponible: {smtp_error}"
+        correo_obj.enviado_correctamente = False
+        correo_obj.error_envio = error_msg
+        correo_obj.save(update_fields=['enviado_correctamente', 'error_envio'])
+        logger.error(f"[REENVIO] Correo id={correo_obj.id}: {error_msg}")
+        return {'status': 'error', 'mensaje': error_msg}
+
+    try:
+        # 3. Determinar si es masivo (>1 trabajador) y generar Excel
+        cantidad_trabajadores = correo_obj.trabajadores.count()
+        excel_buffer = None
+
+        if cantidad_trabajadores > 1:
+            logger.info(
+                f"[REENVIO] Generando Excel para correo masivo id={correo_obj.id} "
+                f"({cantidad_trabajadores} trabajadores)"
+            )
+            excel_buffer = _generar_excel_reenvio(correo_obj)
+
+        # 4. Construir y enviar correo con los datos de BD
+        email = EmailMultiAlternatives(
+            subject=correo_obj.asunto,
+            body=correo_obj.cuerpo_correo,
+            from_email=settings.EMAIL_MEDICAL_FROM_EMAIL,
+            to=destinatarios
+        )
+
+        # Si el cuerpo contiene HTML, adjuntar como alternativa
+        if '<html' in correo_obj.cuerpo_correo.lower() or '<p>' in correo_obj.cuerpo_correo.lower():
+            email.attach_alternative(correo_obj.cuerpo_correo, "text/html")
+
+        # Adjuntar Excel si es masivo
+        if excel_buffer:
+            email.attach(
+                'Trabajadores_Examenes.xlsx',
+                excel_buffer.getvalue(),
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+
+        # Usar backend médico para enviar (360 CloudRegency)
+        email.connection = EnviarCorreoView()._get_medical_email_backend()
+        email.send(fail_silently=False)
+
+        # 5. Marcar como enviado correctamente
+        correo_obj.enviado_correctamente = True
+        correo_obj.error_envio = None
+        correo_obj.save(update_fields=['enviado_correctamente', 'error_envio'])
+
+        logger.info(
+            f"[REENVIO] Correo id={correo_obj.id} reenviado exitosamente "
+            f"a {len(destinatarios)} destinatarios ({cantidad_trabajadores} trabajador(es))"
+        )
+
+        return {
+            'status': 'ok',
+            'correo_id': correo_obj.id,
+            'uuid_correo': correo_obj.uuid_correo,
+            'destinatarios': len(destinatarios),
+            'trabajadores': cantidad_trabajadores,
+            'con_excel': excel_buffer is not None
+        }
+
+    except Exception as e:
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        correo_obj.enviado_correctamente = False
+        correo_obj.error_envio = error_msg
+        correo_obj.save(update_fields=['enviado_correctamente', 'error_envio'])
+        logger.error(
+            f"[REENVIO] Error reenviando correo id={correo_obj.id}: {error_msg}",
+            exc_info=True
+        )
+        return {'status': 'error', 'mensaje': error_msg}
+
+
+class ReintentarCorreoView(APIView):
+    """
+    Vista para reintentar manualmente el envío de un correo.
+
+    POST: Reenvía el correo de forma sincrónica (sin Celery/Redis).
+    Usa el mismo cuerpo, asunto y destinatarios almacenados en BD.
+    Si tiene >1 trabajador asociado, regenera y adjunta el Excel.
+
+    JSON esperado:
+    {
+        "correo_id": 123
+    }
+    """
+    permission_classes = [IsAuthenticated, IsUsuarioEspecial | IsSuperAdmin]
+
+    def post(self, request):
+        """Reenvía un correo directamente (sin Celery/Redis)."""
+        logger = logging.getLogger(__name__)
+        correo_id = request.data.get('correo_id')
+
+        if not correo_id:
+            return Response(
+                {"error": "Se requiere el campo 'correo_id'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            correo_obj = CorreoExamenEnviado.objects.get(id=correo_id)
+        except CorreoExamenEnviado.DoesNotExist:
+            return Response(
+                {"error": f"Correo con id={correo_id} no encontrado"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        logger.info(
+            f"Reenvío manual solicitado para correo id={correo_id} "
+            f"por usuario {request.user}"
+        )
+
+        # Llamar función sincrónica de reenvío
+        resultado = reenviar_correo(correo_obj)
+
+        if resultado['status'] == 'ok':
+            return Response(
+                {
+                    "mensaje": "Correo reenviado exitosamente",
+                    "uuid_correo": resultado['uuid_correo'],
+                    "correo_id": resultado['correo_id'],
+                    "trabajadores": resultado['trabajadores'],
+                    "destinatarios": resultado['destinatarios'],
+                    "con_excel": resultado['con_excel'],
+                },
+                status=status.HTTP_200_OK
+            )
+        else:
+            return Response(
+                {
+                    "error": resultado['mensaje'],
+                    "correo_id": correo_obj.id,
+                    "uuid_correo": correo_obj.uuid_correo,
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def get(self, request):
+        """Lista correos fallidos que pueden ser reintentados (últimas 48h)."""
+        from datetime import timedelta
+        
+        hace_48h = timezone.now() - timedelta(hours=48)
+        correos_fallidos = CorreoExamenEnviado.objects.filter(
+            enviado_correctamente=False,
+            fecha_envio__gte=hace_48h
+        ).order_by('-fecha_envio').values(
+            'id', 'uuid_correo', 'asunto', 'correos_destino',
+            'error_envio', 'fecha_envio', 'tipo_examen'
+        )[:50]
+
+        return Response(
+            {
+                "total": len(correos_fallidos),
+                "correos_fallidos": list(correos_fallidos)
+            },
+            status=status.HTTP_200_OK
+        )
+
+
+class DiagnosticoEmailView(APIView):
+    """
+    Vista de diagnóstico para verificar la configuración de email.
+    Solo accesible por superadmins.
+    
+    GET: Verifica la conexión SMTP y retorna el estado.
+    """
+    permission_classes = [IsAuthenticated, IsSuperAdmin]
+
+    def get(self, request):
+        """Verifica la conexión SMTP y retorna diagnóstico."""
+        logger = logging.getLogger(__name__)
+        
+        from examenes.tasks import verificar_conexion_smtp
+        
+        diagnostico = {
+            "email_backend": settings.EMAIL_BACKEND,
+            "email_host": settings.EMAIL_HOST,
+            "email_port": settings.EMAIL_PORT,
+            "email_use_ssl": settings.EMAIL_USE_SSL,
+            "email_use_tls": settings.EMAIL_USE_TLS,
+            "email_host_user": settings.EMAIL_HOST_USER[:3] + "***" if settings.EMAIL_HOST_USER else "(vacío)",
+            "default_from_email": settings.DEFAULT_FROM_EMAIL,
+            "email_timeout": getattr(settings, 'EMAIL_TIMEOUT', 'No configurado'),
+        }
+
+        # Verificar conexión SMTP
+        smtp_ok, smtp_error = verificar_conexion_smtp()
+        diagnostico["smtp_conexion"] = "OK" if smtp_ok else "FALLO"
+        if smtp_error:
+            diagnostico["smtp_error"] = smtp_error
+
+        # Contar correos recientes
+        from datetime import timedelta
+        hace_24h = timezone.now() - timedelta(hours=24)
+        
+        correos_24h = CorreoExamenEnviado.objects.filter(fecha_envio__gte=hace_24h)
+        diagnostico["correos_ultimas_24h"] = {
+            "total": correos_24h.count(),
+            "enviados": correos_24h.filter(enviado_correctamente=True).count(),
+            "fallidos": correos_24h.filter(enviado_correctamente=False).count(),
+        }
+
+        logger.info(f"Diagnóstico de email ejecutado por {request.user}: SMTP={'OK' if smtp_ok else 'FALLO'}")
+
+        return Response(diagnostico, status=status.HTTP_200_OK)
 
 
 class ImprimirReporteCorreosView(APIView):
@@ -1167,6 +1935,26 @@ class EnviarCorreoMasivoView(APIView):
         'fecha de ingreso': 'fecha_ingreso',
         'tipo de examen': 'tipoexamen',
     }
+
+    def _get_medical_email_backend(self):
+        """
+        Retorna una conexión SMTP configurada con credenciales de Exámenes Médicos.
+        
+        Returns:
+            SMTPConnection: Conexión SMTP con configuración médica (360 CloudRegency)
+        """
+        from django.core.mail.backends.smtp import EmailBackend
+        
+        return EmailBackend(
+            host=settings.EMAIL_MEDICAL_HOST,
+            port=settings.EMAIL_MEDICAL_PORT,
+            username=settings.EMAIL_MEDICAL_HOST_USER,
+            password=settings.EMAIL_MEDICAL_HOST_PASSWORD,
+            use_ssl=settings.EMAIL_MEDICAL_USE_SSL,
+            use_tls=settings.EMAIL_MEDICAL_USE_TLS,
+            timeout=settings.EMAIL_MEDICAL_TIMEOUT,
+            fail_silently=False
+        )
 
     def _detect_csv_format(self, fieldnames):
         """
@@ -1871,7 +2659,12 @@ class EnviarCorreoMasivoView(APIView):
             if solicitante_extra:
                 correos_solicitantes_text = f"{correo_colaborador}, {solicitante_extra}" if correo_colaborador else f"No disponible, {solicitante_extra}"
 
-            cuerpo_final = f"""
+            # DETECTAR SI ES INDIVIDUAL O MASIVO
+            es_masivo = len(trabajadores_validos) > 1
+            
+            if es_masivo:
+                # Cuerpo HTML para correo masivo (múltiples trabajadores)
+                cuerpo_final = f"""
 <html>
 <body>
     <p>Cordial Saludo.</p>
@@ -1885,6 +2678,37 @@ para los trabajadores en el excel adjunto.</p>
 </body>
 </html>
 """
+            else:
+                # Cuerpo para correo individual (1 trabajador) - formato plain text
+                trab = trabajadores_validos[0]
+                tipos_legibles = {
+                    'INGRESO': 'Examen de Ingreso',
+                    'PERIODICO': 'Examen Periódico',
+                    'RETIRO': 'Examen de Retiro',
+                    'ESPECIAL': 'Examen Especial',
+                    'POST_INCAPACIDAD': 'Examen Post-Incapacidad'
+                }
+                tipo_legible = tipos_legibles.get(trab['tipo_examen'], trab['tipo_examen'])
+                
+                # Construir lista de exámenes
+                lista_examenes = "\n".join([f"- {e.nombre}" for e in trab['examenes_bd']])
+                
+                cuerpo_final = (
+                    f"Cordial Saludo.\n\n"
+                    f"Se han programado los siguientes exámenes médicos para el trabajador:\n\n"
+                    f"Nombre: {trab['nombre']}\n"
+                    f"Documento: {trab['documento']}\n"
+                    f"Ciudad: {trab.get('ciudad', 'No disponible')}\n"
+                    f"Cargo: {trab['cargo'].nombrecargo}\n"
+                    f"Empresa: {trab['empresa'].nombre_empresa}\n"
+                    f"Centro Operativo: {trab['centro'].nombrecentrop if trab.get('centro') else 'No disponible'}\n"
+                    f"Tipo de Examen: {tipo_legible}\n\n"
+                    f"Exámenes requeridos:\n{lista_examenes}\n\n"
+                    f"---\n"
+                    f"ID de Lote: {uuid_correo}\n"
+                    f"Solicitante: {nombre_colaborador if nombre_colaborador else 'No disponible'}\n"
+                    f"Correo del solicitante: {correos_solicitantes_text}"
+                )
 
             correos_destino = (
                 ""
@@ -1892,16 +2716,33 @@ para los trabajadores en el excel adjunto.</p>
                 "operativo@servicompetentes.com,"
                 "administrativo@servicompetentes.com"
             )
-            correos_list = [email.strip() for email in correos_destino.split(',') if email.strip()]
+            # Limpiar agresivamente: remover espacios, newlines, tabs
+            correos_list = [
+                email.strip().replace('\r', '').replace('\n', '').replace('\t', '')
+                for email in correos_destino.split(',')
+                if email and email.strip()
+            ]
             
             # Agregar solicitante y solicitante extra a la lista de destinatarios
             if correo_colaborador:
-                correos_list.append(correo_colaborador)
+                correo_colaborador_clean = correo_colaborador.strip().replace('\r', '').replace('\n', '').replace('\t', '')
+                correos_list.append(correo_colaborador_clean)
             if solicitante_extra:
-                correos_list.append(solicitante_extra)
+                solicitante_extra_clean = solicitante_extra.strip().replace('\r', '').replace('\n', '').replace('\t', '')
+                correos_list.append(solicitante_extra_clean)
             
             # Remover duplicados manteniendo el orden
             correos_list = list(dict.fromkeys(correos_list))
+            
+            # Validar que hay destinatarios
+            if not correos_list:
+                logger.error(f"Correo masivo UUID={uuid_correo}: Sin destinatarios válidos (correo_colaborador='{correo_colaborador}', solicitante_extra='{solicitante_extra}')")
+                return Response(
+                    {
+                        "error": "Error: No hay destinatarios válidos para enviar el correo. Verifique el correo del solicitante."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
             # Actualizar correos_destino para que incluya solicitantes (para guardar en BD)
             correos_destino = ', '.join(correos_list)
@@ -1991,38 +2832,126 @@ para los trabajadores en el excel adjunto.</p>
             # representadas en `ExamenTrabajador`.
 
             # Enviar correo SIEMPRE con Excel adjunto
+            excel_buffer = None
             try:
                 # Generar Excel con formato tabla y exámenes como columnas,
                 # separado por tipo
+                logger.info(f"Generando Excel para correo masivo UUID={uuid_correo}...")
                 excel_buffer = self._generar_excel_por_tipo(
                     trabajadores_validos)
+                logger.info(f"Excel generado exitosamente, tamaño: {len(excel_buffer.getvalue())} bytes")
+                
+                # Verificar conexión SMTP antes de enviar
+                from examenes.tasks import verificar_conexion_smtp, enviar_correo_masivo_task
+                smtp_ok, smtp_error = verificar_conexion_smtp()
 
+                if not smtp_ok:
+                    # SMTP no disponible: programar reintento vía Celery
+                    logger.warning(
+                        f"SMTP no disponible para correo masivo UUID={uuid_correo}: {smtp_error}. "
+                        f"Programando reintento vía Celery."
+                    )
+                    correo_lote.error_envio = f"SMTP no disponible: {smtp_error}. Reintento programado."
+                    correo_lote.save(update_fields=['error_envio'])
+
+                    # Programar reenvío con el Excel adjunto
+                    enviar_correo_masivo_task.apply_async(
+                        args=[correo_lote.id],
+                        kwargs={'excel_bytes': excel_buffer.getvalue()},
+                        countdown=60
+                    )
+
+                    self._clear_cache()
+                    return Response(
+                        {
+                            "uuid_correo": uuid_correo,
+                            "total_trabajadores": len(trabajadores_validos),
+                            "enviado_a": correos_list,
+                            "estado": "Registrado - envío en proceso",
+                            "detalle": (
+                                f"Los {len(trabajadores_validos)} trabajadores fueron registrados. "
+                                f"El servidor de correo no está disponible temporalmente. "
+                                f"Se reintentará el envío automáticamente."
+                            ),
+                            "reintento_programado": True,
+                            "solicitantes_notificados": {
+                                "principal": correo_colaborador,
+                                "extra": solicitante_extra
+                            }
+                        },
+                        status=status.HTTP_202_ACCEPTED
+                    )
+
+                # SMTP disponible: enviar directamente
                 email = EmailMultiAlternatives(
                     subject=asunto_correo,
-                    body='Por favor, abra este correo en un cliente que soporte HTML.',
-                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    body='Por favor, abra este correo en un cliente que soporte HTML.' if es_masivo else cuerpo_final,
+                    from_email=settings.EMAIL_MEDICAL_FROM_EMAIL,
                     to=correos_list
                 )
-                email.attach_alternative(cuerpo_final, "text/html")
-                email.attach(
-                    'Trabajadores_Examenes.xlsx',
-                    excel_buffer.getvalue(),
-                    'application/vnd.openxmlformats-officedocument.'
-                    'spreadsheetml.sheet'
-                )
+                
+                # Adjuntar cuerpo como HTML si es masivo
+                if es_masivo:
+                    email.attach_alternative(cuerpo_final, "text/html")
+                
+                # SIEMPRE adjuntar Excel (incluso si es 1 sola persona)
+                # Esto es consistente con el requerimiento: "si es masivo, envía Excel igual"
+                if excel_buffer:
+                    email.attach(
+                        'Trabajadores_Examenes.xlsx',
+                        excel_buffer.getvalue(),
+                        'application/vnd.openxmlformats-officedocument.'
+                        'spreadsheetml.sheet'
+                    )
+                
+                # Usar backend médico para enviar
+                email.connection = self._get_medical_email_backend()
                 email.send(fail_silently=False)
 
                 correo_lote.enviado_correctamente = True
-                correo_lote.save()
+                correo_lote.error_envio = None
+                correo_lote.save(update_fields=['enviado_correctamente', 'error_envio'])
+
+                logger.info(
+                    f"Correo masivo UUID={uuid_correo} enviado exitosamente "
+                    f"a {len(correos_list)} destinatarios con {len(trabajadores_validos)} trabajadores"
+                )
 
             except Exception as e:
-                correo_lote.error_envio = str(e)
-                correo_lote.save()
+                error_msg = f"{type(e).__name__}: {str(e)}"
+                correo_lote.error_envio = error_msg
+                correo_lote.save(update_fields=['error_envio'])
+
+                logger.error(
+                    f"Error enviando correo masivo UUID={uuid_correo}: {error_msg}",
+                    exc_info=True
+                )
+
+                # Intentar programar reintento vía Celery
+                reintento_programado = False
+                try:
+                    from examenes.tasks import enviar_correo_masivo_task
+                    enviar_correo_masivo_task.apply_async(
+                        args=[correo_lote.id],
+                        kwargs={'excel_bytes': excel_buffer.getvalue() if excel_buffer else None},
+                        countdown=120
+                    )
+                    reintento_programado = True
+                    logger.info(f"Reintento Celery programado para correo masivo id={correo_lote.id}")
+                except Exception as celery_err:
+                    logger.error(f"No se pudo programar reintento Celery: {str(celery_err)}")
+
                 return Response(
                     {
                         "error": f"Error al enviar correo: {str(e)}",
                         "uuid_correo": uuid_correo,
-                        "trabajadores_registrados": len(registros)
+                        "trabajadores_registrados": len(registros),
+                        "reintento_programado": reintento_programado,
+                        "detalle": (
+                            "Los trabajadores fueron registrados en la base de datos. "
+                            + ("Se reintentará el envío automáticamente." if reintento_programado
+                               else "Por favor reintente manualmente.")
+                        )
                     },
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
@@ -2534,6 +3463,9 @@ class ActualizarEstadoExamenesMasivoView(APIView):
         actualizados = []
         no_encontrados = []
         cambios = []
+        correos_actualizados = set()  # Recolectar UUIDs únicos de correos actualizados
+        colaboradores_actualizados = set()  # Recolectar IDs de colaboradores que han enviado estos correos
+        
         for tid in trabajador_ids:
             try:
                 reg = RegistroExamenes.objects.get(id=tid)
@@ -2545,16 +3477,62 @@ class ActualizarEstadoExamenesMasivoView(APIView):
                 # es ahora la fuente de verdad (decoupled). Solo registramos el cambio
                 actualizados.append(tid)
                 cambios.append({'id': tid, 'de': estado_anterior, 'a': reg.estado_trabajador})
+                
+                # Recolectar UUID del correo y colaborador para limpiar su caché después
+                if reg.correo_lote:
+                    if reg.correo_lote.uuid_correo:
+                        correos_actualizados.add(reg.correo_lote.uuid_correo)
+                    if reg.correo_lote.enviado_por_id:
+                        colaboradores_actualizados.add(reg.correo_lote.enviado_por_id)
 
                 # Invalidar cache de listados del correo para reflejar el cambio
                 try:
                     correo_id = reg.correo_lote.id
+                    # Limpiar trabajadores_correo_v2 - listados de trabajadores del correo
                     for sz in (10, 25, 50, 100):
                         cache.delete(f"trabajadores_correo_v2={correo_id}_page=1_size={sz}")
-                except Exception:
-                    pass
+                        
+                    # Limpiar reporte_correos - reporte general de correos
+                    for page in range(1, 100):  # Invalida hasta página 100
+                        for sz in (10, 25, 50, 100):
+                            cache.delete(f"reporte_correos_page={page}_size={sz}")
+                            
+                except Exception as e:
+                    print(f"Error limpiando caché de correo: {e}")
             except RegistroExamenes.DoesNotExist:
                 no_encontrados.append(tid)
+        
+        # Limpiar caché de filtrar-examenes para los colaboradores y correos actualizados
+        try:
+            # Limpiar lista general de colaboradores
+            cache.delete("filtrar_examenes_colaboradores")
+            
+            # Limpiar caché por colaborador (todas las páginas y tamaños)
+            for colaborador_id in colaboradores_actualizados:
+                if colaborador_id:
+                    for page in range(1, 100):
+                        for sz in (10, 25, 50, 100):
+                            cache.delete(f"filtrar_examenes_colaborador={colaborador_id}_page={page}_size={sz}")
+            
+            # Limpiar caché de búsqueda por UUID para los correos actualizados
+            # Patrones backend: filtrar_examenes_uuid={uuid_correo}
+            for uuid_correo in correos_actualizados:
+                # Limpiar patrón del backend (sin paginación, devuelve un correo o múltiples)
+                cache.delete(f"filtrar_examenes_uuid={uuid_correo}")
+                
+                # Limpiar patrones del frontend deduplicados con paginación
+                # Patrón: examenes:FiltrarExamenesPorUUID:{uuid}:page={page}:size={size}
+                for page in range(1, 20):
+                    for sz in (10, 25, 50, 100):
+                        cache_key = f"examenes:FiltrarExamenesPorUUID:{uuid_correo}:page={page}:size={sz}"
+                        cache.delete(cache_key)
+                
+                # También limpiar sin paginación por si acaso
+                cache_key_simple = f"examenes:FiltrarExamenesPorUUID:{uuid_correo}"
+                cache.delete(cache_key_simple)
+                
+        except Exception as e:
+            print(f"Error limpiando caché de filtrar-examenes: {e}")
 
         return Response({
             'actualizados': actualizados,
@@ -2763,7 +3741,9 @@ class FiltrarExamenesView(APIView):
 
     def _get_correo_por_uuid(self, request, uuid_correo):
         """
-        Devuelve un correo específico filtrado por su UUID.
+        Devuelve correos filtrados por UUID o nombre del trabajador.
+        Si no encuentra por UUID, busca por nombre del trabajador.
+        Retorna formato compatible con ReporteCorreosEnviadosView.
         """
         cache_key = f"filtrar_examenes_uuid={uuid_correo}"
 
@@ -2772,29 +3752,78 @@ class FiltrarExamenesView(APIView):
             return Response(cached, status=status.HTTP_200_OK, headers={'X-Cache': 'HIT'})
 
         try:
-            # Buscar el correo por UUID
-            correo = CorreoExamenEnviado.objects.select_related('enviado_por').get(
-                uuid_correo=uuid_correo
-            )
+            # Primero intentar buscar por UUID del correo
+            try:
+                correo = CorreoExamenEnviado.objects.select_related('enviado_por').prefetch_related('trabajadores').get(
+                    uuid_correo=uuid_correo
+                )
+                
+                # Serializar el correo encontrado
+                serializer = ReporteCorreoSerializer(correo)
+                response_data = {
+                    "found": True,
+                    "correo": serializer.data,
+                    "uuid": uuid_correo,
+                    "search_type": "uuid"
+                }
 
-            # Serializar el correo
-            serializer = ReporteCorreoSerializer(correo)
+                # Guardar en cache
+                cache.set(cache_key, response_data, timeout=300)
+                return Response(response_data, status=status.HTTP_200_OK, headers={'X-Cache': 'MISS'})
+                
+            except CorreoExamenEnviado.DoesNotExist:
+                # Si no existe por UUID, buscar por nombre del trabajador
+                pass
+
+            # Buscar correos que contengan trabajadores con ese nombre
+            from django.db.models import Q
+            correos = CorreoExamenEnviado.objects.filter(
+                trabajadores__nombre_trabajador__icontains=uuid_correo
+            ).select_related('enviado_por').prefetch_related('trabajadores').distinct().order_by('-fecha_envio')
+
+            if not correos.exists():
+                return Response(
+                    {"found": False, "error": f"No se encontró correo con UUID o nombre de trabajador: {uuid_correo}"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            # Si hay múltiples correos, retornar formato de lista paginada
+            if correos.count() > 1:
+                # Aplicar paginación
+                page = request.query_params.get('page', '1')
+                page_size = request.query_params.get('page_size', '25')
+                
+                paginator = PageNumberPagination()
+                paginator.page_size = int(page_size)
+                paginator.page_size_query_param = 'page_size'
+                paginator.max_page_size = 100
+                
+                paginated_correos = paginator.paginate_queryset(correos, request, view=self)
+
+                if paginated_correos is not None:
+                    serializer = ReporteCorreoSerializer(paginated_correos, many=True)
+                    paginated_response = paginator.get_paginated_response(serializer.data)
+                    paginated_response.data.update({
+                        "search_type": "trabajador",
+                        "search_term": uuid_correo,
+                        "total_correos": correos.count()
+                    })
+                    cache.set(cache_key, paginated_response.data, timeout=300)
+                    return paginated_response
+
+            # Si hay un solo correo, retornar formato unitario
+            serializer = ReporteCorreoSerializer(correos.first())
             response_data = {
                 "found": True,
                 "correo": serializer.data,
-                "uuid": uuid_correo
+                "search_term": uuid_correo,
+                "search_type": "trabajador",
+                "total_found": 1
             }
 
-            # Guardar en cache (5 minutos)
             cache.set(cache_key, response_data, timeout=300)
-
             return Response(response_data, status=status.HTTP_200_OK, headers={'X-Cache': 'MISS'})
 
-        except CorreoExamenEnviado.DoesNotExist:
-            return Response(
-                {"found": False, "error": f"Correo con UUID {uuid_correo} no encontrado"},
-                status=status.HTTP_404_NOT_FOUND
-            )
         except Exception as e:
             return Response(
                 {"error": f"Error buscando correo: {str(e)}"},

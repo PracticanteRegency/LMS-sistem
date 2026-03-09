@@ -87,6 +87,7 @@ pypandoc
 cloudinary==1.41.0
 django-cloudinary-storage==0.3.0
 django-redis==6.0.0
+gunicorn==23.0.0
 zipfile36
 pypdf==6.6.0
 reportlab==4.0.0

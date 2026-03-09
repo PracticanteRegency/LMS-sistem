@@ -208,8 +208,7 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Email Configuration
-# Use SMTP backend for production, console for development
+# Email Configuration - Capacitaciones Generales (GoDaddy - Default)
 EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
 EMAIL_HOST = config('EMAIL_HOST', default='smtp.gmail.com')
 EMAIL_PORT = config('EMAIL_PORT', default=465, cast=int)
@@ -218,6 +217,17 @@ EMAIL_USE_TLS = config('EMAIL_USE_TLS', default=False, cast=bool)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='no-reply@regencysa.net')
+EMAIL_TIMEOUT = config('EMAIL_TIMEOUT', default=30, cast=int)
+
+# Email Configuration - Exámenes Médicos (360 CloudRegency)
+EMAIL_MEDICAL_HOST = config('EMAIL_MEDICAL_HOST', default='360.cloudregencyapps.com')
+EMAIL_MEDICAL_PORT = config('EMAIL_MEDICAL_PORT', default=465, cast=int)
+EMAIL_MEDICAL_USE_SSL = config('EMAIL_MEDICAL_USE_SSL', default=True, cast=bool)
+EMAIL_MEDICAL_USE_TLS = config('EMAIL_MEDICAL_USE_TLS', default=False, cast=bool)
+EMAIL_MEDICAL_HOST_USER = config('EMAIL_MEDICAL_HOST_USER', default='')
+EMAIL_MEDICAL_HOST_PASSWORD = config('EMAIL_MEDICAL_HOST_PASSWORD', default='')
+EMAIL_MEDICAL_FROM_EMAIL = config('EMAIL_MEDICAL_FROM_EMAIL', default='notificacionexamenes@360.cloudregencyapps.com')
+EMAIL_MEDICAL_TIMEOUT = config('EMAIL_MEDICAL_TIMEOUT', default=30, cast=int)  # Usa el mismo timeout
 
 # Media files
 MEDIA_URL = '/media/'
@@ -225,16 +235,37 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Cache Configuration
 # Usa cache en memoria para desarrollo, Redis para producción
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
-        'OPTIONS': {
-            "PASSWORD": "TU_PASSWORD",
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+import sys
+
+if 'test' in sys.argv:
+    # Para tests: cache en memoria
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'unique-snowflake',
         }
     }
-}
+elif DEBUG:
+    # Desarrollo: cache en memoria (más rápido para desarrollo)
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'unique-snowflake',
+        }
+    }
+else:
+    # Producción: Redis
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': f"redis://{os.getenv('REDIS_HOST', 'localhost')}:6379/1",
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'PARSER_KWARGS': {'decode_responses': True},
+                'CONNECTION_POOL_KWARGS': {'max_connections': 50},
+            }
+        }
+    }
 
 # Tiempos de cache específicos (en segundos)
 CACHE_TTL_CAPACITACIONES_LIST = 60 * 5  # 5 minutos para lista de capacitaciones

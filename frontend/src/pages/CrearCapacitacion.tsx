@@ -4,6 +4,7 @@ import styles from "./Styles/CrearCapacitacion.module.css";
 import { useNavigate } from "react-router-dom";
 import CapListService from "../services/Capacitaciones";
 import { normalizeDataUrl } from "../utils/media";
+import FileUploadError from "../components/FileUploadError";
 
 const STORAGE_KEY = "crearCapacitacion_formData";
 const STORAGE_KEY_MODULOS = "crearCapacitacion_modulos";
@@ -158,6 +159,7 @@ export default function CrearCapacitacion() {
   const [searchColaborador, setSearchColaborador] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fileUploadError, setFileUploadError] = useState<{ message: string; type: 'error' | 'success' | 'warning' } | null>(null);
   const today = new Date().toISOString().split("T")[0];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -543,7 +545,8 @@ const handleRespuestaChange = async (
     try {
       setLoading(true);
       setError(null);
-      setColaboradores([]); // Limpiar colaboradores previos
+      setFileUploadError(null);
+      setColaboradores([]);
       
       console.log("Cargando archivo de colaboradores:", file.name);
       
@@ -552,31 +555,29 @@ const handleRespuestaChange = async (
       
       console.log("Respuesta del servidor:", response);
       
-      // Procesar respuesta - estructura: { colaboradores_encontrados: [...], colaboradores_no_encontrados: [...] }
+      // Procesar respuesta
       if (response.colaboradores_encontrados && Array.isArray(response.colaboradores_encontrados)) {
         setColaboradores(response.colaboradores_encontrados);
         console.log(`✓ ${response.colaboradores_encontrados.length} colaboradores cargados exitosamente`);
       } else if (response.colaboradores && Array.isArray(response.colaboradores)) {
-        // Fallback para estructura alternativa
         setColaboradores(response.colaboradores);
         console.log(`✓ ${response.colaboradores.length} colaboradores cargados exitosamente`);
       } else if (response && Array.isArray(response)) {
-        // Si retorna directamente un array
         setColaboradores(response);
         console.log(`✓ ${response.length} colaboradores cargados exitosamente`);
       }
       
-      // Mostrar advertencia si hay colaboradores no encontrados
-      if (response.colaboradores_no_encontrados && response.colaboradores_no_encontrados.length > 0) {
-        console.warn("Colaboradores no encontrados:", response.colaboradores_no_encontrados);
-        setError(`Advertencia: ${response.colaboradores_no_encontrados.length} colaboradores no fueron encontrados en el sistema: ${response.colaboradores_no_encontrados.join(", ")}`);
-      }
     } catch (err: any) {
       console.error("Error al procesar CSV:", err);
-      setError("Error al procesar el archivo CSV: " + (err.message || "Error desconocido"));
+      
+      // Mostrar solo lo que el backend responde
+      const message = err.response?.data?.error || err.response?.data?.message || err.message || 'Error desconocido';
+      setFileUploadError({
+        message,
+        type: 'error'
+      });
     } finally {
       setLoading(false);
-      // Limpiar el input file para permitir subir el mismo archivo nuevamente
       e.target.value = "";
     }
   };
@@ -701,128 +702,111 @@ const handleRespuestaChange = async (
       }
     }
 
-      // SUBIR ARCHIVOS PENDIENTES Y CONSTRUIR PAYLOAD CON URLS
-      try {
-        // Imagen principal
-        let imagenFinalUrl = formData.imagen || "";
-        const imagenFile = (formData as any).imagenFile as File | undefined;
-        if (imagenFile) {
-          const resp: any = await CapListService.uploadImagenCapacitacion(imagenFile);
-          imagenFinalUrl = resp?.url || resp?.file_url || resp?.download_url || resp?.location || imagenFinalUrl;
-          if (!imagenFinalUrl) throw new Error('No se obtuvo URL para imagen principal');
-        }
-
-        // Clonar modulos para mutar urls después de subir
-        const nuevos = structuredClone(modulos);
-        for (let mm = 0; mm < nuevos.length; mm++) {
-          for (let ll = 0; ll < nuevos[mm].lecciones.length; ll++) {
-            const lec = nuevos[mm].lecciones[ll];
-            if (lec.tipo_leccion === 'imagen' && lec.file && !lec.url) {
-              const r: any = await CapListService.uploadImagenLeccion(lec.file);
-              const u = r?.url || r?.file_url || r?.download_url || r?.location;
-              if (!u) throw new Error(`No se obtuvo URL para la imagen de la lección ${ll + 1}`);
-              lec.url = u;
-            }
-            if (lec.tipo_leccion === 'pdf' && lec.file && !lec.url) {
-              const r: any = await CapListService.uploadPdfLeccion(lec.file);
-              const u = r?.url || r?.file_url || r?.download_url || r?.location;
-              if (!u) throw new Error(`No se obtuvo URL para el PDF de la lección ${ll + 1}`);
-              lec.url = u;
-            }
-            if (lec.tipo_leccion === 'formulario' && lec.preguntas) {
-              for (let pp = 0; pp < lec.preguntas.length; pp++) {
-                const pq = lec.preguntas[pp];
-                if (pq.file && !pq.url_multimedia) {
-                  const r: any = await CapListService.uploadImagenPregunta(pq.file);
-                  const u = r?.url || r?.file_url || r?.download_url || r?.location;
-                  if (!u) throw new Error(`No se obtuvo URL para la imagen de la pregunta ${pp + 1}`);
-                  pq.url_multimedia = u;
-                }
-                for (let rdx = 0; rdx < (pq.respuestas || []).length; rdx++) {
-                  const resp = (pq.respuestas as any)[rdx];
-                  if (resp.file && !resp.url_imagen) {
-                    const rr: any = await CapListService.uploadImagenRespuesta(resp.file);
-                    const u = rr?.url || rr?.file_url || rr?.download_url || rr?.location;
-                    if (!u) throw new Error(`No se obtuvo URL para la imagen de la respuesta ${rdx + 1}`);
-                    resp.url_imagen = u;
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        // Construir el payload
-        const normalizedModulos = (nuevos).map((m) => ({
-          ...m,
-          lecciones: (m.lecciones || []).map((l: any) => ({
-            ...l,
-            url: l.url || "",
-            preguntas: (l.preguntas || []).map((p: any) => ({
-              ...p,
-              url_multimedia: p.url_multimedia || p.url_media || "",
-              respuestas: (p.respuestas || []).map((r: any) => ({
-                ...r,
-                url_imagen: r.url_imagen || r.url_archivo || r.url || "",
-                url_archivo: r.url_archivo || r.url_imagen || r.url || "",
-              })),
+      // ============ NUEVO: ENVIAR TODO EN UN SOLO POST CON FormData ============
+      // Construir el payload con estructura normalizada (sin archivos)
+      const modulosParaEnviar = structuredClone(modulos).map((m) => ({
+        nombre_modulo: m.nombre_modulo,
+        lecciones: (m.lecciones || []).map((l: any) => ({
+          titulo_leccion: l.titulo_leccion,
+          descripcion: l.descripcion,
+          duracion: l.duracion,
+          tipo_leccion: l.tipo_leccion,
+          url: l.url || "", // URL si ya existe (edición)
+          preguntas: (l.preguntas || []).map((p: any) => ({
+            pregunta: p.pregunta,
+            tipo_pregunta: p.tipo_pregunta,
+            url_multimedia: p.url_multimedia || "", // URL si ya existe
+            respuestas: (p.respuestas || []).map((r: any) => ({
+              valor: r.valor,
+              es_correcto: r.es_correcto,
+              url_imagen: r.url_imagen || "", // URL si ya existe
             })),
           })),
-        }));
+        })),
+      }));
 
-        const payload = {
-          titulo: formData.titulo,
-          descripcion: formData.descripcion,
-          tipo: formData.tipo,
-          imagen: imagenFinalUrl || "",
-          fecha_inicio: formData.fecha_inicio + "T08:00:00Z",
-          fecha_fin: formData.fecha_fin + "T18:00:00Z",
-          modulos: normalizedModulos,
-        } as any;
+      const payloadBasico = {
+        titulo: formData.titulo,
+        descripcion: formData.descripcion,
+        tipo: formData.tipo,
+        fecha_inicio: formData.fecha_inicio + "T08:00:00Z",
+        fecha_fin: formData.fecha_fin + "T18:00:00Z",
+        modulos: modulosParaEnviar,
+        colaboradores: !id ? colaboradores.map((c) => c.id_colaborador || c.id) : [],
+        imagenFile: (formData as any).imagenFile, // Archivo de imagen principal
+      };
 
-        // Solo incluir colaboradores si es creación (no edición)
-        if (!id) {
-          payload.colaboradores = colaboradores.map((c) => c.id_colaborador || c.id);
-        }
+      // Construir FormData con archivos incrustados
+      const formDataMultipart = new FormData();
+      
+      // Campos simples
+      formDataMultipart.append('titulo', payloadBasico.titulo);
+      formDataMultipart.append('descripcion', payloadBasico.descripcion);
+      formDataMultipart.append('tipo', payloadBasico.tipo);
+      formDataMultipart.append('fecha_inicio', payloadBasico.fecha_inicio);
+      formDataMultipart.append('fecha_fin', payloadBasico.fecha_fin);
 
-        console.log("Enviando capacitación:", payload);
-        if (id) {
-          // Editar existente - solo enviar datos de la capacitación, sin colaboradores
-          const response = await (CapListService as any).patchCapacitacion(id, payload);
-          console.log("Capacitación actualizada exitosamente:", response);
-        } else {
-          // Crear nueva
-          const response = await CapListService.crearCapacitacionCompleta(payload);
-          console.log("Capacitación creada exitosamente:", response);
-        }
-      } catch (uploadErr: any) {
-        console.error(uploadErr);
-        
-        // Extraer detalles del error de subida de archivos
-        let errorMessage = 'Error al subir archivos';
-        
-        if (uploadErr.response?.data) {
-          const data = uploadErr.response.data;
-          if (typeof data === 'string') {
-            errorMessage = data;
-          } else if (data.error) {
-            errorMessage = data.error;
-          } else if (data.message) {
-            errorMessage = data.message;
-          } else if (data.detail) {
-            errorMessage = data.detail;
+      // Imagen principal
+      if (payloadBasico.imagenFile) {
+        formDataMultipart.append('imagen', payloadBasico.imagenFile);
+      }
+
+      // Agregar archivos de lecciones, preguntas y respuestas a FormData
+      modulos.forEach((modulo, moduloIdx) => {
+        modulo.lecciones.forEach((leccion, leccionIdx) => {
+          if (leccion.file) {
+            formDataMultipart.append(
+              `leccion_${moduloIdx}_${leccionIdx}`,
+              leccion.file
+            );
           }
-        } else if (uploadErr.message) {
-          errorMessage = uploadErr.message;
-        }
-        
-        setError(errorMessage);
-        setLoading(false);
-        return;
+
+          if (leccion.preguntas) {
+            leccion.preguntas.forEach((pregunta, preguntaIdx) => {
+              if (pregunta.file) {
+                formDataMultipart.append(
+                  `pregunta_${moduloIdx}_${leccionIdx}_${preguntaIdx}`,
+                  pregunta.file
+                );
+              }
+
+              if (pregunta.respuestas) {
+                pregunta.respuestas.forEach((respuesta, respuestaIdx) => {
+                  if (respuesta.file) {
+                    formDataMultipart.append(
+                      `respuesta_${moduloIdx}_${leccionIdx}_${preguntaIdx}_${respuestaIdx}`,
+                      respuesta.file
+                    );
+                  }
+                });
+              }
+            });
+          }
+        });
+      });
+
+      // Módulos y colaboradores como JSON strings
+      formDataMultipart.append('modulos', JSON.stringify(payloadBasico.modulos));
+      formDataMultipart.append('colaboradores', JSON.stringify(payloadBasico.colaboradores));
+
+      console.log("Enviando capacitación con FormData multipart...");
+      
+      if (id) {
+        // Editar existente
+        const response = await (CapListService as any).patchCapacitacion(id, formDataMultipart);
+        console.log("Capacitación actualizada exitosamente:", response);
+      } else {
+        // Crear nueva - usa crearCapacitacionCompleta que detecta FormData automáticamente
+        const response = await CapListService.crearCapacitacionCompleta(formDataMultipart);
+        console.log("Capacitación creada exitosamente:", response);
       }
       
       // Mostrar mensaje de éxito
       alert("¡Capacitación creada exitosamente!");
+      
+      // Limpiar localStorage
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY_MODULOS);
       
       // Redirigir a la página de capacitaciones
       navigate("/capacitaciones/list");
@@ -1530,11 +1514,21 @@ const handleRespuestaChange = async (
               Subir CSV
               <input
                 type="file"
+                accept=".csv"
                 onChange={handleCsvUpload}
                 style={{ display: "none" }}
               />
             </label>
           </div>
+
+          {/* Componente mejorado para mostrar errores/advertencias de carga de archivos */}
+          {fileUploadError && (
+            <FileUploadError
+              error={fileUploadError.type === 'error' ? fileUploadError.message : null}
+              type={fileUploadError.type}
+              onClose={() => setFileUploadError(null)}
+            />
+          )}
 
           {colaboradores.length > 0 && (
             <div className={styles.colaboradoresTable}>

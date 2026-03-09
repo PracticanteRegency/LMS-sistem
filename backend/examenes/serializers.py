@@ -139,6 +139,8 @@ class ReporteCorreoSerializer(serializers.ModelSerializer):
     """Serializer para listar correos enviados en el reporte"""
     enviado_por_nombre = serializers.SerializerMethodField()
     trabajadores_count = serializers.SerializerMethodField()
+    trabajadores_ids = serializers.SerializerMethodField()
+    estado_nombre = serializers.SerializerMethodField()
 
     class Meta:
         model = CorreoExamenEnviado
@@ -149,6 +151,8 @@ class ReporteCorreoSerializer(serializers.ModelSerializer):
             'fecha_envio',
             'enviado_por_nombre',
             'trabajadores_count',
+            'trabajadores_ids',
+            'estado_nombre',
             'enviado_correctamente']
         read_only_fields = fields
 
@@ -158,7 +162,24 @@ class ReporteCorreoSerializer(serializers.ModelSerializer):
 
     def get_trabajadores_count(self, obj):
         """Cantidad de trabajadores en este correo"""
-        return obj.registros_examenes.count() if hasattr(obj, 'registros_examenes') else 0
+        return obj.trabajadores.count()
+
+    def get_trabajadores_ids(self, obj):
+        """Lista de trabajadores con id, nombre y estado"""
+        return list(obj.trabajadores.values('id', 'nombre_trabajador', 'estado_trabajador'))
+
+    def get_estado_nombre(self, obj):
+        """Estado general del correo basado en el estado de sus trabajadores.
+        Si todos los trabajadores están completados -> 'Completado'
+        Si no hay trabajadores -> 'Sin trabajadores'
+        Si alguno está pendiente -> 'No Completado'
+        """
+        trabajadores = obj.trabajadores.all()
+        if not trabajadores.exists():
+            return 'Sin trabajadores'
+        if trabajadores.filter(estado_trabajador=0).exists():
+            return 'No Completado'
+        return 'Completado'
 
 
 class DetalleCorreoSerializer(serializers.ModelSerializer):

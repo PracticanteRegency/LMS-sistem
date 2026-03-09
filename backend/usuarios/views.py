@@ -18,7 +18,7 @@ from analitica.models import Centroop, Proyecto, Unidadnegocio, Epresa
 from capacitaciones.models import Capacitaciones, progresoCapacitaciones, Modulos, Lecciones, progresolecciones
 from capacitaciones.serializers import CapacitacionProgresoSerializer
 from usuarios.serializers import ColaboradorListadoSerializer, cargosSerializer, nivelesSerializer, regionalesSerializer
-from django.db.models import Count, Q, Prefetch, OuterRef, Subquery, IntegerField, Case, When
+from django.db.models import Count, Q, Prefetch, OuterRef, Subquery, IntegerField, Case, When, Max
 from django.db.models.functions import Coalesce
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -63,18 +63,30 @@ class Perfil(APIView):
             )
 
         # Subquery para contar lecciones completadas por capacitación
+        # Contar lecciones donde el progreso está completado (completada=1)
         lecciones_completadas_subq = progresolecciones.objects.filter(
             idcolaborador=colaborador,
             idleccion__idmodulo__idcapacitacion=OuterRef('capacitacion_id'),
-            completada=1
+            completada=1  # Usar completada=1 como indicador de completación
         ).values('idleccion__idmodulo__idcapacitacion').annotate(
-            count=Count('id_progreso')
+            count=Count('id_progreso', distinct=True)
         ).values('count')
 
-        progresos = (
+        # FIX: Eliminar duplicados si un colaborador está múltiples veces en la misma capacitación
+        # Usar Max('id') + GROUP BY capacitacion (compatible con MySQL)
+        latest_ids = (
             progresoCapacitaciones.objects
             .filter(colaborador=colaborador)
             .exclude(capacitacion__estado=3)
+            .values('capacitacion')
+            .annotate(max_id=Max('id'))
+            .values_list('max_id', flat=True)
+        )
+        
+        # Filtrar solo los registros de progreso más recientes
+        progresos = (
+            progresoCapacitaciones.objects
+            .filter(id__in=list(latest_ids))
             .select_related('capacitacion')
             .annotate(
                 total_lecciones=Count(
@@ -85,13 +97,13 @@ class Perfil(APIView):
                     Subquery(lecciones_completadas_subq, output_field=IntegerField()),
                     0
                 ),
-                estado_orden=Case(
-                    When(capacitacion__estado=1, then=1),  # Estado 1 primero
-                    When(capacitacion__estado=2, then=2),  # Estado 2 después
+                completada_orden=Case(
+                    When(completada=0, then=0),  # Incompletas primero
+                    When(completada=1, then=1),  # Completadas después
                     output_field=IntegerField()
                 )
             )
-            .order_by('estado_orden', '-fecha_registro')
+            .order_by('completada_orden', '-fecha_registro')
         )
 
         capacitaciones_totales = progresos.count()
@@ -666,27 +678,30 @@ class CambiarEstadoUsuarioView(APIView):
         POST para desactivar/activar múltiples usuarios.
         POST /usuarios/cambiar-estado-usuario/
         Body: { "colaborador_ids": [1, 2, 3, ...], "estado": 1 o 0 }
+        o
+        Body: { "cedulas": ["1234567", "7654321", ...], "estado": 1 o 0 }
         
         Retorna:
         {
             "mensaje": "...",
             "total": 3,
             "actualizados": 3,
-            "errores": 0,
-            "detalles": [
-                {"colaborador_id": 1, "usuario_id": 10, "estado": 0, "success": true},
-                ...
+            "no_encontrados": 0,
+            "detalles_encontrados": [...],
+            "detalles_no_encontrados": [
+                {"identificador": "1234567", "tipo": "cedula", "error": "No encontrado"}
             ]
         }
         """
         try:
             colaborador_ids = request.data.get('colaborador_ids', [])
+            cedulas = request.data.get('cedulas', [])
             nuevo_estado = request.data.get('estado')
             
             # Validaciones
-            if not isinstance(colaborador_ids, list) or len(colaborador_ids) == 0:
+            if not (isinstance(colaborador_ids, list) or isinstance(cedulas, list)) or (len(colaborador_ids) == 0 and len(cedulas) == 0):
                 return Response(
-                    {"error": "El campo 'colaborador_ids' es requerido y debe ser una lista no vacía"},
+                    {"error": "El campo 'colaborador_ids' o 'cedulas' es requerido y debe ser una lista no vacía"},
                     status=400
                 )
             
@@ -703,26 +718,35 @@ class CambiarEstadoUsuarioView(APIView):
                 )
             
             # Procesar cada colaborador
-            resultados = []
+            encontrados = []
+            no_encontrados = []
             actualizados = 0
-            errores = 0
             
+            # Procesar por ID de colaborador
             for colaborador_id in colaborador_ids:
                 try:
-                    # Obtener usuario por colaborador
-                    usuario = Usuarios.objects.filter(
-                        idcolaboradoru__idcolaborador=colaborador_id
+                    # Obtener colaborador primero
+                    colaborador = Colaboradores.objects.filter(
+                        idcolaborador=colaborador_id
                     ).first()
                     
-                    if not usuario:
-                        resultados.append({
-                            "colaborador_id": colaborador_id,
-                            "usuario_id": None,
-                            "estado": None,
-                            "success": False,
-                            "error": "Usuario no encontrado"
+                    if not colaborador:
+                        no_encontrados.append({
+                            "identificador": colaborador_id,
+                            "tipo": "colaborador_id",
+                            "error": "Colaborador no encontrado"
                         })
-                        errores += 1
+                        continue
+                    
+                    # Obtener usuario del colaborador
+                    usuario = Usuarios.objects.filter(idcolaboradoru=colaborador).first()
+                    
+                    if not usuario:
+                        no_encontrados.append({
+                            "identificador": colaborador_id,
+                            "tipo": "colaborador_id",
+                            "error": "Usuario no encontrado para este colaborador"
+                        })
                         continue
                     
                     # Actualizar usuario
@@ -730,35 +754,89 @@ class CambiarEstadoUsuarioView(APIView):
                     usuario.save()
                     
                     # Sincronizar estado en colaborador
-                    colaborador = getattr(usuario, 'idcolaboradoru', None)
-                    if colaborador:
-                        colaborador.estadocolaborador = nuevo_estado
-                        colaborador.save()
+                    colaborador.estadocolaborador = nuevo_estado
+                    colaborador.save()
                     
-                    resultados.append({
+                    # Construir nombre completo
+                    nombre_completo = f"{colaborador.nombrecolaborador} {colaborador.apellidocolaborador}".strip()
+                    
+                    encontrados.append({
                         "colaborador_id": colaborador_id,
                         "usuario_id": usuario.id,
+                        "nombre": nombre_completo,
+                        "cedula": colaborador.cccolaborador,
                         "estado": nuevo_estado,
                         "success": True
                     })
                     actualizados += 1
                     
                 except Exception as e:
-                    resultados.append({
-                        "colaborador_id": colaborador_id,
-                        "usuario_id": None,
-                        "estado": None,
-                        "success": False,
+                    no_encontrados.append({
+                        "identificador": colaborador_id,
+                        "tipo": "colaborador_id",
                         "error": str(e)
                     })
-                    errores += 1
+            
+            # Procesar por cédula
+            for cedula in cedulas:
+                try:
+                    # Buscar colaborador por cédula (cccolaborador)
+                    colaborador = Colaboradores.objects.filter(cccolaborador=str(cedula)).first()
+                    
+                    if not colaborador:
+                        no_encontrados.append({
+                            "identificador": str(cedula),
+                            "tipo": "cedula",
+                            "error": "Cédula no encontrada"
+                        })
+                        continue
+                    
+                    # Obtener usuario del colaborador
+                    usuario = Usuarios.objects.filter(idcolaboradoru=colaborador).first()
+                    
+                    if not usuario:
+                        no_encontrados.append({
+                            "identificador": str(cedula),
+                            "tipo": "cedula",
+                            "error": "Usuario no encontrado para esta cédula"
+                        })
+                        continue
+                    
+                    # Actualizar usuario
+                    usuario.estadousuario = nuevo_estado
+                    usuario.save()
+                    
+                    # Sincronizar estado en colaborador
+                    colaborador.estadocolaborador = nuevo_estado
+                    colaborador.save()
+                    
+                    # Construir nombre completo
+                    nombre_completo = f"{colaborador.nombrecolaborador} {colaborador.apellidocolaborador}".strip()
+                    
+                    encontrados.append({
+                        "colaborador_id": colaborador.idcolaborador,
+                        "usuario_id": usuario.id,
+                        "nombre": nombre_completo,
+                        "cedula": str(cedula),
+                        "estado": nuevo_estado,
+                        "success": True
+                    })
+                    actualizados += 1
+                    
+                except Exception as e:
+                    no_encontrados.append({
+                        "identificador": str(cedula),
+                        "tipo": "cedula",
+                        "error": str(e)
+                    })
             
             return Response({
-                "mensaje": f"Procesamiento completado: {actualizados} actualizados, {errores} errores",
-                "total": len(colaborador_ids),
+                "mensaje": f"Procesamiento completado: {actualizados} activados/desactivados, {len(no_encontrados)} no encontrados",
+                "total": len(colaborador_ids) + len(cedulas),
                 "actualizados": actualizados,
-                "errores": errores,
-                "detalles": resultados
+                "no_encontrados": len(no_encontrados),
+                "detalles_encontrados": encontrados,
+                "detalles_no_encontrados": no_encontrados
             }, status=200)
             
         except Exception as e:
