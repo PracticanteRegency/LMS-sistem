@@ -681,21 +681,13 @@ def actualizar_progreso_leccion(colaborador_id, leccion, progreso, completada):
     """
     Guarda o actualiza el progreso de una lección y luego recalcula módulo y capacitación.
     """
-    # Convertir booleano a entero si es necesario
-    completada_int = 1 if completada else 0
-    
-    defaults = {
-        'progreso': progreso,
-        'completada': completada_int
-    }
-    # Agregar fecha de completado si se completó
-    if completada_int == 1:
-        defaults['fecha_completado'] = timezone.now()
-    
     progreso_leccion, _ = progresolecciones.objects.update_or_create(
         idcolaborador_id=colaborador_id,
         idleccion=leccion,
-        defaults=defaults
+        defaults={
+            'progreso': progreso,
+            'completada': completada
+        }
     )
 
     progreso_modulo_data = actualizar_progreso_modulo(colaborador_id, leccion.idmodulo)
@@ -705,29 +697,10 @@ def actualizar_progreso_leccion(colaborador_id, leccion, progreso, completada):
 def actualizar_progreso_modulo(colaborador_id, modulo):
     """
     Calcula el promedio de progreso de todas las lecciones del módulo.
-    
-    BUG FIX #1: Módulos vacíos ahora retornan 0% de progreso y no se marcan como completados.
-    Los módulos sin lecciones no deberían contar como completados automáticamente.
     """
     lecciones = Lecciones.objects.filter(idmodulo=modulo)
     total_lecciones = lecciones.count()
-    
-    # ✅ FIX #1: Si el módulo no tiene lecciones, no se puede completar
     if total_lecciones == 0:
-        # Actualizar o crear el registro con 0% progreso
-        progresoModulo.objects.update_or_create(
-            colaborador_id=colaborador_id,
-            modulo=modulo,
-            defaults={
-                'progreso': 0,
-                'completada': 0,  # ✅ Explícitamente NO completado
-                'fecha_completado': None
-            }
-        )
-        logger.warning(
-            f"⚠️  Módulo vacío (ID:{modulo.id}) para colaborador {colaborador_id} - "
-            f"Progreso: 0%, Completada: 0"
-        )
         return {"progreso_modulo": 0, "progreso_capacitacion": 0}
 
     progreso_total = 0
@@ -740,21 +713,19 @@ def actualizar_progreso_modulo(colaborador_id, modulo):
         ).first()
 
         if progreso_leccion:
-            progreso_total += float(progreso_leccion.progreso or 0)
-            if progreso_leccion.completada == 1:
+            progreso_total += float(progreso_leccion.progreso)
+            if progreso_leccion.completada:
                 completadas += 1
 
     promedio_modulo = round(progreso_total / total_lecciones, 2)
     modulo_completado = completadas == total_lecciones
-    modulo_completado_int = 1 if modulo_completado else 0
 
     progreso_modulo, _ = progresoModulo.objects.update_or_create(
         colaborador_id=colaborador_id,
         modulo=modulo,
         defaults={
             'progreso': promedio_modulo,
-            'completada': modulo_completado_int,
-            'fecha_completado': timezone.now() if modulo_completado else None
+            'completada': modulo_completado
         }
     )
 
@@ -769,21 +740,15 @@ def actualizar_progreso_modulo(colaborador_id, modulo):
 def actualizar_progreso_capacitacion(colaborador_id, capacitacion):
     """
     Calcula el progreso general de una capacitación basado en sus módulos.
-    
-    BUG FIX #2: Ahora valida coherencia:
-    - La capacitación solo se marca como completada si ALL módulos están completados
-    - Se valida que no haya inconsistencias (completada=1 pero progreso_modulo=0)
-    - Se limpia la fecha_completada si se descompleta
+    Maneja duplicados en la tabla capacitaciones_colaboradores de forma segura.
     """
     modulos = Modulos.objects.filter(idcapacitacion=capacitacion)
     total_modulos = modulos.count()
-    
     if total_modulos == 0:
         return 0
 
     progreso_total = 0
     completados = 0
-    progreso_por_modulo = {}  # Para auditoría
 
     for modulo in modulos:
         progreso_modulo = progresoModulo.objects.filter(
@@ -792,74 +757,49 @@ def actualizar_progreso_capacitacion(colaborador_id, capacitacion):
         ).first()
 
         if progreso_modulo:
-            progreso_value = float(progreso_modulo.progreso or 0)
-            progreso_total += progreso_value
-            progreso_por_modulo[modulo.id] = {
-                'progreso': progreso_value,
-                'completada': progreso_modulo.completada
-            }
-            
-            # ✅ FIX #2: Validación de coherencia
-            # Si módulo está marcado como completado, debe tener progreso >= 100
-            if progreso_modulo.completada == 1:
-                if progreso_value < 100:
-                    # ❌ INCONSISTENCIA DETECTADA
-                    logger.warning(
-                        f"⚠️  INCONSISTENCIA DETECTADA: "
-                        f"Módulo {modulo.id} marcado completada=1 pero progreso={progreso_value}% "
-                        f"para colaborador {colaborador_id}. Corrigiendo..."
-                    )
-                    # Auto-corrección: marcar como no completado
-                    progreso_modulo.completada = 0
-                    progreso_modulo.fecha_completado = None
-                    progreso_modulo.save(update_fields=['completada', 'fecha_completado'])
-                    progreso_por_modulo[modulo.id]['completada'] = 0
-                else:
-                    completados += 1
-            else:
-                # Si no está completado, completados no se incrementa
-                pass
-        else:
-            # Si no hay registro de progreso, se considera 0%
-            progreso_por_modulo[modulo.id] = {'progreso': 0, 'completada': 0}
+            progreso_total += float(progreso_modulo.progreso)
+            if progreso_modulo.completada:
+                completados += 1
 
     promedio_capacitacion = round(progreso_total / total_modulos, 2)
-    
-    # ✅ FIX #2: Coherence validation
-    # La capacitación se completa SOLO si:
-    # 1. TODOS los módulos están completados (completados == total_modulos)
-    # 2. Y TODOS tienen progreso >= 100 (implícito en #1)
-    capacitacion_completada = completados == total_modulos and total_modulos > 0
-    capacitacion_completada_int = 1 if capacitacion_completada else 0
+    capacitacion_completada = completados == total_modulos
 
-    obj, created = progresoCapacitaciones.objects.get_or_create(
+    from django.utils import timezone
+
+    # Usar filter().first() en lugar de get_or_create para evitar
+    # MultipleObjectsReturned cuando existen registros duplicados
+    registros = progresoCapacitaciones.objects.filter(
         colaborador_id=colaborador_id,
-        capacitacion=capacitacion,
-        defaults={
-            'progreso': promedio_capacitacion,
-            'completada': capacitacion_completada_int,
-            'fecha_completada': timezone.now() if capacitacion_completada else None
-        }
-    )
-    
-    # Si ya existe, actualizar con validación
-    update_fields = ['progreso', 'completada']
-    if not created:
-        # Detectar cambios para auditoría
-        cambio_completada = obj.completada != capacitacion_completada_int
-        cambio_progreso = float(obj.progreso or 0) != promedio_capacitacion
-        
-        if cambio_completada or cambio_progreso:
-            logger.warning(
-                f"📊 Capacitación {capacitacion.id} actualizada para colaborador {colaborador_id}: "
-                f"completada={obj.completada}→{capacitacion_completada_int}, "
-                f"progreso={float(obj.progreso or 0)}→{promedio_capacitacion}% "
-                f"(módulos completados: {completados}/{total_modulos})"
-            )
-        
+        capacitacion=capacitacion
+    ).order_by('id')
+
+    obj = registros.first()
+
+    # Limpiar duplicados si existen (mantener solo el primero)
+    if registros.count() > 1:
+        ids_duplicados = list(registros.values_list('id', flat=True)[1:])
+        progresoCapacitaciones.objects.filter(id__in=ids_duplicados).delete()
+        logger.warning(
+            f"Se eliminaron {len(ids_duplicados)} registros duplicados de "
+            f"progresoCapacitaciones para colaborador={colaborador_id}, "
+            f"capacitacion={capacitacion.id}"
+        )
+
+    if obj is None:
+        # Crear registro nuevo si no existe
+        obj = progresoCapacitaciones.objects.create(
+            colaborador_id=colaborador_id,
+            capacitacion=capacitacion,
+            progreso=promedio_capacitacion,
+            completada=capacitacion_completada,
+            fecha_registro=timezone.now(),
+            fecha_completada=timezone.now() if capacitacion_completada else None
+        )
+    else:
+        # Actualizar registro existente
+        update_fields = ['progreso', 'completada']
         obj.progreso = promedio_capacitacion
-        obj.completada = capacitacion_completada_int
-        
+        obj.completada = capacitacion_completada
         # Si se completa y nunca se había completado antes, poner fecha
         if capacitacion_completada and not obj.fecha_completada:
             obj.fecha_completada = timezone.now()
@@ -868,7 +808,6 @@ def actualizar_progreso_capacitacion(colaborador_id, capacitacion):
         elif not capacitacion_completada and obj.fecha_completada:
             obj.fecha_completada = None
             update_fields.append('fecha_completada')
-        
         obj.save(update_fields=update_fields)
 
     return promedio_capacitacion
