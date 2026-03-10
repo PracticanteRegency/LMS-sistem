@@ -45,7 +45,7 @@ app.conf.beat_schedule = {
     # Los lunes a las 18:00, bien separado de los demás.
     'notificar-jefes-sin-progreso': {
         'task': 'notificaciones.tasks.notificar_jefes_por_colaboradores_sin_progreso',
-        'schedule': crontab(hour=18, minute=0, day_of_week='monday'),  # Lunes 18:00
+        'schedule': crontab(hour=10, minute=0, day_of_week='monday'),  # Lunes 10:00
     },
 
     # ── Tareas sin envío de correos (no afectan límite) ─────────────────
