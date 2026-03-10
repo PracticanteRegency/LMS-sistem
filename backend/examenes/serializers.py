@@ -158,7 +158,9 @@ class ReporteCorreoSerializer(serializers.ModelSerializer):
 
     def get_enviado_por_nombre(self, obj):
         # Ajuste a nombre del campo real en Colaboradores
-        return obj.enviado_por.nombrecolaborador if obj.enviado_por else "N/A"
+        if obj.enviado_por:
+            return f"{obj.enviado_por.nombrecolaborador} {obj.enviado_por.apellidocolaborador}"
+        return "N/A"
 
     def get_trabajadores_count(self, obj):
         """Cantidad de trabajadores en este correo"""
@@ -196,7 +198,9 @@ class DetalleCorreoSerializer(serializers.ModelSerializer):
 
     def get_enviado_por_nombre(self, obj):
         # Ajuste a nombre del campo real en Colaboradores
-        return obj.enviado_por.nombrecolaborador if obj.enviado_por else "N/A"
+        if obj.enviado_por:
+            return f"{obj.enviado_por.nombrecolaborador} {obj.enviado_por.apellidocolaborador}"
+        return "N/A"
 
 
 class RegistroExamenesSerializer(serializers.ModelSerializer):
@@ -340,8 +344,7 @@ class DetalleCorreoMasivoSerializer(serializers.ModelSerializer):
     """Serializer para ver detalle de un envío masivo con sus trabajadores"""
     trabajadores = RegistroExamenesSerializer(many=True, read_only=True)
     estado = serializers.SerializerMethodField()
-    enviado_por_nombre = serializers.CharField(
-        source='enviado_por.nombrecolaborador', read_only=True)
+    enviado_por_nombre = serializers.SerializerMethodField()
 
     class Meta:
         model = CorreoExamenEnviado
@@ -361,6 +364,12 @@ class DetalleCorreoMasivoSerializer(serializers.ModelSerializer):
 
     def get_estado(self, obj):
         return "Enviado" if obj.enviado_correctamente else "Pendiente"
+
+    def get_enviado_por_nombre(self, obj):
+        # Incluye nombre y apellido del colaborador que envió el correo
+        if obj.enviado_por:
+            return f"{obj.enviado_por.nombrecolaborador} {obj.enviado_por.apellidocolaborador}"
+        return "N/A"
 
 
 class ActualizarEstadoTrabajadorSerializer(serializers.ModelSerializer):
@@ -491,8 +500,9 @@ class ReporteCorreoDetalladoSerializer(serializers.ModelSerializer):
         ]
     
     def get_enviado_por_nombre(self, obj):
-        return obj.enviado_por.nombrecolaborador if obj.enviado_por else "N/A"
-    
+        if obj.enviado_por:
+            return f"{obj.enviado_por.nombrecolaborador} {obj.enviado_por.apellidocolaborador}"
+        return "N/A"
     def get_trabajadores_count(self, obj):
         return obj.registros_examenes.count()
     
