@@ -357,13 +357,22 @@ def notificar_jefes_por_colaboradores_sin_progreso():
     Envía un archivo Excel adjunto personalizado por proyecto con las columnas:
     Nombre Completo, Correo, Capacitación, Estado (Completado / No Completado).
     
-    Se ejecuta cada lunes a las 09:00.
+    Se ejecuta cada lunes a las 18:00.
     
-    IMPORTANTE:
-    - Solo incluye colaboradores ACTIVOS (estadocolaborador = 1)
-    - Solo incluye capacitaciones activas (estado = 1)
-    - Solo notifica si hay al menos un colaborador con capacitación pendiente
-    - Cada jefe recibe su reporte personalizado con Excel adjunto
+    LÓGICA DE FILTRADO:
+    1. Solo capacitaciones activas (estado = 1)
+    2. Solo proyectos activos (estadoproyecto = 1) con jefe asignado
+    3. Solo centros operativos activos (estadocentrop = 1) del proyecto
+    4. Solo colaboradores activos (estadocolaborador = 1) de esos centros
+    5. Solo colaboradores ASIGNADOS a cada capacitación (tienen registro en progresoCapacitaciones)
+    6. Del registro en progresoCapacitaciones se obtiene si está completada o no
+    7. Solo notifica si hay al menos un colaborador con capacitación pendiente
+    
+    SALIDA:
+    - Cada jefe recibe un Excel con solo SUS colaboradores del proyecto
+    - Cada fila muestra: Nombre, Correo, Capacitación, Estado (Completado/No Completado)
+    - No incluye colaboradores inactivos, ni capacitaciones desactivadas/eliminadas
+    - No incluye colaboradores no asignados a las capacitaciones
     """
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -387,8 +396,22 @@ def notificar_jefes_por_colaboradores_sin_progreso():
 
     for proyecto in proyectos:
         jefe = proyecto.idcolaborador
-        if not jefe or not jefe.correocolaborador:
+        if not jefe:
+            logger.warning(f"notificar_jefes: Proyecto {proyecto.nombreproyecto} sin jefe asignado")
             continue
+
+        # Validar que el correo sea válido (formato básico)
+        correo_jefe = (jefe.correocolaborador or "").strip()
+        if not correo_jefe or "@" not in correo_jefe or correo_jefe == "1":
+            logger.warning(
+                f"notificar_jefes: Proyecto '{proyecto.nombreproyecto}' - "
+                f"Jefe '{jefe.nombrecolaborador}' tiene correo inválido: '{correo_jefe}' "
+                f"(se generará Excel pero no se enviará)"
+            )
+            # Continuar para generar el Excel, pero no enviar correo
+            correo_valido = False
+        else:
+            correo_valido = True
 
         # Obtener centros operativos activos del proyecto
         centros = Centroop.objects.filter(
@@ -408,18 +431,23 @@ def notificar_jefes_por_colaboradores_sin_progreso():
         if not colaboradores.exists():
             continue
 
-        # Construir filas del Excel: una fila por cada combinación colaborador + capacitación
+        # Construir filas del Excel: solo colaboradores ASIGNADOS a cada capacitación
         filas_excel = []
         tiene_pendientes = False
 
         for colaborador in colaboradores:
             for cap in capacitaciones_activas:
+                # Solo incluir si el colaborador está ASIGNADO a esta capacitación
                 progreso = progresoCapacitaciones.objects.filter(
                     capacitacion=cap,
                     colaborador=colaborador
                 ).first()
 
-                if progreso and progreso.completada:
+                # Si no tiene registro en progresoCapacitaciones, no está asignado → saltar
+                if not progreso:
+                    continue
+
+                if progreso.completada:
                     estado = "Completado"
                 else:
                     estado = "No Completado"
@@ -571,31 +599,40 @@ def notificar_jefes_por_colaboradores_sin_progreso():
         # Crear email individual para cada jefe con Excel adjunto
         nombre_archivo = f"Reporte_Capacitaciones_{proyecto.nombreproyecto.replace(' ', '_')}.xlsx"
 
-        try:
-            email = EmailMultiAlternatives(
-                subject=subject,
-                body=text_message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[jefe.correocolaborador],
-            )
-            email.attach_alternative(html_message, "text/html")
-            email.attach(
-                nombre_archivo,
-                excel_buffer.getvalue(),
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
-            email.send(fail_silently=False)
+        # Solo enviar si el correo es válido
+        if correo_valido:
+            try:
+                email = EmailMultiAlternatives(
+                    subject=subject,
+                    body=text_message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[correo_jefe],
+                )
+                email.attach_alternative(html_message, "text/html")
+                email.attach(
+                    nombre_archivo,
+                    excel_buffer.getvalue(),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+                email.send(fail_silently=False)
 
-            logger.info(
-                f"notificar_jefes: ✅ Reporte enviado a {jefe.correocolaborador} "
-                f"(Proyecto: {proyecto.nombreproyecto}, "
-                f"Colaboradores: {total_colab}, Pendientes: {total_pendientes})"
-            )
-        except Exception as e:
-            logger.error(
-                f"notificar_jefes: ❌ Error enviando a {jefe.correocolaborador} "
-                f"(Proyecto: {proyecto.nombreproyecto}): {str(e)}",
-                exc_info=True,
+                logger.info(
+                    f"notificar_jefes: ✅ Reporte enviado a {correo_jefe} "
+                    f"(Proyecto: {proyecto.nombreproyecto}, "
+                    f"Colaboradores: {total_colab}, Pendientes: {total_pendientes})"
+                )
+            except Exception as e:
+                logger.error(
+                    f"notificar_jefes: ❌ Error enviando a {correo_jefe} "
+                    f"(Proyecto: {proyecto.nombreproyecto}): {str(e)}",
+                    exc_info=True,
+                )
+        else:
+            logger.warning(
+                f"notificar_jefes: ⚠️  Excel generado pero NO enviado "
+                f"(Proyecto: {proyecto.nombreproyecto}, Jefe: {jefe.nombrecolaborador}, "
+                f"Colaboradores: {total_colab}, Pendientes: {total_pendientes}) - "
+                f"Correo inválido: '{correo_jefe}'"
             )
 
         # Esperar entre envíos para evitar rate-limiting
