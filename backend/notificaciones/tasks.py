@@ -357,13 +357,22 @@ def notificar_jefes_por_colaboradores_sin_progreso():
     Envía un archivo Excel adjunto personalizado por proyecto con las columnas:
     Nombre Completo, Correo, Capacitación, Estado (Completado / No Completado).
     
-    Se ejecuta cada lunes a las 09:00.
+    Se ejecuta cada lunes a las 18:00.
     
-    IMPORTANTE:
-    - Solo incluye colaboradores ACTIVOS (estadocolaborador = 1)
-    - Solo incluye capacitaciones activas (estado = 1)
-    - Solo notifica si hay al menos un colaborador con capacitación pendiente
-    - Cada jefe recibe su reporte personalizado con Excel adjunto
+    LÓGICA DE FILTRADO:
+    1. Solo capacitaciones activas (estado = 1)
+    2. Solo proyectos activos (estadoproyecto = 1) con jefe asignado
+    3. Solo centros operativos activos (estadocentrop = 1) del proyecto
+    4. Solo colaboradores activos (estadocolaborador = 1) de esos centros
+    5. Solo colaboradores ASIGNADOS a cada capacitación (tienen registro en progresoCapacitaciones)
+    6. Del registro en progresoCapacitaciones se obtiene si está completada o no
+    7. Solo notifica si hay al menos un colaborador con capacitación pendiente
+    
+    SALIDA:
+    - Cada jefe recibe un Excel con solo SUS colaboradores del proyecto
+    - Cada fila muestra: Nombre, Correo, Capacitación, Estado (Completado/No Completado)
+    - No incluye colaboradores inactivos, ni capacitaciones desactivadas/eliminadas
+    - No incluye colaboradores no asignados a las capacitaciones
     """
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -408,18 +417,23 @@ def notificar_jefes_por_colaboradores_sin_progreso():
         if not colaboradores.exists():
             continue
 
-        # Construir filas del Excel: una fila por cada combinación colaborador + capacitación
+        # Construir filas del Excel: solo colaboradores ASIGNADOS a cada capacitación
         filas_excel = []
         tiene_pendientes = False
 
         for colaborador in colaboradores:
             for cap in capacitaciones_activas:
+                # Solo incluir si el colaborador está ASIGNADO a esta capacitación
                 progreso = progresoCapacitaciones.objects.filter(
                     capacitacion=cap,
                     colaborador=colaborador
                 ).first()
 
-                if progreso and progreso.completada:
+                # Si no tiene registro en progresoCapacitaciones, no está asignado → saltar
+                if not progreso:
+                    continue
+
+                if progreso.completada:
                     estado = "Completado"
                 else:
                     estado = "No Completado"
