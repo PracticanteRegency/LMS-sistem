@@ -106,6 +106,12 @@ class Command(BaseCommand):
                     total_modulos = modulos.count()
                     modulos_completados = 0
                     progreso_total_cap = 0
+                    
+                    # Verificar si existe algún registro de progreso en módulos para este colaborador en esta capacitación
+                    hay_progreso_modulos = progresoModulo.objects.filter(
+                        colaborador=colaborador,
+                        modulo__idcapacitacion=capacitacion
+                    ).exists()
 
                     for modulo in modulos:
                         lecciones = lecciones_por_modulo.get(modulo.id, [])
@@ -194,13 +200,29 @@ class Command(BaseCommand):
 
                     cap_completada_real = modulos_completados == total_modulos and total_modulos > 0
                     cap_completada_int = 1 if cap_completada_real else 0
+                    
+                    # Lógica de decisión:
+                    # 1. Si YA está completada → MANTENERLA completada (no modificar)
+                    # 2. Si NO está completada:
+                    #    - Si NO hay progreso → dejarla incompleta
+                    #    - Si SÍ hay progreso → actualizar según el progreso real
+                    if prog_cap.completada == 1:
+                        # Ya está completada, mantenerla así
+                        cap_completada_int = 1
+                        promedio_cap_real = 100
+                    else:
+                        # NO está completada, entonces SÍ la podemos modificar
+                        # Usar el cálculo real basado en progreso de módulos y lecciones
+                        cap_completada_int = 1 if cap_completada_real else 0
+                        # El promedio ya está calculado arriba
 
                     # Detectar inconsistencia en capacitación
                     progreso_anterior = float(prog_cap.progreso or 0)
                     completada_anterior = prog_cap.completada
 
                     if completada_anterior != cap_completada_int or progreso_anterior != promedio_cap_real:
-                        if completada_anterior == 1 and not cap_completada_real:
+                        # Contar como corregida solo si se actualizo desde incompleta
+                        if completada_anterior == 0 and cap_completada_int == 1:
                             stats['capacitaciones_corregidas'] += 1
 
                         self.stdout.write(self.style.WARNING(
@@ -217,10 +239,12 @@ class Command(BaseCommand):
 
                         update_fields = ['progreso', 'completada']
 
-                        if cap_completada_real and not prog_cap.fecha_completada:
+                        # Si está completada (sea por lógica real o por legacy), registrar fecha
+                        if cap_completada_int == 1 and not prog_cap.fecha_completada:
                             prog_cap.fecha_completada = timezone.now()
                             update_fields.append('fecha_completada')
-                        elif not cap_completada_real and prog_cap.fecha_completada:
+                        # Si se descompleta, limpiar la fecha
+                        elif cap_completada_int == 0 and prog_cap.fecha_completada:
                             prog_cap.fecha_completada = None
                             update_fields.append('fecha_completada')
 
