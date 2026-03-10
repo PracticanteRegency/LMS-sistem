@@ -396,8 +396,22 @@ def notificar_jefes_por_colaboradores_sin_progreso():
 
     for proyecto in proyectos:
         jefe = proyecto.idcolaborador
-        if not jefe or not jefe.correocolaborador:
+        if not jefe:
+            logger.warning(f"notificar_jefes: Proyecto {proyecto.nombreproyecto} sin jefe asignado")
             continue
+
+        # Validar que el correo sea válido (formato básico)
+        correo_jefe = (jefe.correocolaborador or "").strip()
+        if not correo_jefe or "@" not in correo_jefe or correo_jefe == "1":
+            logger.warning(
+                f"notificar_jefes: Proyecto '{proyecto.nombreproyecto}' - "
+                f"Jefe '{jefe.nombrecolaborador}' tiene correo inválido: '{correo_jefe}' "
+                f"(se generará Excel pero no se enviará)"
+            )
+            # Continuar para generar el Excel, pero no enviar correo
+            correo_valido = False
+        else:
+            correo_valido = True
 
         # Obtener centros operativos activos del proyecto
         centros = Centroop.objects.filter(
@@ -585,31 +599,40 @@ def notificar_jefes_por_colaboradores_sin_progreso():
         # Crear email individual para cada jefe con Excel adjunto
         nombre_archivo = f"Reporte_Capacitaciones_{proyecto.nombreproyecto.replace(' ', '_')}.xlsx"
 
-        try:
-            email = EmailMultiAlternatives(
-                subject=subject,
-                body=text_message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[jefe.correocolaborador],
-            )
-            email.attach_alternative(html_message, "text/html")
-            email.attach(
-                nombre_archivo,
-                excel_buffer.getvalue(),
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
-            email.send(fail_silently=False)
+        # Solo enviar si el correo es válido
+        if correo_valido:
+            try:
+                email = EmailMultiAlternatives(
+                    subject=subject,
+                    body=text_message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[correo_jefe],
+                )
+                email.attach_alternative(html_message, "text/html")
+                email.attach(
+                    nombre_archivo,
+                    excel_buffer.getvalue(),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+                email.send(fail_silently=False)
 
-            logger.info(
-                f"notificar_jefes: ✅ Reporte enviado a {jefe.correocolaborador} "
-                f"(Proyecto: {proyecto.nombreproyecto}, "
-                f"Colaboradores: {total_colab}, Pendientes: {total_pendientes})"
-            )
-        except Exception as e:
-            logger.error(
-                f"notificar_jefes: ❌ Error enviando a {jefe.correocolaborador} "
-                f"(Proyecto: {proyecto.nombreproyecto}): {str(e)}",
-                exc_info=True,
+                logger.info(
+                    f"notificar_jefes: ✅ Reporte enviado a {correo_jefe} "
+                    f"(Proyecto: {proyecto.nombreproyecto}, "
+                    f"Colaboradores: {total_colab}, Pendientes: {total_pendientes})"
+                )
+            except Exception as e:
+                logger.error(
+                    f"notificar_jefes: ❌ Error enviando a {correo_jefe} "
+                    f"(Proyecto: {proyecto.nombreproyecto}): {str(e)}",
+                    exc_info=True,
+                )
+        else:
+            logger.warning(
+                f"notificar_jefes: ⚠️  Excel generado pero NO enviado "
+                f"(Proyecto: {proyecto.nombreproyecto}, Jefe: {jefe.nombrecolaborador}, "
+                f"Colaboradores: {total_colab}, Pendientes: {total_pendientes}) - "
+                f"Correo inválido: '{correo_jefe}'"
             )
 
         # Esperar entre envíos para evitar rate-limiting
