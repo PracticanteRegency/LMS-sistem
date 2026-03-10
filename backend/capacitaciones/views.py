@@ -126,20 +126,29 @@ class CrearCapacitacionView(APIView):
             import json
             
             # Extraer datos del request - soporta tanto multipart como JSON
+            # IMPORTANTE: request.data en DRF mezcla archivos + texto,
+            # request.POST solo tiene campos de texto (seguro para serializer)
             data = {}
             try:
                 if hasattr(request, 'POST') and request.POST:
-                    # Si tiene multipart/form-data
                     data = dict(request.POST.items())
-                else:
-                    # Si es JSON
+                elif hasattr(request, 'data'):
                     data = dict(request.data)
+                else:
+                    data = {}
             except Exception:
-                data = dict(request.data)
+                data = {}
 
-            # Eliminar solo cadenas vacías; mantener False/0/None si es necesario
+            # Filtrar objetos archivo que puedan haber llegado desde request.data
+            # (InMemoryUploadedFile, etc.) - estos se procesan desde request.FILES
             for k in list(data.keys()):
-                if isinstance(data.get(k), str) and data.get(k) == '':
+                val = data[k]
+                if hasattr(val, 'read') or hasattr(val, 'chunks'):
+                    del data[k]
+
+            # Eliminar cadenas vacías (no relevantes para PATCH parcial)
+            for k in list(data.keys()):
+                if isinstance(data.get(k), str) and data[k] == '':
                     data.pop(k)
 
             # NO procesar colaboradores desde el request - se ignoran completamente
@@ -294,6 +303,12 @@ class CrearCapacitacionView(APIView):
                     {'error': 'Error al procesar datos del formulario'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+            
+            # Filtrar objetos archivo que puedan colarse en data
+            for k in list(data.keys()):
+                val = data[k]
+                if hasattr(val, 'read') or hasattr(val, 'chunks'):
+                    del data[k]
             
             # Extraer colaboradores
             colaboradores_ids = []
