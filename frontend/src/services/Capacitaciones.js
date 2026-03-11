@@ -282,8 +282,9 @@ export async function patchCapacitacion(capacitacionId, payload) {
   // Payload: campos a actualizar, { colaboradores: [ids...] }, o FormData para multipart
   return dedupe('cap:patchCapacitacion', { capacitacionId, payload }, async () => {
     // Si es FormData, axios detecta automáticamente y usa multipart/form-data
-    // Si es objeto JSON, axios envía como application/json
-    const config = payload instanceof FormData ? {} : {};
+    const config = payload instanceof FormData
+      ? { headers: { "Content-Type": "multipart/form-data" } }
+      : {};
     const response = await api.patch(`capacitaciones/crear-capacitacion/${capacitacionId}/`, payload, config);
     return response.data;
   });
