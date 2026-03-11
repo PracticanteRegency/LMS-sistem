@@ -21,6 +21,25 @@ import {
   upsertPrediccionEspecial,
 } from "../services/mundial.js";
 
+/* ===== BANNER MARQUEE (ONLY ON MUNDIAL HOME) ===== */
+function BannerMarquee() {
+  return (
+    <div className={styles.topBanner} role="region" aria-label="Anuncio Mundial">
+      <div className={styles.topBannerInner}>
+        <div className={styles.marquee}>
+          <div className={styles.marqueeTrack}>
+            <span className={styles.marqueeText}>
+              Con motivo de la <strong>Copa Mundial de la FIFA 2026</strong>, invitamos a todos los colaboradores a participar en nuestra plataforma de predicciones, un espacio creado para compartir la emoción del fútbol y fortalecer la integración en nuestra organización. Esta iniciativa busca promover uno de nuestros valores fundamentales: <strong>el respeto</strong>, fomentando una participación sana, donde cada opinión y pronóstico sea valorado dentro de un ambiente de compañerismo y juego limpio. Los invitamos a vivir esta experiencia con entusiasmo, respeto y espíritu de equipo.
+            </span>
+            <span className={styles.marqueeText} aria-hidden="true">
+              Con motivo de la <strong>Copa Mundial de la FIFA 2026</strong>, invitamos a todos los colaboradores a participar en nuestra plataforma de predicciones, un espacio creado para compartir la emoción del fútbol y fortalecer la integración en nuestra organización. Esta iniciativa busca promover uno de nuestros valores fundamentales: <strong>el respeto</strong>, fomentando una participación sana, donde cada opinión y pronóstico sea valorado dentro de un ambiente de compañerismo y juego limpio. Los invitamos a vivir esta experiencia con entusiasmo, respeto y espíritu de equipo.
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 // All data from backend API
 
 /* ===== HERO ===== */
@@ -704,6 +723,7 @@ export default function MundialHome() {
 
   return (
     <div className={styles.pageWrapper}>
+      <BannerMarquee />
       <Hero />
       <MatchesSection initialMatches={matches} />
       <RankingSection initialPlayers={players} />

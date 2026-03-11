@@ -276,6 +276,7 @@
 .btnPrimaryLg {
   display: inline-flex;
   align-items: center;
+  width: max-content;
   gap: 6px;
   padding: 12px 28px;
   background: #4CAF50;
@@ -398,6 +399,55 @@
   border-radius: 50px;
   background: #f0f0f0;
   color: #666;
+}
+
+/* ===== TOP BANNER MARQUEE (MundialHome only) ===== */
+.topBanner {
+  width: 100%;
+  background: linear-gradient(90deg, #0b3b1f 0%, #123c2b 50%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  border-radius: 16px;
+  height: 44px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  position: relative;
+  z-index: 40;
+}
+.topBannerInner {
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 0 20px;
+}
+.marquee {
+  overflow: hidden;
+  white-space: nowrap;
+}
+.marqueeTrack {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+  /* Duplicate text elements should fill the track; we move -50% to create a seamless loop */
+  animation: marquee 26s linear infinite;
+}
+.marquee:hover .marqueeTrack {
+  animation-play-state: paused;
+}
+.marqueeText {
+  display: inline-block;
+  padding-right: 40px; /* small gap between repetitions */
+  font-size: 14px;
+  line-height: 1;
+  color: #f7fff8;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
 }
 
 .badgePrimary {
