@@ -211,15 +211,24 @@
   margin-bottom: 48px;
 }
 
+@media (max-width: 768px) {
+  .heroButtons {
+    gap: 8px;
+    padding: 0 8px;
+  }
+}
+
 @media (max-width: 480px) {
   .heroButtons {
     flex-direction: column;
     gap: 10px;
     margin-bottom: 32px;
+    padding: 0 8px;
   }
   
   .heroButtons a {
     width: 100%;
+    min-width: 0;
   }
 }
 
@@ -276,9 +285,8 @@
 .btnPrimaryLg {
   display: inline-flex;
   align-items: center;
-  width: max-content;
   gap: 6px;
-  padding: 12px 28px;
+  padding: 12px 24px;
   background: #4CAF50;
   color: #fff;
   border: none;
@@ -288,6 +296,8 @@
   cursor: pointer;
   text-decoration: none;
   transition: background 0.2s, transform 0.15s;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .btnPrimaryLg:hover {
@@ -295,11 +305,18 @@
   transform: translateY(-1px);
 }
 
+@media (max-width: 480px) {
+  .btnPrimaryLg {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+}
+
 .btnOutlineLg {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 12px 28px;
+  padding: 12px 24px;
   background: transparent;
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -309,11 +326,20 @@
   cursor: pointer;
   text-decoration: none;
   transition: background 0.2s, border-color 0.2s;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .btnOutlineLg:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.5);
+}
+
+@media (max-width: 480px) {
+  .btnOutlineLg {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
 }
 
 .btnPrimary {
@@ -409,11 +435,13 @@
   display: flex;
   align-items: center;
   border-radius: 16px;
+  margin: 20px 0 20px 0;
   height: 44px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   position: relative;
   z-index: 40;
+  overflow: hidden;
 }
 .topBannerInner {
   max-width: 1200px;
@@ -424,12 +452,24 @@
 .marquee {
   overflow: hidden;
   white-space: nowrap;
+  position: relative;
+  mask-image: linear-gradient(90deg,
+    transparent 0%,
+    black 12%,
+    black 88%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(90deg,
+    transparent 0%,
+    black 12%,
+    black 88%,
+    transparent 100%
+  );
 }
 .marqueeTrack {
   display: flex;
   width: max-content;
   will-change: transform;
-  /* Duplicate text elements should fill the track; we move -50% to create a seamless loop */
   animation: marquee 26s linear infinite;
 }
 .marquee:hover .marqueeTrack {
@@ -437,12 +477,12 @@
 }
 .marqueeText {
   display: inline-block;
-  padding-right: 40px; /* small gap between repetitions */
+  padding-right: 40px;
   font-size: 14px;
-  line-height: 1;
+  line-height: 1.4;
   color: #f7fff8;
   font-weight: 500;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 @keyframes marquee {
@@ -1261,9 +1301,20 @@
   }
 }
 
+@media (max-width: 768px) {
+  .topBanner {
+    margin: 16px 0 32px 0;
+  }
+
+  .marqueeText {
+    font-size: 13px;
+  }
+}
+
 @media (max-width: 480px) {
   .hero {
-    padding: 40px 16px 32px;
+    padding: 40px 12px 32px;
+    margin-bottom: 20px;
   }
 
   .heroTitle {
@@ -1276,6 +1327,17 @@
 
   .phaseFilter {
     gap: 4px;
+  }
+
+  .topBanner {
+    margin: 12px 0 24px 0;
+    height: 38px;
+    border-radius: 10px;
+  }
+
+  .marqueeText {
+    font-size: 11px;
+    padding-right: 30px;
   }
 }
 
