@@ -21,7 +21,8 @@ class CrearExamenSerializer(serializers.Serializer):
                 ("PERIODICO", "Examen Periódico"),
                 ("RETIRO", "Examen de Retiro"),
                 ("ESPECIAL", "Examen Especial"),
-                ("POST_INCAPACIDAD", "Examen Post-Incapacidad")
+                ("POST_INCAPACIDAD", "Examen Post-Incapacidad"),
+                ("ALTURAS", "Examen con énfasis en alturas")
             ]
         ),
         allow_empty=False,
@@ -79,7 +80,8 @@ class EmpresaConCargosSerializer(serializers.Serializer):
                 'PERIODICO': [],
                 'RETIRO': [],
                 'ESPECIAL': [],
-                'POST_INCAPACIDAD': []
+                'POST_INCAPACIDAD': [],
+                'ALTURAS': []
             }
 
             for ec in examenes:
@@ -120,8 +122,8 @@ class EnviarCorreoSerializer(serializers.Serializer):
         help_text="ID del cargo del trabajador"
     )
     tipo_examen = serializers.ChoiceField(
-        choices=['INGRESO', 'PERIODICO', 'RETIRO', 'ESPECIAL', 'POST_INCAPACIDAD'],
-        help_text="Tipo de examen: INGRESO, PERIODICO, RETIRO, ESPECIAL o POST_INCAPACIDAD"
+        choices=['INGRESO', 'PERIODICO', 'RETIRO', 'ESPECIAL', 'POST_INCAPACIDAD', 'ALTURAS'],
+        help_text="Tipo de examen: INGRESO, PERIODICO, RETIRO, ESPECIAL, POST_INCAPACIDAD o ALTURAS"
     )
     examenes_ids = serializers.ListField(
         child=serializers.IntegerField(),

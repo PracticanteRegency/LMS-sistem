@@ -3,8 +3,8 @@ import react from '@vitejs/plugin-react-swc'
 
 // https://vite.dev/config/
 export default defineConfig({
-  // Use relative base so built assets resolve correctly when served from file or CDN roots
-  base: './',
+  // Use absolute base for proper SPA routing
+  base: '/',
   plugins: [react()],
   // Allow specific hosts (e.g., ngrok) to access the dev server.
   // Add additional hosts separated by commas in the ALLOWED_HOSTS env var if needed.

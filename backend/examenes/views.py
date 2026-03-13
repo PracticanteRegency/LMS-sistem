@@ -29,7 +29,7 @@ from django.conf import settings
 from .models import ExamenesCargo, CorreoExamenEnviado, RegistroExamenes, Examen, ExamenTrabajador
 
 # Tipos de examen válidos
-TIPOS_EXAMEN_VALIDOS = ['INGRESO', 'PERIODICO', 'RETIRO', 'ESPECIAL', 'POST_INCAPACIDAD']
+TIPOS_EXAMEN_VALIDOS = ['INGRESO', 'PERIODICO', 'RETIRO', 'ESPECIAL', 'POST_INCAPACIDAD', 'ALTURAS']
 
 from .serializers import (
     CrearExamenSerializer,
@@ -576,7 +576,8 @@ class EnviarCorreoView(APIView):
             'PERIODICO': 'Examen Periódico',
             'RETIRO': 'Examen de Retiro',
             'ESPECIAL': 'Examen Especial',
-            'POST_INCAPACIDAD': 'Examen Post-Incapacidad'
+            'POST_INCAPACIDAD': 'Examen Post-Incapacidad',
+            'ALTURAS': 'Examen con énfasis en alturas'
         }
         tipo_legible = tipos_legibles.get(tipo_examen, tipo_examen)
 
@@ -2425,7 +2426,7 @@ class EnviarCorreoMasivoView(APIView):
                         continue
 
                     # Validar tipo de examen
-                    tipos_validos = ['INGRESO', 'PERIODICO', 'RETIRO', 'ESPECIAL', 'POST_INCAPACIDAD']
+                    tipos_validos = ['INGRESO', 'PERIODICO', 'RETIRO', 'ESPECIAL', 'POST_INCAPACIDAD', 'ALTURAS']
                     if tipo_examen not in tipos_validos:
                         errores_validacion.append(
                             f"Línea {idx}: TipoExamen debe ser uno de "
@@ -2686,7 +2687,8 @@ para los trabajadores en el excel adjunto.</p>
                     'PERIODICO': 'Examen Periódico',
                     'RETIRO': 'Examen de Retiro',
                     'ESPECIAL': 'Examen Especial',
-                    'POST_INCAPACIDAD': 'Examen Post-Incapacidad'
+                    'POST_INCAPACIDAD': 'Examen Post-Incapacidad',
+                    'ALTURAS': 'Examen con énfasis en alturas'
                 }
                 tipo_legible = tipos_legibles.get(trab['tipo_examen'], trab['tipo_examen'])
                 
@@ -3161,7 +3163,7 @@ para los trabajadores en el excel adjunto.</p>
             cell.border = border_style
 
         # Ordenar trabajadores por tipo de examen
-        orden_tipos = ['INGRESO', 'PERIODICO', 'RETIRO', 'ESPECIAL', 'POST_INCAPACIDAD']
+        orden_tipos = ['INGRESO', 'PERIODICO', 'RETIRO', 'ESPECIAL', 'POST_INCAPACIDAD', 'ALTURAS']
         trabajadores_ordenados = sorted(
             trabajadores,
             key=lambda x: orden_tipos.index(x['tipo_examen']) if x['tipo_examen'] in orden_tipos else 999
@@ -3596,6 +3598,9 @@ class CrearExamenView(APIView):
                         tipo=tipo
                     )
 
+        # Limpiar cache de datos de empresas con exámenes (se actualizó el catálogo)
+        self._clear_cache()
+
         return Response({
             'id_examen': examen.id_examen,
             'nombre': examen.nombre,
@@ -3603,6 +3608,16 @@ class CrearExamenView(APIView):
             'cargos_ids': cargos_ids,
             'tipos': tipos
         }, status=status.HTTP_201_CREATED)
+
+    def _clear_cache(self):
+        """Limpia el cache de datos de empresas con exámenes."""
+        logger = logging.getLogger(__name__)
+        try:
+            # Limpiar cache de datos de empresas con exámenes
+            cache.delete('cargo_empresa_examenes_data')
+            logger.info("Cache limpiado: datos de empresas con exámenes (CrearExamenView)")
+        except Exception as e:
+            logger.warning(f"Error al limpiar cache en CrearExamenView: {str(e)}")
 
 
 class FiltrarExamenesView(APIView):

@@ -995,7 +995,7 @@ def procesar_archivo_multimedia(file_obj, tipo_archivo: str, nombre_unico: str =
     Args:
         file_obj: File object
         tipo_archivo: 'imagen', 'pdf', 'video'
-        nombre_unico: Nombre único para el archivo (si no se proporciona, se genera)
+        nombre_unico: Nombre único para el archivo (si no se proporciona, se genera con UUID_nombre_original)
     
     Returns:
         (url, error_message)
@@ -1017,16 +1017,13 @@ def procesar_archivo_multimedia(file_obj, tipo_archivo: str, nombre_unico: str =
     
     try:
         # Generar nombre único si no se proporciona
+        # Formato: {uuid_hex}_{nombre_original} para mantener consistencia con CargarArchivoView
         if not nombre_unico:
-            ext = file_obj.name.rsplit('.', 1)[-1].lower()
-            nombre_unico = f"{uuid.uuid4().hex}.{ext}"
+            nombre_original = file_obj.name
+            nombre_unico = f"{uuid.uuid4().hex}_{nombre_original}"
         
-        # Crear carpeta destino
-        carpeta = {
-            'imagen': 'capacitaciones/imagenes',
-            'pdf': 'capacitaciones/pdfs',
-            'video': 'capacitaciones/videos',
-        }[tipo_archivo]
+        # Crear carpeta destino - todo en capacitaciones/ para consistencia con CargarArchivoView
+        carpeta = 'capacitaciones'
         
         # Configurar Cloudinary si está disponible
         if hasattr(settings, 'CLOUDINARY_STORAGE') and settings.CLOUDINARY_STORAGE:

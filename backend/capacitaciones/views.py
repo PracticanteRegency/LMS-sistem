@@ -340,9 +340,13 @@ class CrearCapacitacionView(APIView):
                     imagen_file, 'imagen'
                 )
                 if error:
-                    return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({'error': f'Error al procesar imagen: {error}'}, status=status.HTTP_400_BAD_REQUEST)
                 data['imagen'] = url_imagen
                 archivos_creados.append(url_imagen)
+                logger.info(f"Imagen procesada exitosamente: {url_imagen}")
+            else:
+                logger.warning("No se proporcionó imagen en el POST")
+                data['imagen'] = ''  # Asegurar que no sea NULL
             
             # Procesar archivos de lecciones y preguntas
             for modulo_idx, modulo_data in enumerate(modulos_data):
@@ -405,6 +409,10 @@ class CrearCapacitacionView(APIView):
             data['modulos'] = modulos_data
             data['colaboradores'] = colaboradores_ids
             
+            # Asegurar que imagen tiene un valor (requerido por BD)
+            if 'imagen' not in data or not data.get('imagen'):
+                data['imagen'] = ''
+            
             # Crear capacitación con transacción
             serializer = CrearCapacitacionSerializer(data=data)
             if not serializer.is_valid():
@@ -423,6 +431,13 @@ class CrearCapacitacionView(APIView):
                     estadocolaborador=1
                 )
                 
+                # Obtener IDs ya existentes para esta capacitación (evitar duplicados)
+                existentes = set(
+                    progresoCapacitaciones.objects.filter(
+                        capacitacion=capacitacion
+                    ).values_list('colaborador_id', flat=True)
+                )
+                
                 progreso_records = [
                     progresoCapacitaciones(
                         capacitacion=capacitacion,
@@ -431,9 +446,11 @@ class CrearCapacitacionView(APIView):
                         progreso=0
                     )
                     for colaborador in colaboradores
+                    if colaborador.idcolaborador not in existentes
                 ]
                 
-                progresoCapacitaciones.objects.bulk_create(progreso_records, ignore_conflicts=True)
+                if progreso_records:
+                    progresoCapacitaciones.objects.bulk_create(progreso_records)
                 
                 # Enviar correos
                 try:
@@ -1086,14 +1103,12 @@ class PrevisualizarColaboradoresView(APIView):
 
 class CargarArchivoView(APIView):
     permission_classes = [IsAuthenticated]
-    """Cargar archivos (imágenes y PDFs) a Cloudinary"""
-    
-    # Extensiones permitidas
-    ALLOWED_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']
-    ALLOWED_PDF_EXTENSION = ['pdf']
+    """Cargar archivos (imágenes y PDFs) usando procesar_archivo_multimedia"""
     
     def post(self, request, *args, **kwargs):
         try:
+            from capacitaciones.utils import procesar_archivo_multimedia
+            
             archivo = request.FILES.get('archivo')
             if not archivo:
                 return Response(
@@ -1101,28 +1116,34 @@ class CargarArchivoView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
+            # Determinar tipo de archivo
             nombre_archivo = archivo.name
             extension = nombre_archivo.rsplit('.', 1)[-1].lower() if '.' in nombre_archivo else ''
-            all_allowed = self.ALLOWED_IMAGE_EXTENSIONS + self.ALLOWED_PDF_EXTENSION
-            if extension not in all_allowed:
+            
+            # Mapear extensión a tipo
+            if extension in ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp']:
+                tipo_archivo = 'imagen'
+            elif extension in ['pdf']:
+                tipo_archivo = 'pdf'
+            else:
                 return Response(
-                    {'error': f'Tipo de archivo no permitido. Extensiones válidas: {", ".join(all_allowed)}'},
+                    {'error': f'Tipo de archivo no permitido. Extensiones válidas: jpg, jpeg, png, gif, webp, bmp, pdf'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Guardar imágenes y PDFs localmente
-            carpeta_destino = os.path.join(settings.MEDIA_ROOT, 'capacitaciones')
-            os.makedirs(carpeta_destino, exist_ok=True)
-            nombre_unico = f"{uuid.uuid4().hex}_{nombre_archivo}"
-            ruta_destino = os.path.join(carpeta_destino, nombre_unico)
-            with open(ruta_destino, 'wb+') as destino:
-                for chunk in archivo.chunks():
-                    destino.write(chunk)
-            url = f"{settings.MEDIA_URL}capacitaciones/{nombre_unico}"
+            # Procesar archivo con procesar_archivo_multimedia (genera nombre con UUID_original)
+            url, error = procesar_archivo_multimedia(archivo, tipo_archivo)
+            
+            if error:
+                return Response(
+                    {'error': error},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
             return Response(
                 {
                     'url': url,
-                    'filename': nombre_unico,
+                    'filename': archivo.name,
                     'original_filename': nombre_archivo,
                     'extension': extension,
                     'size': archivo.size,
@@ -1132,7 +1153,7 @@ class CargarArchivoView(APIView):
             )
         except Exception as e:
             return Response(
-                {'error': f'Error al subir archivo a Cloudinary: {str(e)}'},
+                {'error': f'Error al subir archivo: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -2142,18 +2163,25 @@ class EditarColaboradorCapacitacionView(APIView):
                 added = []
                 removed = []
 
-                # Agregar nuevos
-                to_add = add_ids - set(progresoCapacitaciones.objects.filter(capacitacion=capacitacion).values_list('colaborador_id', flat=True))
+                # Agregar nuevos (verificar que no existan ya)
+                existentes = set(progresoCapacitaciones.objects.filter(
+                    capacitacion=capacitacion
+                ).values_list('colaborador_id', flat=True))
+                to_add = add_ids - existentes
                 bulk = []
                 for cid in to_add:
-                    bulk.append(progresoCapacitaciones(
-                        capacitacion=capacitacion,
-                        colaborador_id=cid,
-                        fecha_registro=timezone.now(),
-                        completada=False,
-                        progreso=0
-                    ))
-                    added.append(cid)
+                    # Verificación extra: solo agregar si realmente no existe
+                    if not progresoCapacitaciones.objects.filter(
+                        capacitacion=capacitacion, colaborador_id=cid
+                    ).exists():
+                        bulk.append(progresoCapacitaciones(
+                            capacitacion=capacitacion,
+                            colaborador_id=cid,
+                            fecha_registro=timezone.now(),
+                            completada=False,
+                            progreso=0
+                        ))
+                        added.append(cid)
                 if bulk:
                     progresoCapacitaciones.objects.bulk_create(bulk)
 

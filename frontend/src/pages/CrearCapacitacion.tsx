@@ -739,103 +739,7 @@ const handleRespuestaChange = async (
         imagenFile: (formData as any).imagenFile, // Archivo de imagen principal
       };
 
-      // PASO 1: Si es edición y hay imagen nueva, subirla con uploadImagenCapacitacion
-      let imagenUrl = null;
-      if (id && payloadBasico.imagenFile) {
-        try {
-          console.log("Subiendo imagen de capacitación con uploadImagenCapacitacion...");
-          const uploadResponse = await CapListService.uploadImagenCapacitacion(payloadBasico.imagenFile);
-          imagenUrl = uploadResponse.url || uploadResponse.imagen || uploadResponse.archivo;
-          console.log("Imagen subida exitosamente. URL:", imagenUrl);
-        } catch (uploadError) {
-          console.error("Error al subir imagen:", uploadError);
-          setError("Error al subir la imagen de la capacitación");
-          setLoading(false);
-          return;
-        }
-      }
-
-      // PASO 2: Si es edición, subir archivos de lecciones, preguntas y respuestas
-      if (id) {
-        try {
-          for (let moduloIdx = 0; moduloIdx < modulos.length; moduloIdx++) {
-            const modulo = modulos[moduloIdx];
-            for (let leccionIdx = 0; leccionIdx < modulo.lecciones.length; leccionIdx++) {
-              const leccion = modulo.lecciones[leccionIdx];
-
-              // Subir archivo de lección si existe
-              if (leccion.file) {
-                try {
-                  let uploadResponse;
-                  if (leccion.tipo_leccion === 'pdf') {
-                    console.log(`Subiendo PDF de lección ${moduloIdx}-${leccionIdx}...`);
-                    uploadResponse = await CapListService.uploadPdfLeccion(leccion.file);
-                  } else if (leccion.tipo_leccion === 'imagen') {
-                    console.log(`Subiendo imagen de lección ${moduloIdx}-${leccionIdx}...`);
-                    uploadResponse = await CapListService.uploadImagenLeccion(leccion.file);
-                  }
-                  if (uploadResponse) {
-                    const leccionUrl = uploadResponse.url || uploadResponse.imagen || uploadResponse.archivo;
-                    payloadBasico.modulos[moduloIdx].lecciones[leccionIdx].url = leccionUrl;
-                    console.log(`Lección ${moduloIdx}-${leccionIdx} subida. URL:`, leccionUrl);
-                  }
-                } catch (err) {
-                  console.error(`Error al subir lección ${moduloIdx}-${leccionIdx}:`, err);
-                  throw new Error(`Error al subir lección ${leccionIdx + 1} del módulo ${moduloIdx + 1}`);
-                }
-              }
-
-              // Subir archivos de preguntas y respuestas
-              if (leccion.preguntas) {
-                for (let preguntaIdx = 0; preguntaIdx < leccion.preguntas.length; preguntaIdx++) {
-                  const pregunta = leccion.preguntas[preguntaIdx];
-
-                  // Subir archivo de pregunta si existe
-                  if (pregunta.file) {
-                    try {
-                      console.log(`Subiendo imagen de pregunta ${moduloIdx}-${leccionIdx}-${preguntaIdx}...`);
-                      const uploadResponse = await CapListService.uploadImagenPregunta(pregunta.file);
-                      const preguntaUrl = uploadResponse.url || uploadResponse.imagen || uploadResponse.archivo;
-                      payloadBasico.modulos[moduloIdx].lecciones[leccionIdx].preguntas[preguntaIdx].url_multimedia = preguntaUrl;
-                      console.log(`Pregunta ${moduloIdx}-${leccionIdx}-${preguntaIdx} subida. URL:`, preguntaUrl);
-                    } catch (err) {
-                      console.error(`Error al subir pregunta ${moduloIdx}-${leccionIdx}-${preguntaIdx}:`, err);
-                      throw new Error(`Error al subir imagen de pregunta ${preguntaIdx + 1} de la lección ${leccionIdx + 1}`);
-                    }
-                  }
-
-                  // Subir archivos de respuestas si existen
-                  if (pregunta.respuestas) {
-                    for (let respuestaIdx = 0; respuestaIdx < pregunta.respuestas.length; respuestaIdx++) {
-                      const respuesta = pregunta.respuestas[respuestaIdx];
-
-                      if (respuesta.file) {
-                        try {
-                          console.log(`Subiendo imagen de respuesta ${moduloIdx}-${leccionIdx}-${preguntaIdx}-${respuestaIdx}...`);
-                          const uploadResponse = await CapListService.uploadImagenRespuesta(respuesta.file);
-                          const respuestaUrl = uploadResponse.url || uploadResponse.imagen || uploadResponse.archivo;
-                          payloadBasico.modulos[moduloIdx].lecciones[leccionIdx].preguntas[preguntaIdx].respuestas[respuestaIdx].url_imagen = respuestaUrl;
-                          console.log(`Respuesta ${moduloIdx}-${leccionIdx}-${preguntaIdx}-${respuestaIdx} subida. URL:`, respuestaUrl);
-                        } catch (err) {
-                          console.error(`Error al subir respuesta ${moduloIdx}-${leccionIdx}-${preguntaIdx}-${respuestaIdx}:`, err);
-                          throw new Error(`Error al subir imagen de respuesta en la pregunta ${preguntaIdx + 1}`);
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        } catch (err: any) {
-          console.error("Error al subir archivos multimedia:", err);
-          setError(err.message || "Error al subir archivos multimedia");
-          setLoading(false);
-          return;
-        }
-      }
-
-      // Construir FormData con archivos incrustados
+      // Construir FormData con todos los archivos incrustados (mismo flujo para crear y editar)
       const formDataMultipart = new FormData();
       
       // Campos simples
@@ -845,53 +749,45 @@ const handleRespuestaChange = async (
       formDataMultipart.append('fecha_inicio', payloadBasico.fecha_inicio);
       formDataMultipart.append('fecha_fin', payloadBasico.fecha_fin);
 
-      // Imagen principal:
-      // - Si es EDICIÓN con imagen nueva: usar URL obtenida del uploadImagenCapacitacion
-      // - Si es CREACIÓN con imagen: enviar archivo directamente
-      // - Si no hay imagen nueva: no enviar nada (Django PATCH partial=True preserva)
-      if (imagenUrl) {
-        formDataMultipart.append('imagen', imagenUrl);
-      } else if (!id && payloadBasico.imagenFile) {
+      // Imagen principal como archivo si hay una nueva seleccionada
+      if (payloadBasico.imagenFile) {
         formDataMultipart.append('imagen', payloadBasico.imagenFile);
       }
 
-      // Agregar archivos de lecciones, preguntas y respuestas a FormData
-      // Si es CREACIÓN: enviar archivos directamente
-      // Si es EDICIÓN: NO enviar archivos (ya fueron subidos y se obtuvieron URLs)
-      if (!id) {
-        modulos.forEach((modulo, moduloIdx) => {
-          modulo.lecciones.forEach((leccion, leccionIdx) => {
-            if (leccion.file) {
-              formDataMultipart.append(
-                `leccion_${moduloIdx}_${leccionIdx}`,
-                leccion.file
-              );
-            }
+      // Agregar archivos de lecciones, preguntas y respuestas directamente al FormData
+      // El backend (POST y PATCH) procesa estos archivos con procesar_archivo_multimedia
+      modulos.forEach((modulo, moduloIdx) => {
+        modulo.lecciones.forEach((leccion, leccionIdx) => {
+          if (leccion.file) {
+            formDataMultipart.append(
+              `leccion_${moduloIdx}_${leccionIdx}`,
+              leccion.file
+            );
+          }
 
-            if (leccion.preguntas) {
-              leccion.preguntas.forEach((pregunta, preguntaIdx) => {
-                if (pregunta.file) {
-                  formDataMultipart.append(
-                    `pregunta_${moduloIdx}_${leccionIdx}_${preguntaIdx}`,
-                    pregunta.file
-                  );
-                }
+          if (leccion.preguntas) {
+            leccion.preguntas.forEach((pregunta, preguntaIdx) => {
+              if (pregunta.file) {
+                formDataMultipart.append(
+                  `pregunta_${moduloIdx}_${leccionIdx}_${preguntaIdx}`,
+                  pregunta.file
+                );
+              }
 
-                if (pregunta.respuestas) {
-                  pregunta.respuestas.forEach((respuesta, respuestaIdx) => {
-                    if (respuesta.file) {
-                      formDataMultipart.append(
-                        `respuesta_${moduloIdx}_${leccionIdx}_${preguntaIdx}_${respuestaIdx}`,
-                        respuesta.file
-                      );
-                    }
-                  });
-                }
-              });
-            }
-          });
+              if (pregunta.respuestas) {
+                pregunta.respuestas.forEach((respuesta, respuestaIdx) => {
+                  if (respuesta.file) {
+                    formDataMultipart.append(
+                      `respuesta_${moduloIdx}_${leccionIdx}_${preguntaIdx}_${respuestaIdx}`,
+                      respuesta.file
+                    );
+                  }
+                });
+              }
+            });
+          }
         });
-      }
+      });
 
       // Módulos y colaboradores como JSON strings
       formDataMultipart.append('modulos', JSON.stringify(payloadBasico.modulos));

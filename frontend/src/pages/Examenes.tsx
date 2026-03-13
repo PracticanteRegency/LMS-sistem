@@ -8,7 +8,7 @@ interface Examen {
   nombre: string;
 }
 
-type TipoExamen = "INGRESO" | "PERIODICO" | "RETIRO";
+type TipoExamen = "INGRESO" | "PERIODICO" | "RETIRO" | "ESPECIAL" | "POST_INCAPACIDAD" | "ALTURAS";
 
 type ExamenesPorTipo = Partial<Record<TipoExamen, Examen[]>>;
 
@@ -471,6 +471,7 @@ export default function Examenes() {
                 <option value="RETIRO">RETIRO</option>
                 <option value="ESPECIAL">ESPECIAL</option>
                 <option value="POST_INCAPACIDAD">POST INCAPACIDAD</option>
+                <option value="ALTURAS">ALTURAS</option>
             </select>
           </div>
 
@@ -742,7 +743,7 @@ export default function Examenes() {
               <div className={styles.formInfo}>
                 <p><strong>Formato requerido del CSV:</strong></p>
                 <p>• Archivo delimitado por comas (,)</p>
-                <p>• Los tipos se examenes son: INGRESO", "PERIODICO", "RETIRO", "ESPECIAL", "POST_INCAPACIDAD"</p>
+                <p>• Los tipos de exámenes son: INGRESO, PERIODICO, RETIRO, ESPECIAL, POST_INCAPACIDAD, ALTURAS</p>
                 <p>• Debe contener las columnas necesarias según lo definido por el backend</p>
                 <p>• Codificación recomendada: UTF-8</p>
               </div>
