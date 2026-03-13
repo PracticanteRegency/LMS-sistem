@@ -204,6 +204,11 @@ class CrearCapacitacionSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         modulos_data = validated_data.pop('modulos', [])
         colaboradores_data = validated_data.pop('colaboradores', [])
+        
+        # Asegurar que imagen tiene un valor (no NULL)
+        # Si no se proporciona, usar cadena vacía (que BD permite)
+        if 'imagen' not in validated_data or not validated_data.get('imagen'):
+            validated_data['imagen'] = ''
 
         with transaction.atomic():
             capacitacion = Capacitaciones.objects.create(
@@ -248,10 +253,7 @@ class CrearCapacitacionSerializer(serializers.ModelSerializer):
                             )
 
                             for respuesta_data in respuestas_data:
-                                # Convertir cadena vacía a None
-                                respuesta_url = respuesta_data.get('url_imagen', None)
-                                if respuesta_url == '':
-                                    respuesta_url = None
+                                respuesta_url = respuesta_data.get('url_imagen') or ""
                                 Respuestas.objects.create(
                                     idpregunta=pregunta,
                                     valor=respuesta_data.get('valor'),
@@ -259,14 +261,8 @@ class CrearCapacitacionSerializer(serializers.ModelSerializer):
                                     urlimagen=respuesta_url
                                 )
 
-            for colaborador_id in colaboradores_data:
-                progresoCapacitaciones.objects.create(
-                    capacitacion=capacitacion,
-                    colaborador_id=colaborador_id,
-                    fecha_registro=timezone.now(),
-                    completada=False,
-                    progreso=0
-                )
+            # NOTA: La creación de progresoCapacitaciones se maneja en la vista (CrearCapacitacionView.post)
+            # para evitar duplicados y aplicar filtros de colaboradores activos (estadocolaborador=1)
 
         return capacitacion
 
@@ -342,19 +338,19 @@ class CrearCapacitacionSerializer(serializers.ModelSerializer):
                 to_add = incoming - current
                 to_remove = current - incoming
 
-                # Agregar nuevos
-                bulk_objs = []
+                # Agregar nuevos (con verificación anti-duplicado)
                 for cid in to_add:
-                    bulk_objs.append(progresoCapacitaciones(
+                    _, created = progresoCapacitaciones.objects.get_or_create(
                         capacitacion=instance,
                         colaborador_id=cid,
-                        fecha_registro=timezone.now(),
-                        completada=False,
-                        progreso=0
-                    ))
-                    added.append(cid)
-                if bulk_objs:
-                    progresoCapacitaciones.objects.bulk_create(bulk_objs)
+                        defaults={
+                            'fecha_registro': timezone.now(),
+                            'completada': False,
+                            'progreso': 0
+                        }
+                    )
+                    if created:
+                        added.append(cid)
 
                 # Eliminar removidos y limpiar progreso relacionado
                 if to_remove:

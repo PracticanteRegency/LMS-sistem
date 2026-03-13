@@ -340,9 +340,13 @@ class CrearCapacitacionView(APIView):
                     imagen_file, 'imagen'
                 )
                 if error:
-                    return Response({'error': error}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({'error': f'Error al procesar imagen: {error}'}, status=status.HTTP_400_BAD_REQUEST)
                 data['imagen'] = url_imagen
                 archivos_creados.append(url_imagen)
+                logger.info(f"Imagen procesada exitosamente: {url_imagen}")
+            else:
+                logger.warning("No se proporcionó imagen en el POST")
+                data['imagen'] = ''  # Asegurar que no sea NULL
             
             # Procesar archivos de lecciones y preguntas
             for modulo_idx, modulo_data in enumerate(modulos_data):
@@ -405,6 +409,10 @@ class CrearCapacitacionView(APIView):
             data['modulos'] = modulos_data
             data['colaboradores'] = colaboradores_ids
             
+            # Asegurar que imagen tiene un valor (requerido por BD)
+            if 'imagen' not in data or not data.get('imagen'):
+                data['imagen'] = ''
+            
             # Crear capacitación con transacción
             serializer = CrearCapacitacionSerializer(data=data)
             if not serializer.is_valid():
@@ -423,6 +431,13 @@ class CrearCapacitacionView(APIView):
                     estadocolaborador=1
                 )
                 
+                # Obtener IDs ya existentes para esta capacitación (evitar duplicados)
+                existentes = set(
+                    progresoCapacitaciones.objects.filter(
+                        capacitacion=capacitacion
+                    ).values_list('colaborador_id', flat=True)
+                )
+                
                 progreso_records = [
                     progresoCapacitaciones(
                         capacitacion=capacitacion,
@@ -431,9 +446,11 @@ class CrearCapacitacionView(APIView):
                         progreso=0
                     )
                     for colaborador in colaboradores
+                    if colaborador.idcolaborador not in existentes
                 ]
                 
-                progresoCapacitaciones.objects.bulk_create(progreso_records, ignore_conflicts=True)
+                if progreso_records:
+                    progresoCapacitaciones.objects.bulk_create(progreso_records)
                 
                 # Enviar correos
                 try:
@@ -2146,18 +2163,25 @@ class EditarColaboradorCapacitacionView(APIView):
                 added = []
                 removed = []
 
-                # Agregar nuevos
-                to_add = add_ids - set(progresoCapacitaciones.objects.filter(capacitacion=capacitacion).values_list('colaborador_id', flat=True))
+                # Agregar nuevos (verificar que no existan ya)
+                existentes = set(progresoCapacitaciones.objects.filter(
+                    capacitacion=capacitacion
+                ).values_list('colaborador_id', flat=True))
+                to_add = add_ids - existentes
                 bulk = []
                 for cid in to_add:
-                    bulk.append(progresoCapacitaciones(
-                        capacitacion=capacitacion,
-                        colaborador_id=cid,
-                        fecha_registro=timezone.now(),
-                        completada=False,
-                        progreso=0
-                    ))
-                    added.append(cid)
+                    # Verificación extra: solo agregar si realmente no existe
+                    if not progresoCapacitaciones.objects.filter(
+                        capacitacion=capacitacion, colaborador_id=cid
+                    ).exists():
+                        bulk.append(progresoCapacitaciones(
+                            capacitacion=capacitacion,
+                            colaborador_id=cid,
+                            fecha_registro=timezone.now(),
+                            completada=False,
+                            progreso=0
+                        ))
+                        added.append(cid)
                 if bulk:
                     progresoCapacitaciones.objects.bulk_create(bulk)
 

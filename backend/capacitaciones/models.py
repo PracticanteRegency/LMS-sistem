@@ -71,6 +71,7 @@ class progresoCapacitaciones(models.Model):
     class Meta:
         managed = False
         db_table = 'capacitaciones_colaboradores'
+        unique_together = (('capacitacion', 'colaborador'),)
 
 
 class progresolecciones(models.Model):

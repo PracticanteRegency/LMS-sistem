@@ -37,11 +37,12 @@ class ExamenesCargo(models.Model):
             ("PERIODICO", "Examen Periódico"),
             ("RETIRO", "Examen de Retiro"),
             ("ESPECIAL", "Examen Especial"),
-            ("POST_INCAPACIDAD", "Examen Post-Incapacidad")
+            ("POST_INCAPACIDAD", "Examen Post-Incapacidad"),
+            ("ALTURAS", "Examen con énfasis en alturas")
         ],
         default="INGRESO",
         db_index=True,
-        help_text="Tipo de examen: INGRESO, PERIODICO, RETIRO, ESPECIAL o POST_INCAPACIDAD"
+        help_text="Tipo de examen: INGRESO, PERIODICO, RETIRO, ESPECIAL, POST_INCAPACIDAD o ALTURAS"
     )
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
@@ -93,11 +94,12 @@ class CorreoExamenEnviado(models.Model):
             ("RETIRO", "Examen de Retiro"),
             ("ESPECIAL", "Examen Especial"),
             ("POST_INCAPACIDAD", "Examen Post-Incapacidad"),
+            ("ALTURAS", "Examen con énfasis en alturas"),
             ("MIXTO", "Múltiples tipos")
         ],
         default="INGRESO",
         db_index=True,
-        help_text="Tipo de examen: INGRESO, PERIODICO, RETIRO, ESPECIAL, POST_INCAPACIDAD o MIXTO"
+        help_text="Tipo de examen: INGRESO, PERIODICO, RETIRO, ESPECIAL, POST_INCAPACIDAD, ALTURAS o MIXTO"
     )
     enviado_correctamente = models.BooleanField(default=False)
     error_envio = models.TextField(blank=True, null=True)
@@ -172,10 +174,11 @@ class RegistroExamenes(models.Model):
             ("PERIODICO", "Examen Periódico"),
             ("RETIRO", "Examen de Retiro"),
             ("ESPECIAL", "Examen Especial"),
-            ("POST_INCAPACIDAD", "Examen Post-Incapacidad")
+            ("POST_INCAPACIDAD", "Examen Post-Incapacidad"),
+            ("ALTURAS", "Examen con énfasis en alturas")
         ],
         db_index=True,
-        help_text="Tipo de examen: INGRESO, PERIODICO, RETIRO, ESPECIAL o POST_INCAPACIDAD"
+        help_text="Tipo de examen: INGRESO, PERIODICO, RETIRO, ESPECIAL, POST_INCAPACIDAD o ALTURAS"
     )
     examenes_asignados = models.TextField(
         blank=True,

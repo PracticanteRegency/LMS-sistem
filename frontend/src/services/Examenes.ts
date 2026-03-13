@@ -1,4 +1,4 @@
-type TipoExamen = "INGRESO" | "PERIODICO" | "RETIRO" | "ESPECIAL" | "POST-INCAPACIDAD";
+type TipoExamen = "INGRESO" | "PERIODICO" | "RETIRO" | "ESPECIAL" | "POST_INCAPACIDAD" | "ALTURAS";
 
 interface Examen {
   id: number;
