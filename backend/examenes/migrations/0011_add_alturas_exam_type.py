@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.AlterField(
-            model_name='examenscargo',
+            model_name='examenescargo',
             name='tipo',
             field=models.CharField(
                 choices=[
