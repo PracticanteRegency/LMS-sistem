@@ -145,6 +145,7 @@ export default function CrearCapacitacion() {
     "HABILIDADES TECNICAS",
     "SOCIAL",
     "LEGAL",
+    "INDUCCIÓN CORPORATIVA",
   ];
 
   const [modulos, setModulos] = useState<Modulo[]>([]);

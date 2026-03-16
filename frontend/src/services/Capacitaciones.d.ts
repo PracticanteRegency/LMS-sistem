@@ -33,6 +33,7 @@ interface CapListService {
   GetUsersCapacitacion(capacitacionId: string | number): Promise<any>;
   descargarReporteCapacitacion(capacitacionId: string | number, includeQuestions?: boolean): Promise<Blob>;
   descargarReporteRangoFechas(fechaInicio: string, fechaFin: string): Promise<Blob>;
+  getInducciones(capacitacionId?: string | number): Promise<any>;
 }
 
 declare const CapListService: CapListService;

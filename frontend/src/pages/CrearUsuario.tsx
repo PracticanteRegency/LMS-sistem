@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { getUserId, getUserRole } from "../services/auth.ts";
 import PerfilService from "../services/perfil";
 import AnaliticaService from "../services/analitica";
+import CapListService from "../services/Capacitaciones";
 import api from "../services/axios";
 
 export default function CrearUsuario() {
@@ -15,9 +16,10 @@ export default function CrearUsuario() {
   const [cargosData, setCargosData] = useState<any>(null);
 
   // temporal form
-  const [tempForm, setTempForm] = useState({ cc: "", nombre: "", apellido: "", correo: "", telefono: "" });
+  const [tempForm, setTempForm] = useState({ cc: "", nombre: "", apellido: "", correo: "", telefono: "", induccion_id: undefined as number | undefined });
   const [tempError, setTempError] = useState<string>("");
   const [tempLoading, setTempLoading] = useState(false);
+  const [inducciones, setInducciones] = useState<any[]>([]);
 
   // completo form
   const [fullForm, setFullForm] = useState({ usuario: "", is_staff: "0", idcolaborador: { cc_colaborador: "", nombre_colaborador: "", apellido_colaborador: "", cargo_colaborador: undefined as number | undefined, correo_colaborador: "", telefo_colaborador: "", nivel_colaborador: undefined as number | undefined, regional_colab: undefined as number | undefined, centroOP: undefined as number | undefined } });
@@ -46,7 +48,7 @@ export default function CrearUsuario() {
     if ([1,3,4].includes(uid) || r === 1 || r === 4 || r === 3) setAllowed(true);
     else setAllowed(false);
 
-    // fetch cargos/niveles/regionales and empresas
+    // fetch cargos/niveles/regionales y empresas
         (async () => {
           try {
             const data = await (PerfilService as any).getCargoRegionesNiveles();
@@ -60,6 +62,16 @@ export default function CrearUsuario() {
             setEmpresas(res?.empresas || res || []);
           } catch (e) {
             console.error('Error cargando empresas', e);
+          }
+
+          // Cargar inducciones si es tipo 3 (staff especial)
+          {
+            try {
+              const indRes = await (CapListService as any).getInducciones();
+              setInducciones(indRes || []);
+            } catch (e) {
+              console.error('Error cargando inducciones', e);
+            }
           }
         })();
   }, []);
@@ -81,7 +93,7 @@ export default function CrearUsuario() {
 
       {/* Selector for form type */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 24 }}>
-        {(role === 3 || role === 4) && (
+        {role === 3 && (
           <button
             className={selectedForm === 1 ? styles.btnPrimary : ''}
             style={{ border: '1px solid #C0281B', background: selectedForm === 1 ? '#C0281B' : 'white', color: selectedForm === 1 ? 'white' : '#C0281B', borderRadius: 4, padding: '8px 16px', cursor: 'pointer' }}
@@ -90,7 +102,25 @@ export default function CrearUsuario() {
             Crear Usuario Temporal
           </button>
         )}
-        {(role === 1 || role === 4) && (
+        {role === 4 && (
+          <>
+            <button
+              className={selectedForm === 1 ? styles.btnPrimary : ''}
+              style={{ border: '1px solid #C0281B', background: selectedForm === 1 ? '#C0281B' : 'white', color: selectedForm === 1 ? 'white' : '#C0281B', borderRadius: 4, padding: '8px 16px', cursor: 'pointer' }}
+              onClick={() => setSelectedForm(1)}
+            >
+              Crear Usuario Temporal
+            </button>
+            <button
+              className={selectedForm === 2 ? styles.btnPrimary : ''}
+              style={{ border: '1px solid #C0281B', background: selectedForm === 2 ? '#C0281B' : 'white', color: selectedForm === 2 ? 'white' : '#C0281B', borderRadius: 4, padding: '8px 16px', cursor: 'pointer' }}
+              onClick={() => setSelectedForm(2)}
+            >
+              Crear Usuario Completo
+            </button>
+          </>
+        )}
+        {role === 1 && (
           <button
             className={selectedForm === 2 ? styles.btnPrimary : ''}
             style={{ border: '1px solid #C0281B', background: selectedForm === 2 ? '#C0281B' : 'white', color: selectedForm === 2 ? 'white' : '#C0281B', borderRadius: 4, padding: '8px 16px', cursor: 'pointer' }}
@@ -116,7 +146,13 @@ export default function CrearUsuario() {
             <input className={styles.input} placeholder="apellido" value={tempForm.apellido} onChange={(e) => { setTempForm({...tempForm, apellido: e.target.value}); setTempError(""); }} />
             <input className={styles.input} placeholder="correo" value={tempForm.correo} onChange={(e) => { setTempForm({...tempForm, correo: e.target.value}); setTempError(""); }} />
             <input className={styles.input} placeholder="telefono" value={tempForm.telefono} onChange={(e) => { setTempForm({...tempForm, telefono: e.target.value}); setTempError(""); }} />
-            <button className={styles.btnPrimary} disabled={tempLoading} onClick={async () => {
+            <select className={styles.select} value={tempForm.induccion_id || ''} onChange={(e) => { setTempForm({...tempForm, induccion_id: e.target.value ? Number(e.target.value) : undefined}); setTempError(""); }}>
+              <option value="">Seleccionar inducción</option>
+              {inducciones.map((ind: any) => (
+                <option key={ind.id} value={ind.id}>{ind.titulo}</option>
+              ))}
+            </select>
+            <button className={styles.btnPrimary} disabled={tempLoading || !tempForm.induccion_id} onClick={async () => {
               setTempLoading(true);
               setTempError("");
               const payload = {
@@ -128,12 +164,15 @@ export default function CrearUsuario() {
                   apellido_colaborador: tempForm.apellido,
                   correo_colaborador: tempForm.correo,
                   telefo_colaborador: tempForm.telefono,
-                }
+                },
+                capacitacion_id: tempForm.induccion_id
               };
               try {
+                // Crear usuario temporal y registrarlo a capacitación en una sola llamada
                 await (PerfilService as any).registerTemporalUser(payload);
-                setTempForm({ cc: "", nombre: "", apellido: "", correo: "", telefono: "" });
-                alert("Usuario temporal creado exitosamente");
+                
+                setTempForm({ cc: "", nombre: "", apellido: "", correo: "", telefono: "", induccion_id: undefined });
+                alert("Usuario temporal creado y registrado a capacitación exitosamente");
               } catch (err: any) {
                 const errorMsg = err.response?.data?.error || err.message || "Error al crear usuario";
                 setTempError(errorMsg);
