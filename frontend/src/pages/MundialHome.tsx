@@ -12,14 +12,81 @@ import {
   // @ts-ignore
   getConfiguracion,
   // @ts-ignore
-  getPrediccionesEspeciales,
-  // @ts-ignore
   getHomeData,
-  // @ts-ignore
-  getEquipos,
   // @ts-ignore
   upsertPrediccionEspecial,
 } from "../services/mundial.js";
+
+/* ===== COMPONENTE PARA MOSTRAR BANDERAS CON FALLBACK ===== */
+function BanderaDisplay({ url, nombre, emoji }: { url?: string; nombre?: string; emoji?: string }) {
+  const [imageError, setImageError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const handleImageError = () => {
+    setImageError(true);
+    setIsLoading(false);
+  };
+
+  const handleImageLoad = () => {
+    setImageError(false);
+    setIsLoading(false);
+  };
+
+  // Si no hay URL o hubo error, mostrar emoji
+  if (!url || imageError) {
+    return (
+      <div
+        style={{
+          width: "48px",
+          height: "48px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: "4px",
+          backgroundColor: "var(--muted)",
+          fontSize: "1.5rem",
+          fontWeight: "bold",
+        }}
+        title={nombre || "Equipo"}
+      >
+        {emoji || "🏁"}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ position: "relative" }}>
+      {isLoading && (
+        <div
+          style={{
+            width: "48px",
+            height: "48px",
+            borderRadius: "4px",
+            backgroundColor: "var(--muted)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>⏳</span>
+        </div>
+      )}
+      <img
+        src={url}
+        alt={nombre || "Bandera del equipo"}
+        onError={handleImageError}
+        onLoad={handleImageLoad}
+        style={{
+          width: "48px",
+          height: "48px",
+          borderRadius: "4px",
+          objectFit: "cover",
+          display: isLoading ? "none" : "block",
+        }}
+      />
+    </div>
+  );
+}
 
 /* ===== BANNER MARQUEE (ONLY ON MUNDIAL HOME) ===== */
 function BannerMarquee() {
@@ -141,8 +208,33 @@ function ScoringRulesGrid() {
   useEffect(() => {
     dedupe("config", {}, () => getConfiguracion())
       .then((res: any): void => {
-        if (res.data?.scoring_rules) setScoringRules(res.data.scoring_rules);
-        if (res.data?.multiplier_rules) setMultiplierRules(res.data.multiplier_rules);
+        const cfg = res.data || {};
+
+        // Construir scoring rules desde los campos reales del backend
+        const rules: any[] = [];
+        if (cfg.puntos_resultado_exacto !== undefined) {
+          rules.push({
+            points: cfg.puntos_resultado_exacto,
+            condition: "Resultado Exacto",
+            example: "Ej: Predices 2-1 y el resultado es 2-1",
+          });
+        }
+        if (cfg.puntos_ganador_correcto !== undefined) {
+          rules.push({
+            points: cfg.puntos_ganador_correcto,
+            condition: "Ganador Correcto",
+            example: "Ej: Predices que gana el local y gana el local",
+          });
+        }
+        setScoringRules(rules);
+
+        // Construir multiplicadores desde el dict del backend
+        const multiplicadores = cfg.multiplicadores || {};
+        const mRules = Object.entries(multiplicadores).map(([phase, multiplier]) => ({
+          phase,
+          multiplier: typeof multiplier === "string" && multiplier.startsWith("x") ? multiplier : `x${multiplier}`,
+        }));
+        setMultiplierRules(mRules);
       })
       .catch(() => {
         setScoringRules([]);
@@ -150,8 +242,13 @@ function ScoringRulesGrid() {
       });
   }, []);
 
+  if (scoringRules.length === 0 && multiplierRules.length === 0) {
+    return null;
+  }
+
   return (
     <div className={styles.scoringGrid}>
+      {scoringRules.length > 0 && (
       <div className={styles.scoringCard}>
         <h3 className={styles.scoringCardTitle}>Sistema de Puntuación</h3>
         {scoringRules.map((item, idx) => (
@@ -167,7 +264,9 @@ function ScoringRulesGrid() {
           </div>
         ))}
       </div>
+      )}
 
+      {multiplierRules.length > 0 && (
       <div className={styles.scoringCard}>
         <h3 className={styles.scoringCardTitle}>Multiplicadores por Fase</h3>
         <p className={styles.scoringCardDesc}>
@@ -180,6 +279,7 @@ function ScoringRulesGrid() {
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }
@@ -236,7 +336,7 @@ function MatchesSection({ initialMatches = [] }: { initialMatches?: MatchData[] 
                   </div>
                 </div>
 
-                <Link to="/mundial/partidos" className={styles.btnPrimary} style={{ width: "100%", textAlign: "center" }}>
+                <Link to="/mundial/partidos" className={styles.btnPrimary} style={{ width: "100%", textAlign: "center", boxSizing: "border-box", overflow: "hidden" }}>
                   Hacer Predicción →
                 </Link>
               </div>
@@ -253,141 +353,46 @@ function MatchesSection({ initialMatches = [] }: { initialMatches?: MatchData[] 
   );
 }
 
-/* ===== PRIZES ===== */
-function PrizesSection({ initialPrizes = [], initialSpecialPredictions = [] }: { initialPrizes?: any[], initialSpecialPredictions?: any[] }) {
-  const [prizes, setPrizes] = useState<any[]>(initialPrizes);
-  const [specialPredictions, setSpecialPredictions] = useState<any[]>(initialSpecialPredictions);
-
-  useEffect(() => {
-    setPrizes(initialPrizes);
-    setSpecialPredictions(initialSpecialPredictions);
-  }, [initialPrizes, initialSpecialPredictions]);
-
-  return (
-    <section id="premios" className={styles.prizesSection}>
-      <div className={styles.sectionInner}>
-        <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Premios Increíbles</h2>
-          <p className={styles.sectionSubtitle}>
-            Compite por más de $50,000 en premios. Los tres primeros lugares se llevan todo.
-          </p>
-        </div>
-
-        <div className={styles.prizesGrid}>
-          {prizes.map((prize, idx) => (
-            <div key={idx} className={idx === 0 ? styles.prizeCardFirst : styles.prizeCard}>
-              <div
-                className={styles.prizeIcon}
-                style={{ background: prize.bgColor, border: `2px solid ${prize.borderColor}` }}
-              >
-                {prize.emoji}
-              </div>
-              <p className={styles.prizePosition}>{prize.position}</p>
-              <p className={styles.prizeAmount}>{prize.prize}</p>
-              <p className={styles.prizePercent}>{prize.percentage} del pozo total</p>
-            </div>
-          ))}
-        </div>
-
-        <div className={styles.specialCard}>
-          <div className={styles.specialHeader}>
-            <span className={styles.specialEmoji}>🎁</span>
-            <h3 className={styles.specialTitle}>Predicciones Especiales</h3>
-          </div>
-          <p className={styles.specialDesc}>
-            Además de los partidos, puedes ganar puntos adicionales con predicciones especiales que se evalúan al finalizar el torneo.
-          </p>
-          <div className={styles.specialGrid}>
-            {specialPredictions.map((pred, idx) => (
-              <div key={idx} className={styles.specialItem}>
-                <span className={styles.specialItemName}>{pred.name}</span>
-                <span className={styles.specialItemPoints}>{pred.points}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className={styles.prizesCta}>
-          <Link to="/mundial/partidos" className={styles.btnPrimary}>
-            Participar Ahora →
-          </Link>
-          <p className={styles.prizesCtaNote}>Registro gratuito. Sin cargos ocultos.</p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 /* ===== SPECIAL PREDICTIONS ===== */
-function SpecialPredictionsSection({ initialSpecialPredictions = [] }: { initialSpecialPredictions?: any[] }) {
+function SpecialPredictionsSection({ initialSpecialPredictions = [], initialTeams = [], initialUserPredictions = [] }: { initialSpecialPredictions?: any[], initialTeams?: any[], initialUserPredictions?: any[] }) {
   const [predictions, setPredictions] = useState<any[]>(initialSpecialPredictions);
-  const [userPredictions, setUserPredictions] = useState<any[]>([]);
+  const [userPredictions, setUserPredictions] = useState<any[]>(initialUserPredictions);
   const [selectedTeam, setSelectedTeam] = useState<{ [key: string]: any }>({});
-  const [selectedPlayer, setSelectedPlayer] = useState<{ [key: string]: string }>({});
   const [loading, setLoading] = useState(false);
-  const [teams, setTeams] = useState<any[]>([]);
+  const [teams, setTeams] = useState<any[]>(initialTeams);
 
   useEffect(() => {
     setPredictions(initialSpecialPredictions);
   }, [initialSpecialPredictions]);
 
   useEffect(() => {
-    // Cargar equipos
-    dedupe("equipos-for-special", {}, () => getEquipos())
-      .then((res: any): void => {
-        const data = Array.isArray(res.data) ? res.data : res.data?.equipos || [];
-        setTeams(data);
-      })
-      .catch(() => {
-        setTeams([]);
-      });
+    setTeams(initialTeams);
+  }, [initialTeams]);
 
-    // Cargar predicciones especiales del usuario
-    dedupe("my-special-predictions", {}, () => getPrediccionesEspeciales())
-      .then((res: any): void => {
-        const data = res.data?.predicciones || [];
-        setUserPredictions(data);
-        // Inicializar selectedTeam y selectedPlayer con las predicciones existentes
-        const teamMap: any = {};
-        const playerMap: any = {};
-        data.forEach((pred: any) => {
-          if (pred.equipo_seleccionado) {
-            teamMap[pred.tipo] = pred.equipo_seleccionado;
-          }
-          if (pred.jugador_seleccionado) {
-            playerMap[pred.tipo] = pred.jugador_seleccionado;
-          }
-        });
-        setSelectedTeam(teamMap);
-        setSelectedPlayer(playerMap);
-      })
-      .catch(() => {
-        setUserPredictions([]);
-      });
-  }, []);
+  useEffect(() => {
+    setUserPredictions(initialUserPredictions);
+    // Inicializar selectedTeam con las predicciones existentes del usuario
+    const teamMap: any = {};
+    initialUserPredictions.forEach((pred: any) => {
+      if (pred.equipo_seleccionado) {
+        teamMap[pred.tipo] = pred.equipo_seleccionado;
+      }
+    });
+    setSelectedTeam(teamMap);
+  }, [initialUserPredictions]);
 
   const handleSubmitSpecial = async (tipo: string) => {
     setLoading(true);
     try {
       const payload: any = { tipo };
       
-      if (["campeon", "subcampeon", "tercer_lugar"].includes(tipo)) {
-        const teamId = selectedTeam[tipo];
-        if (!teamId) {
-          alert("Selecciona un equipo");
-          setLoading(false);
-          return;
-        }
-        payload.equipo_seleccionado = teamId;
-      } else if (tipo === "maximo_goleador") {
-        const player = selectedPlayer[tipo];
-        if (!player) {
-          alert("Ingresa el nombre del jugador");
-          setLoading(false);
-          return;
-        }
-        payload.jugador_seleccionado = player;
+      const teamId = selectedTeam[tipo];
+      if (!teamId) {
+        alert("Selecciona un equipo");
+        setLoading(false);
+        return;
       }
+      payload.equipo_seleccionado = teamId;
 
       const res = await upsertPrediccionEspecial(payload);
       
@@ -426,32 +431,72 @@ function SpecialPredictionsSection({ initialSpecialPredictions = [] }: { initial
           </div>
         ) : (
           <div className={styles.specialGrid}>
-            {predictions.map((pred) => {
-              const userPred = userPredictions.find(p => p.tipo === pred.tipo);
-              const isTeamType = ["campeon", "subcampeon", "tercer_lugar"].includes(pred.tipo);
+            {predictions
+              .filter((pred) => ["campeon", "subcampeon", "tercer_lugar"].includes(pred.tipo))
+              .map((pred) => {
+                const userPred = userPredictions.find(p => p.tipo === pred.tipo);
+                const getIcon = (tipo: string) => {
+                  switch(tipo) {
+                    case "campeon": return "🏆";
+                    case "subcampeon": return "🥈";
+                    case "tercer_lugar": return "🥉";
+                    default: return "🎯";
+                  }
+                };
+                const getLabel = (tipo: string) => {
+                  switch(tipo) {
+                    case "campeon": return "Campeón";
+                    case "subcampeon": return "Subcampeón";
+                    case "tercer_lugar": return "Tercer Lugar";
+                    default: return tipo;
+                  }
+                };
 
-              return (
-                <div key={pred.tipo} className={styles.specialPredictionCard}>
-                  <div className={styles.specialPredHeader}>
-                    <h3 style={{ fontWeight: 700, marginBottom: "0.5rem" }}>{pred.get_tipo_display || pred.tipo}</h3>
-                    <span className={styles.specialPoints}>+{pred.puntos_acierto} pts</span>
-                  </div>
-
-                  {userPred ? (
-                    <div style={{ padding: "1rem", backgroundColor: "var(--muted)", borderRadius: "6px", marginBottom: "1rem" }}>
-                      <p style={{ fontSize: "0.875rem", color: "var(--success)" }}>✓ Respondida</p>
-                      <p style={{ fontWeight: 600, marginTop: "0.5rem" }}>
-                        {isTeamType ? userPred.equipo_seleccionado?.nombre : userPred.jugador_seleccionado}
-                      </p>
+                return (
+                  <div key={pred.id || pred.tipo} className={styles.specialPredictionCard}>
+                    <div className={styles.specialPredHeader}>
+                      <h3 style={{ fontWeight: 700, marginBottom: "0.25rem", fontSize: "1.1rem" }}>
+                        {getIcon(pred.tipo)} {getLabel(pred.tipo)}
+                      </h3>
+                      <span className={styles.specialPoints}>+{pred.puntos_acierto} pts</span>
                     </div>
-                  ) : (
-                    <>
-                      {isTeamType ? (
+
+                    {pred.descripcion && (
+                      <p style={{ fontSize: "0.85rem", color: "var(--muted-foreground)", marginBottom: "1rem", lineHeight: 1.5 }}>
+                        {pred.descripcion}
+                      </p>
+                    )}
+
+                    {userPred && !userPred.puede_editar ? (
+                      // Read-only: ya respondió y está cerrada
+                      <div style={{ padding: "1rem", backgroundColor: "var(--muted)", borderRadius: "6px", marginBottom: "1rem", border: "2px solid var(--success)" }}>
+                        <p style={{ fontSize: "0.875rem", color: "var(--success)", fontWeight: 600, margin: "0 0 0.5rem 0" }}>✓ Respondida</p>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginTop: "0.75rem" }}>
+                          <BanderaDisplay url={userPred.equipo_bandera} nombre={userPred.equipo_nombre} emoji={userPred.equipo_emoji} />
+                          <span style={{ fontWeight: 600, fontSize: "1rem" }}>
+                            {userPred.equipo_nombre}
+                          </span>
+                        </div>
+                        <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", margin: "0.5rem 0 0 0" }}>
+                          Cerrada desde el {new Date(userPred.fecha_cierre).toLocaleDateString()}
+                        </p>
+                      </div>
+                    ) : userPred && userPred.puede_editar ? (
+                      // Editable: ya respondió pero aún puede editar
+                      <div style={{ padding: "1rem", backgroundColor: "var(--muted)", borderRadius: "6px", marginBottom: "1rem", border: "2px solid var(--primary)" }}>
+                        <p style={{ fontSize: "0.875rem", color: "var(--primary)", fontWeight: 600, margin: "0 0 0.5rem 0" }}>✓ Respondida (editable)</p>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginTop: "0.75rem", marginBottom: "0.75rem" }}>
+                          <BanderaDisplay url={userPred.equipo_bandera} nombre={userPred.equipo_nombre} emoji={userPred.equipo_emoji} />
+                          <span style={{ fontWeight: 600, fontSize: "1rem" }}>
+                            {userPred.equipo_nombre}
+                          </span>
+                        </div>
                         <select
-                          value={selectedTeam[pred.tipo] || ""}
+                          value={selectedTeam[pred.tipo] || userPred.equipo_seleccionado || ""}
                           onChange={(e) => setSelectedTeam({ ...selectedTeam, [pred.tipo]: parseInt(e.target.value) })}
                           className={styles.specialSelect}
                           disabled={loading}
+                          style={{ marginBottom: "0.75rem" }}
                         >
                           <option value="">Selecciona un equipo...</option>
                           {teams.map((team) => (
@@ -460,33 +505,45 @@ function SpecialPredictionsSection({ initialSpecialPredictions = [] }: { initial
                             </option>
                           ))}
                         </select>
-                      ) : (
-                        <input
-                          type="text"
-                          value={selectedPlayer[pred.tipo] || ""}
-                          onChange={(e) => setSelectedPlayer({ ...selectedPlayer, [pred.tipo]: e.target.value })}
-                          placeholder="Ej: Mbappé"
-                          className={styles.specialInput}
+                        <button
+                          className={styles.specialSubmitBtn}
+                          onClick={() => handleSubmitSpecial(pred.tipo)}
+                          disabled={loading || !selectedTeam[pred.tipo]}
+                          style={{ width: "100%", fontWeight: 600 }}
+                        >
+                          {loading ? "Actualizando..." : "Actualizar →"}
+                        </button>
+                      </div>
+                    ) : (
+                      // Not answered yet: show selection form
+                      <>
+                        <select
+                          value={selectedTeam[pred.tipo] || ""}
+                          onChange={(e) => setSelectedTeam({ ...selectedTeam, [pred.tipo]: parseInt(e.target.value) })}
+                          className={styles.specialSelect}
                           disabled={loading}
-                        />
-                      )}
-                      <button
-                        className={styles.specialSubmitBtn}
-                        onClick={() => handleSubmitSpecial(pred.tipo)}
-                        disabled={loading}
-                        style={{ marginTop: "0.75rem", width: "100%" }}
-                      >
-                        {loading ? "Guardando..." : "Responder"}
-                      </button>
-                    </>
-                  )}
-
-                  <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: "0.75rem" }}>
-                    Cierra: {pred.fecha_cierre ? new Date(pred.fecha_cierre).toLocaleDateString() : "—"}
-                  </p>
-                </div>
-              );
-            })}
+                          style={{ marginBottom: "0.75rem" }}
+                        >
+                          <option value="">Selecciona un equipo...</option>
+                          {teams.map((team) => (
+                            <option key={team.id} value={team.id}>
+                              {team.bandera_emoji} {team.nombre}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          className={styles.specialSubmitBtn}
+                          onClick={() => handleSubmitSpecial(pred.tipo)}
+                          disabled={loading || !selectedTeam[pred.tipo]}
+                          style={{ width: "100%", fontWeight: 600 }}
+                        >
+                          {loading ? "Guardando..." : "Predecir →"}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
           </div>
         )}
       </div>
@@ -623,9 +680,10 @@ function RankingSection({ initialPlayers = [] }: { initialPlayers?: RankingEntry
 export default function MundialHome() {
   const [steps, setSteps] = useState<any[]>([]);
   const [matches, setMatches] = useState<MatchData[]>([]);
-  const [prizes, setPrizes] = useState<any[]>([]);
   const [specialPredictions, setSpecialPredictions] = useState<any[]>([]);
   const [players, setPlayers] = useState<RankingEntry[]>([]);
+  const [equipos, setEquipos] = useState<any[]>([]);
+  const [userSpecialPredictions, setUserSpecialPredictions] = useState<any[]>([]);
 
   useEffect(() => {
     dedupe("home", {}, () => getHomeData())
@@ -637,16 +695,19 @@ export default function MundialHome() {
         // ============================================
         if (data.configuracion) {
           if (data.configuracion?.steps) setSteps(data.configuracion.steps);
-          if (data.configuracion?.prizes) setPrizes(data.configuracion.prizes);
         }
         
         // ============================================
         // PREDICCIONES ESPECIALES (from predicciones-especiales endpoint)
-        // Structure: { predicciones: [...] }
+        // Structure: { predicciones: [...], configuraciones: [...] }
         // ============================================
         if (data.predicciones_especiales) {
-          const especiales = data.predicciones_especiales?.predicciones || [];
-          setSpecialPredictions(especiales);
+          // Configuraciones son los tipos de predicciones especiales disponibles
+          const configs = data.predicciones_especiales?.configuraciones || [];
+          setSpecialPredictions(configs);
+          // Predicciones del usuario actual
+          const userPreds = data.predicciones_especiales?.predicciones || [];
+          setUserSpecialPredictions(userPreds);
         }
         
         // ============================================
@@ -686,6 +747,10 @@ export default function MundialHome() {
             status: partido.estado,
           }));
           setMatches(partidos);
+
+          // Equipos disponibles para predicciones especiales
+          const equiposData = data.partidos?.equipos || [];
+          setEquipos(equiposData);
         }
         
         // ============================================
@@ -715,7 +780,6 @@ export default function MundialHome() {
       .catch(() => {
         setSteps([]);
         setMatches([]);
-        setPrizes([]);
         setSpecialPredictions([]);
         setPlayers([]);
       });
@@ -726,9 +790,8 @@ export default function MundialHome() {
       <BannerMarquee />
       <Hero />
       <MatchesSection initialMatches={matches} />
+      <SpecialPredictionsSection initialSpecialPredictions={specialPredictions} initialTeams={equipos} initialUserPredictions={userSpecialPredictions} />
       <RankingSection initialPlayers={players} />
-      <SpecialPredictionsSection initialSpecialPredictions={specialPredictions} />
-      <PrizesSection initialPrizes={prizes} initialSpecialPredictions={specialPredictions} />
       <HowItWorks steps={steps} />
     </div>
   );

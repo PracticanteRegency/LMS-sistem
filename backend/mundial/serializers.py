@@ -311,6 +311,8 @@ class PrediccionCreateSerializer(PrediccionSerializer):
 class PrediccionEspecialSerializer(serializers.ModelSerializer):
     tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
     equipo_nombre = serializers.SerializerMethodField()
+    equipo_bandera = serializers.SerializerMethodField()
+    equipo_emoji = serializers.SerializerMethodField()
     puede_editar = serializers.SerializerMethodField()
     fecha_cierre = serializers.SerializerMethodField()
 
@@ -318,14 +320,31 @@ class PrediccionEspecialSerializer(serializers.ModelSerializer):
         model = PrediccionEspecial
         fields = [
             "id", "tipo", "tipo_display",
-            "equipo_seleccionado", "equipo_nombre", "jugador_seleccionado",
+            "equipo_seleccionado", "equipo_nombre", "equipo_bandera", "equipo_emoji",
+            "jugador_seleccionado",
             "puntos_obtenidos", "puede_editar", "fecha_cierre",
             "creado_en", "actualizado_en",
         ]
-        read_only_fields = ["puntos_obtenidos"]
+        read_only_fields = ["puntos_obtenidos", "creado_en", "actualizado_en"]
 
     def get_equipo_nombre(self, obj):
         return obj.equipo_seleccionado.nombre if obj.equipo_seleccionado else None
+
+    def get_equipo_bandera(self, obj):
+        if not obj.equipo_seleccionado:
+            return None
+        # Retorna URL de imagen si existe (igual que en partidos)
+        request = self.context.get("request")
+        if obj.equipo_seleccionado.bandera_imagen and request:
+            try:
+                return request.build_absolute_uri(obj.equipo_seleccionado.bandera_imagen.url)
+            except Exception:
+                # Si hay error, devolver emoji
+                return obj.equipo_seleccionado.bandera_emoji or ""
+        return obj.equipo_seleccionado.bandera_emoji or ""
+
+    def get_equipo_emoji(self, obj):
+        return obj.equipo_seleccionado.bandera_emoji if obj.equipo_seleccionado else None
 
     def get_puede_editar(self, obj):
         return obj.puede_editarse()
@@ -333,6 +352,28 @@ class PrediccionEspecialSerializer(serializers.ModelSerializer):
     def get_fecha_cierre(self, obj):
         config = obj._get_config()
         return config.fecha_cierre.isoformat() if config else None
+
+    def create(self, validated_data):
+        colaborador = self.context.get("colaborador")
+        if not colaborador:
+            raise serializers.ValidationError("Colaborador no especificado")
+        validated_data["colaborador"] = colaborador
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        return super().update(instance, validated_data)
+    
+
+class PrediccionEspecialRespuestaSerializer(serializers.ModelSerializer):
+    tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
+
+    class Meta:
+        model = PrediccionEspecial
+        fields = [
+            "id", "tipo", "tipo_display",
+            "equipo_seleccionado", "jugador_seleccionado",
+            "puntos_obtenidos",
+        ]
 
 
 # ================================================================
@@ -388,8 +429,6 @@ class ConfiguracionTorneoSerializer(serializers.ModelSerializer):
             "multiplicador_grupos", "multiplicador_dieciseisavos", "multiplicador_octavos",
             "multiplicador_cuartos", "multiplicador_semifinales", "multiplicador_tercer_puesto",
             "multiplicador_final", "multiplicadores",
-            # Predicciones especiales
-            "puntos_campeon", "puntos_subcampeon", "puntos_tercer_lugar", "puntos_maximo_goleador",
             # Premios
             "porcentaje_primer_lugar", "porcentaje_segundo_lugar", "porcentaje_tercer_lugar",
             "fondo_premios_total",
@@ -438,14 +477,6 @@ class ConfiguracionPrediccionEspecialSerializer(serializers.ModelSerializer):
 
     def get_esta_abierta(self, obj):
         return obj.esta_abierta()
-
-    def validate(self, data):
-        edicion = data.get("edicion") or getattr(self.instance, "edicion", None)
-        if edicion and edicion.bloqueo_configuracion:
-            raise serializers.ValidationError(
-                "No se puede editar las predicciones especiales: el mundial ya ha iniciado."
-            )
-        return data
 
 
 # ================================================================

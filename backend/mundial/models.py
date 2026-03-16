@@ -637,12 +637,6 @@ class ConfiguracionTorneo(models.Model):
     multiplicador_tercer_puesto = models.CharField(max_length=5, default="x2.5")
     multiplicador_final = models.CharField(max_length=5, default="x3")
 
-    # Puntos para predicciones especiales
-    puntos_campeon = models.IntegerField(default=50)
-    puntos_subcampeon = models.IntegerField(default=30)
-    puntos_tercer_lugar = models.IntegerField(default=20)
-    puntos_maximo_goleador = models.IntegerField(default=25)
-
     # Premios
     porcentaje_primer_lugar = models.CharField(max_length=10, default="50%")
     porcentaje_segundo_lugar = models.CharField(max_length=10, default="30%")

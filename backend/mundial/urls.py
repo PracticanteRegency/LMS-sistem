@@ -26,6 +26,7 @@ urlpatterns = [
 
     # ── Predicciones especiales ───────────────────────────────────
     path("predicciones-especiales/", views.PrediccionEspecialListCreateView.as_view(), name="prediccion-especial-list-create"),
+    path("predicciones-especiales/<int:pk>/", views.PrediccionEspecialDetailView.as_view(), name="prediccion-especial-detail"),
 
     # ── Ranking ───────────────────────────────────────────────────
     path("ranking/", views.RankingView.as_view(), name="ranking"),

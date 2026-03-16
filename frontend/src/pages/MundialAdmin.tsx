@@ -25,6 +25,14 @@ import {
   createEquipo,
   // @ts-ignore
   createConfigEspecial,
+  // @ts-ignore
+  getConfigEspeciales,
+  // @ts-ignore
+  updateConfigEspecial,
+  // @ts-ignore
+  deleteConfigEspecial,
+  // @ts-ignore
+  getEdiciones,
 } from "../services/mundial.js";
 
 // All data from backend API
@@ -77,6 +85,11 @@ export default function MundialAdmin() {
   const [formSpecialDeadline, setFormSpecialDeadline] = useState("");
   const [formSpecialDescription, setFormSpecialDescription] = useState("");
   const [formSpecialEnabled, setFormSpecialEnabled] = useState(true);
+  const [formSpecialEdicion, setFormSpecialEdicion] = useState("");
+  const [editingSpecialId, setEditingSpecialId] = useState<number | null>(null);
+
+  // Ediciones del mundial
+  const [ediciones, setEdiciones] = useState<any[]>([]);
 
   useEffect(() => {
     // Obtener partidos
@@ -114,9 +127,6 @@ export default function MundialAdmin() {
 
         // Grupos (letras A-H para 8 grupos)
         setGroups(["A", "B", "C", "D", "E", "F", "G", "H","I","J", "K", "L"]);
-
-        // Predicciones especiales
-        if (res.data?.special_settings) setSpecialSettings(res.data.special_settings);
       })
       .catch(() => {
         // Valores por defecto si falla la API
@@ -131,7 +141,29 @@ export default function MundialAdmin() {
         ];
         setPhases(defaultPhases);
         setGroups(["A", "B", "C", "D", "E", "F", "G", "H","I", "J", "K", "L"]);
+      });
+
+    // Obtener configuraciones de predicciones especiales
+    dedupe("config-especiales", {}, () => getConfigEspeciales())
+      .then((res: any): void => {
+        const data = Array.isArray(res.data) ? res.data : [];
+        setSpecialSettings(data);
+      })
+      .catch(() => {
         setSpecialSettings([]);
+      });
+
+    // Obtener ediciones del mundial
+    dedupe("ediciones", {}, () => getEdiciones())
+      .then((res: any): void => {
+        const data = Array.isArray(res.data) ? res.data : [];
+        setEdiciones(data);
+        // Seleccionar la edición activa por defecto
+        const activa = data.find((e: any) => e.activa);
+        if (activa) setFormSpecialEdicion(String(activa.id));
+      })
+      .catch(() => {
+        setEdiciones([]);
       });
   }, []);
 
@@ -291,10 +323,9 @@ export default function MundialAdmin() {
 
   const reloadSpecialSettings = async () => {
     try {
-      const res = await getConfiguracion();
-      if (res.data?.special_settings) {
-        setSpecialSettings(res.data.special_settings);
-      }
+      const res = await getConfigEspeciales();
+      const data = Array.isArray(res.data) ? res.data : [];
+      setSpecialSettings(data);
     } catch (error) {
       console.error("Error recargando configuraciones especiales:", error);
     }
@@ -311,21 +342,34 @@ export default function MundialAdmin() {
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
+    const s = (status || "").toLowerCase();
+    switch (s) {
+      case "abierto":
       case "open":
         return <span className={styles.badgePrimary}>Abierto</span>;
+      case "bloqueado":
       case "locked":
         return <span className={styles.badgeWarning}>Bloqueado</span>;
+      case "finalizado":
       case "finished":
         return <span className={styles.badgeAccent}>Finalizado</span>;
       default:
-        return null;
+        return <span className={styles.badgeMuted}>{status || "—"}</span>;
     }
   };
 
-  const totalOpen = matches.filter((m) => m.status === "open").length;
-  const totalFinished = matches.filter((m) => m.status === "finished").length;
-  const totalLocked = matches.filter((m) => m.status === "locked").length;
+  const totalOpen = matches.filter((m) => {
+    const e = (m.estado || m.status || "").toLowerCase();
+    return e === "abierto" || e === "open";
+  }).length;
+  const totalFinished = matches.filter((m) => {
+    const e = (m.estado || m.status || "").toLowerCase();
+    return e === "finalizado" || e === "finished";
+  }).length;
+  const totalLocked = matches.filter((m) => {
+    const e = (m.estado || m.status || "").toLowerCase();
+    return e === "bloqueado" || e === "locked";
+  }).length;
 
   return (
     <div className={styles.adminLayout}>
@@ -439,70 +483,87 @@ export default function MundialAdmin() {
                     <th className={styles.hiddenTablet}>Fecha</th>
                     <th>Estado</th>
                     <th>Resultado</th>
+                    <th className={styles.hiddenMobile}>Predicciones</th>
                     <th style={{ textAlign: "right" }}>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredMatches.map((match) => (
-                    <tr key={match.id} className={styles.matchTableRow}>
-                      <td className={styles.matchTableCell}>
-                        <div className={styles.teamDisplay}>
-                          <img src={match.equipo_local_bandera || match.homeFlag} alt={match.equipo_local_nombre || match.homeTeam} className={styles.teamFlagImg} />
-                          <span className={styles.teamName}>{match.equipo_local_nombre || match.homeTeam}</span>
-                          <span className={styles.vs}>vs</span>
-                          <span className={styles.teamName}>{match.equipo_visitante_nombre || match.awayTeam}</span>
-                          <img src={match.equipo_visitante_bandera || match.awayFlag} alt={match.equipo_visitante_nombre || match.awayTeam} className={styles.teamFlagImg} />
-                        </div>
-                      </td>
-                      <td className={`${styles.matchTableCell} ${styles.hiddenMobile}`}>
-                        <span className={styles.badge}>{match.fase || match.phase}{(match.grupo || match.group) ? ` ${match.grupo || match.group}` : ""}</span>
-                        <span className={styles.badgeMuted}>{match.multiplicador || match.multiplier}</span>
-                      </td>
-                      <td className={`${styles.matchTableCell} ${styles.hiddenTablet}`}>
-                        <div>
-                          <p>{formatDateES(match.fecha || match.date || "")}</p>
-                          <p className={styles.smallText}>{match.hora || match.time}</p>
-                        </div>
-                      </td>
-                      <td className={styles.matchTableCell}>
-                        {getStatusBadge(match.estado || match.status || "")}
-                      </td>
-                      <td className={styles.matchTableCell} style={{ textAlign: "center" }}>
-                        {match.resultado ? (
-                          <span className={styles.resultDisplay}>
-                            {match.resultado.goles_local || match.result?.home} - {match.resultado.goles_visitante || match.result?.away}
+                  {filteredMatches.map((match) => {
+                    const estado = (match.estado || match.status || "").toLowerCase();
+                    const isFinished = estado === "finalizado" || estado === "finished";
+                    return (
+                      <tr key={match.id} className={`${styles.matchTableRow} ${isFinished ? styles.finishedRow : ""}`} style={{ opacity: isFinished ? 0.9 : 1 }}>
+                        <td className={styles.matchTableCell}>
+                          <div className={styles.teamDisplay}>
+                            <img src={match.equipo_local_bandera || match.homeFlag} alt={match.equipo_local_nombre || match.homeTeam} className={styles.teamFlagImg} />
+                            <span className={styles.teamName}>{match.equipo_local_nombre || match.homeTeam}</span>
+                            <span className={styles.vs}>vs</span>
+                            <span className={styles.teamName}>{match.equipo_visitante_nombre || match.awayTeam}</span>
+                            <img src={match.equipo_visitante_bandera || match.awayFlag} alt={match.equipo_visitante_nombre || match.awayTeam} className={styles.teamFlagImg} />
+                          </div>
+                        </td>
+                        <td className={`${styles.matchTableCell} ${styles.hiddenMobile}`}>
+                          <span className={styles.badge}>{match.fase || match.phase}{(match.grupo || match.group) ? ` ${match.grupo || match.group}` : ""}</span>
+                          <span className={styles.badgeMuted}>{match.multiplicador || match.multiplier}</span>
+                        </td>
+                        <td className={`${styles.matchTableCell} ${styles.hiddenTablet}`}>
+                          <div>
+                            <p>{formatDateES(match.fecha || match.date || "")}</p>
+                            <p className={styles.smallText}>{match.hora || match.time}</p>
+                          </div>
+                        </td>
+                        <td className={styles.matchTableCell}>
+                          {getStatusBadge(match.estado || match.status || "")}
+                        </td>
+                        <td className={styles.matchTableCell} style={{ textAlign: "center", fontWeight: 600 }}>
+                          {match.goles_local !== undefined || match.resultado ? (
+                            <div>
+                              <span style={{ fontSize: "1.1rem", color: "var(--success)" }}>
+                                {match.goles_local !== undefined ? match.goles_local : match.resultado?.goles_local || "-"} - {match.goles_visitante !== undefined ? match.goles_visitante : match.resultado?.goles_visitante || "-"}
+                              </span>
+                              {(match.fue_a_penaltis || match.penaltis_local !== undefined) && (
+                                <div style={{ fontSize: "0.75rem", color: "var(--warning)", marginTop: "0.25rem" }}>
+                                  (P: {match.penaltis_local || 0}-{match.penaltis_visitante || 0})
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className={styles.mutedText}>-</span>
+                          )}
+                        </td>
+                        <td className={`${styles.matchTableCell} ${styles.hiddenMobile}`} style={{ textAlign: "center" }}>
+                          <span className={styles.badge} style={{ fontSize: "0.75rem" }}>
+                            {match.total_predicciones || 0} 📊
                           </span>
-                        ) : (
-                          <span className={styles.mutedText}>-</span>
-                        )}
-                      </td>
-                      <td className={styles.matchTableCell}>
-                        <div className={styles.actionButtons}>
-                          <button
-                            className={styles.actionBtn}
-                            onClick={() => openEditModal(match)}
-                            title="Editar"
-                          >
-                            ✏️
-                          </button>
-                          <button
-                            className={styles.actionBtn}
-                            onClick={() => openResultModal(match)}
-                            title="Registrar resultado"
-                          >
-                            🎯
-                          </button>
-                          <button
-                            className={`${styles.actionBtn} ${styles.actionBtnDelete}`}
-                            onClick={() => setShowDeleteConfirm(match.id)}
-                            title="Eliminar"
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className={styles.matchTableCell}>
+                          <div className={styles.actionButtons}>
+                            <button
+                              className={styles.actionBtn}
+                              onClick={() => openEditModal(match)}
+                              title="Editar partido"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              className={styles.actionBtn}
+                              onClick={() => openResultModal(match)}
+                              title="Registrar resultado"
+                            >
+                              🎯
+                            </button>
+                            <button
+                              className={`${styles.actionBtn} ${styles.actionBtnDelete}`}
+                              onClick={() => setShowDeleteConfirm(match.id)}
+                              title="Eliminar partido"
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
               {filteredMatches.length === 0 && (
@@ -517,74 +578,130 @@ export default function MundialAdmin() {
         {/* ===== RESULTS TAB ===== */}
         {activeTab === "results" && (
           <div>
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "0.5rem" }}>Cargar Resultados</h2>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "0.5rem" }}>📊 Gesionar Resultados</h2>
             <p style={{ color: "var(--muted-foreground)", marginBottom: "1.5rem", fontSize: "0.875rem" }}>
-              Selecciona un partido para registrar su resultado. El sistema calculará los puntos automáticamente.
+              Vista completa de todos los partidos. Haz clic en un partido pendiente para registrar su resultado.
             </p>
 
             <div className={styles.resultsLayout}>
-              <div className={styles.resultsColumn}>
-                <h3>⏳ Pendientes</h3>
-                {matches
-                  .filter((m) => {
-                    const estado = (m.estado || m.status || "").toLowerCase();
-                    return estado !== "finished" && estado !== "finalizado";
-                  })
-                  .map((match) => (
-                    <div
-                      key={match.id}
-                      className={styles.resultCard}
-                      onClick={() => openResultModal(match)}
-                    >
-                      <div className={styles.resultCardHeader}>
-                        <div className={styles.resultTeams}>
-                          <img src={match.equipo_local_bandera || match.homeFlag} alt={match.equipo_local_nombre || match.homeTeam} className={styles.resultTeamFlagImg} />
-                          <span>{match.equipo_local_nombre || match.homeTeam}</span>
-                          <span className={styles.vs}>VS</span>
-                          <span>{match.equipo_visitante_nombre || match.awayTeam}</span>
-                          <img src={match.equipo_visitante_bandera || match.awayFlag} alt={match.equipo_visitante_nombre || match.awayTeam} className={styles.resultTeamFlagImg} />
+              {/* PENDIENTES */}
+              {matches.filter((m) => {
+                const estado = (m.estado || m.status || "").toLowerCase();
+                return estado !== "finished" && estado !== "finalizado";
+              }).length > 0 && (
+                <div className={styles.resultsColumn}>
+                  <h3 style={{ fontSize: "1.125rem", fontWeight: 700, marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    ⏳ Pendientes ({matches.filter((m) => {
+                      const estado = (m.estado || m.status || "").toLowerCase();
+                      return estado !== "finished" && estado !== "finalizado";
+                    }).length})
+                  </h3>
+                  {matches
+                    .filter((m) => {
+                      const estado = (m.estado || m.status || "").toLowerCase();
+                      return estado !== "finished" && estado !== "finalizado";
+                    })
+                    .map((match) => (
+                      <div
+                        key={match.id}
+                        className={styles.resultCard}
+                        onClick={() => openResultModal(match)}
+                        style={{ cursor: "pointer", transition: "all 0.2s" }}
+                        onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 4px 12px rgba(59, 130, 246, 0.2)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
+                      >
+                        <div className={styles.resultCardHeader}>
+                          <div className={styles.resultTeams} style={{ flex: 1 }}>
+                            <img src={match.equipo_local_bandera || match.homeFlag} alt={match.equipo_local_nombre || match.homeTeam} className={styles.resultTeamFlagImg} />
+                            <span style={{ fontWeight: 600 }}>{match.equipo_local_nombre || match.homeTeam}</span>
+                            <span className={styles.vs} style={{ margin: "0 0.5rem" }}>VS</span>
+                            <span style={{ fontWeight: 600 }}>{match.equipo_visitante_nombre || match.awayTeam}</span>
+                            <img src={match.equipo_visitante_bandera || match.awayFlag} alt={match.equipo_visitante_nombre || match.awayTeam} className={styles.resultTeamFlagImg} />
+                          </div>
+                          {getStatusBadge(match.estado || match.status || "")}
                         </div>
-                        {getStatusBadge(match.estado || match.status || "")}
+                        <div className={styles.resultMeta}>
+                          <span className={styles.badgeMuted}>
+                            {match.fase || match.phase}{(match.grupo || match.group) ? ` - ${match.grupo || match.group}` : ""}
+                          </span>
+                          <span className={styles.badgeMuted}>📅 {formatDateES(match.fecha || match.date || "")}</span>
+                          <span className={styles.badgeMuted}>⏰ {match.hora || match.time}</span>
+                        </div>
+                        <div style={{ fontSize: "0.75rem", color: "var(--primary)", marginTop: "0.5rem", fontWeight: 500 }}>
+                          👆 Haz clic para ingresar resultado
+                        </div>
                       </div>
-                      <div className={styles.resultMeta}>
-                        <span className={styles.badgeMuted}>
-                          {match.fase || match.phase}{(match.grupo || match.group) ? ` - ${match.grupo || match.group}` : ""}
-                        </span>
-                        <span className={styles.badgeMuted}>📅 {formatDateES(match.fecha || match.date || "")}</span>
-                        <span className={styles.badgeMuted}>⏰ {match.hora || match.time}</span>
-                      </div>
-                    </div>
-                  ))}
-              </div>
+                    ))}
+                </div>
+              )}
 
+              {/* FINALIZADOS */}
               {matches.filter((m) => {
                 const estado = (m.estado || m.status || "").toLowerCase();
                 return estado === "finalizado" || estado === "finished";
               }).length > 0 && (
                 <div className={styles.resultsColumn}>
-                  <h3>✅ Finalizados</h3>
+                  <h3 style={{ fontSize: "1.125rem", fontWeight: 700, marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    ✅ Finalizados ({matches.filter((m) => {
+                      const estado = (m.estado || m.status || "").toLowerCase();
+                      return estado === "finalizado" || estado === "finished";
+                    }).length})
+                  </h3>
                   {matches
                     .filter((m) => {
                       const estado = (m.estado || m.status || "").toLowerCase();
                       return estado === "finalizado" || estado === "finished";
                     })
                     .map((match) => (
-                      <div key={match.id} className={styles.resultCard}>
+                      <div key={match.id} className={styles.resultCard} style={{ backgroundColor: "var(--muted)", borderLeft: "4px solid var(--success)" }}>
                         <div className={styles.resultCardHeader}>
-                          <div className={styles.resultTeams}>
+                          <div className={styles.resultTeams} style={{ flex: 1 }}>
                             <img src={match.equipo_local_bandera || match.homeFlag} alt={match.equipo_local_nombre || match.homeTeam} className={styles.resultTeamFlagImg} />
-                            <span>{match.equipo_local_nombre || match.homeTeam}</span>
+                            <span style={{ fontWeight: 600 }}>{match.equipo_local_nombre || match.homeTeam}</span>
                           </div>
-                          <span className={styles.resultScore}>
-                            {match.resultado?.goles_local || match.result?.home} - {match.resultado?.goles_visitante || match.result?.away}
-                          </span>
-                          <div className={styles.resultTeams}>
-                            <span>{match.equipo_visitante_nombre || match.awayTeam}</span>
+                          <div style={{ textAlign: "center" }}>
+                            <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--success)" }}>
+                              {match.goles_local || match.resultado?.goles_local || 0}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: "center", fontSize: "0.875rem", color: "var(--muted-foreground)", minWidth: "60px" }}>
+                            {match.fue_a_penaltis || match.penaltis_local !== undefined ? (
+                              <div>
+                                <div style={{ fontWeight: 600 }}>-</div>
+                                <div style={{ fontSize: "0.75rem" }}>
+                                  (P: {match.penaltis_local || 0}-{match.penaltis_visitante || 0})
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{ fontWeight: 600 }}>-</div>
+                            )}
+                          </div>
+                          <div style={{ textAlign: "center" }}>
+                            <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--success)" }}>
+                              {match.goles_visitante || match.resultado?.goles_visitante || 0}
+                            </div>
+                          </div>
+                          <div className={styles.resultTeams} style={{ flex: 1, justifyContent: "flex-end" }}>
+                            <span style={{ fontWeight: 600 }}>{match.equipo_visitante_nombre || match.awayTeam}</span>
                             <img src={match.equipo_visitante_bandera || match.awayFlag} alt={match.equipo_visitante_nombre || match.awayTeam} className={styles.resultTeamFlagImg} />
                           </div>
                         </div>
+                        <div className={styles.resultMeta}>
+                          <span className={styles.badgeMuted}>
+                            {match.fase || match.phase}{(match.grupo || match.group) ? ` - ${match.grupo || match.group}` : ""}
+                          </span>
+                          <span className={styles.badgeMuted}>📅 {formatDateES(match.fecha || match.date || "")}</span>
+                          <span className={styles.badgeMuted}>🏆 {match.total_predicciones || 0} predicciones</span>
+                          <span className={styles.badgeMuted}>📊 Multiplicador: {match.multiplicador || "x1"}</span>
+                        </div>
                       </div>
                     ))}
+                </div>
+              )}
+
+              {matches.length === 0 && (
+                <div style={{ gridColumn: "1 / -1", padding: "3rem 1rem", textAlign: "center" }}>
+                  <p style={{ color: "var(--muted-foreground)", fontSize: "1rem" }}>No hay partidos registrados aún.</p>
                 </div>
               )}
             </div>
@@ -628,41 +745,168 @@ export default function MundialAdmin() {
         {activeTab === "special" && (
           <div className={styles.container}>
             <div className={styles.toolbar}>
-              <h2 style={{ fontSize: "1.25rem", fontWeight: 700 }}>🎯 Predicciones Especiales</h2>
+              <div>
+                <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "0.5rem" }}>🎯 Predicciones Especiales</h2>
+                <p style={{ color: "var(--muted-foreground)", fontSize: "0.875rem" }}>
+                  Crea predicciones adicionales (campeón, máximo goleador, etc.) con puntos bonus
+                </p>
+              </div>
               <button className={styles.btnPrimary} onClick={() => {
+                setEditingSpecialId(null);
                 setFormSpecialType("");
                 setFormSpecialPoints(50);
                 setFormSpecialDeadline("");
                 setFormSpecialDescription("");
                 setFormSpecialEnabled(true);
+                // Preseleccionar la edición activa
+                const activa = ediciones.find((e: any) => e.activa);
+                setFormSpecialEdicion(activa ? String(activa.id) : "");
                 setShowCreateSpecialModal(true);
               }}>
                 ➕ Crear Predicción Especial
               </button>
             </div>
 
+            {/* Info Box */}
+            <div style={{ 
+              padding: "1rem", 
+              backgroundColor: "var(--card)", 
+              borderLeft: "4px solid var(--primary)",
+              borderRadius: "8px", 
+              marginBottom: "1.5rem",
+              border: "1px solid var(--border)"
+            }}>
+              <h3 style={{ fontSize: "0.875rem", fontWeight: 700, marginBottom: "0.5rem" }}>ℹ️ Cómo funcionan las Predicciones Especiales</h3>
+              <ul style={{ fontSize: "0.8rem", color: "var(--muted-foreground)", margin: "0.5rem 0 0 1.5rem", lineHeight: 1.6 }}>
+                <li>Se cierran automáticamente en la fecha/hora especificada</li>
+                <li>Los puntos se otorgan solo si la predicción es correcta</li>
+                <li>Se suman a los puntos totales del usuario</li>
+                <li>Úsalas para eventos importantes como la final o premiaciones especiales</li>
+              </ul>
+            </div>
+
             <div className={styles.specialPredictionsGrid}>
               {specialSettings.length === 0 ? (
-                <div style={{ padding: "2rem", textAlign: "center", color: "var(--muted-foreground)" }}>
-                  No hay predicciones especiales configuradas aún
+                <div style={{ 
+                  padding: "2rem", 
+                  textAlign: "center", 
+                  color: "var(--muted-foreground)",
+                  backgroundColor: "var(--muted)",
+                  borderRadius: "8px",
+                  gridColumn: "1 / -1"
+                }}>
+                  <p style={{ fontSize: "1rem" }}>📭 No hay predicciones especiales configuradas aún</p>
+                  <p style={{ fontSize: "0.875rem", marginTop: "0.5rem" }}>Crea una para agregar retos adicionales al torneo</p>
                 </div>
               ) : (
-                specialSettings.map((sp, idx) => (
-                  <div key={idx} className={styles.specialCard} style={{ padding: "1.5rem", border: "1px solid var(--border)", borderRadius: "8px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "1rem" }}>
-                      <div>
-                        <h3 style={{ fontWeight: 700, marginBottom: "0.25rem" }}>{sp.tipo || "Sin tipo"}</h3>
-                        <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)" }}>{sp.descripcion}</p>
+                specialSettings
+                  .filter((sp) => ["campeon", "subcampeon", "tercer_lugar"].includes(sp.tipo))
+                  .map((sp, idx) => {
+                    const getIcon = (tipo: string) => {
+                      switch(tipo) {
+                        case "campeon": return "🏆";
+                        case "subcampeon": return "🥈";
+                        case "tercer_lugar": return "🥉";
+                        default: return "🎯";
+                      }
+                    };
+                    const getLabel = (tipo: string) => {
+                      switch(tipo) {
+                        case "campeon": return "Campeón";
+                        case "subcampeon": return "Subcampeón";
+                        case "tercer_lugar": return "Tercer Lugar";
+                        default: return tipo;
+                      }
+                    };
+                    
+                    return (
+                      <div key={idx} className={styles.specialCard} style={{ 
+                        padding: "1.5rem", 
+                        border: "1px solid var(--border)", 
+                        borderRadius: "8px",
+                        backgroundColor: sp.habilitada ? "var(--card)" : "var(--muted)",
+                        opacity: sp.habilitada ? 1 : 0.6,
+                        transition: "all 0.2s"
+                      }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "1rem" }}>
+                          <div style={{ flex: 1 }}>
+                            <h3 style={{ fontWeight: 700, marginBottom: "0.25rem", fontSize: "1.1rem" }}>
+                              {getIcon(sp.tipo)} {getLabel(sp.tipo)}
+                            </h3>
+                            <p style={{ fontSize: "0.85rem", color: "var(--muted-foreground)", lineHeight: 1.4 }}>
+                              {sp.descripcion || "Sin descripción"}
+                            </p>
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--primary)" }}>
+                              {sp.puntos_acierto || 50}
+                            </div>
+                            <div style={{ fontSize: "0.65rem", color: "var(--muted-foreground)", marginTop: "0.25rem" }}>
+                              puntos
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ 
+                          display: "grid", 
+                          gridTemplateColumns: "1fr 1fr", 
+                          gap: "1rem",
+                          fontSize: "0.8rem", 
+                          color: "var(--muted-foreground)", 
+                          marginBottom: "1rem",
+                          paddingBottom: "1rem",
+                          borderBottom: "1px solid var(--border)"
+                        }}>
+                          <div>
+                            <div style={{ fontSize: "0.7rem", fontWeight: 600, color: "var(--muted-foreground)", marginBottom: "0.25rem" }}>
+                              CIERRE
+                            </div>
+                            📅 {sp.fecha_cierre ? new Date(sp.fecha_cierre).toLocaleDateString() : "—"} 
+                            {sp.fecha_cierre && (
+                              <div style={{ fontSize: "0.7rem" }}>
+                                ⏰ {new Date(sp.fecha_cierre).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <div style={{ fontSize: "0.7rem", fontWeight: 600, color: "var(--muted-foreground)", marginBottom: "0.25rem" }}>
+                              ESTADO
+                            </div>
+                            {sp.habilitada ? "✅ Habilitada" : "❌ Deshabilitada"}
+                          </div>
+                        </div>
+
+                        <div style={{ display: "flex", gap: "0.5rem" }}>
+                          <button className={styles.btnOutline} style={{ flex: 1, fontSize: "0.8rem" }} onClick={() => {
+                            setEditingSpecialId(sp.id);
+                            setFormSpecialType(sp.tipo);
+                            setFormSpecialPoints(sp.puntos_acierto || 50);
+                            setFormSpecialDeadline(sp.fecha_cierre || "");
+                            setFormSpecialDescription(sp.descripcion || "");
+                            setFormSpecialEnabled(sp.habilitada || false);
+                            setFormSpecialEdicion(String(sp.edicion || ""));
+                            setShowCreateSpecialModal(true);
+                          }}>
+                            ✏️ Editar
+                          </button>
+                          <button className={styles.btnOutline} style={{ flex: 1, fontSize: "0.8rem", color: "var(--destructive)" }} onClick={async () => {
+                            if (confirm("¿Eliminar esta predicción especial?")) {
+                              try {
+                                await deleteConfigEspecial(sp.id);
+                                await reloadSpecialSettings();
+                                triggerSuccess("Predicción especial eliminada");
+                              } catch (error) {
+                                console.error("Error eliminando predicción especial:", error);
+                                alert("Error al eliminar la predicción especial");
+                              }
+                            }
+                          }}>
+                            🗑️ Eliminar
+                          </button>
+                        </div>
                       </div>
-                      <span style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--primary)" }}>{sp.puntos_acierto || 50} pts</span>
-                    </div>
-                    <div style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", marginBottom: "1rem" }}>
-                      <div>📅 Cierra: {sp.fecha_cierre ? new Date(sp.fecha_cierre).toLocaleDateString() : "—"}</div>
-                      <div>{sp.habilitada ? "✅ Habilitada" : "❌ Deshabilitada"}</div>
-                    </div>
-                    <button className={styles.btnOutline} style={{ width: "100%" }}>Editar</button>
-                  </div>
-                ))
+                    );
+                  })
               )}
             </div>
           </div>
@@ -671,8 +915,64 @@ export default function MundialAdmin() {
         {/* ===== SETTINGS TAB ===== */}
         {activeTab === "settings" && (
           <div className={styles.settingsLayout}>
-            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>Configuración del Torneo</h2>
+            <h2 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "1rem" }}>⚙️ Configuración del Torneo</h2>
 
+            {/* Sistema de Puntos Explicado */}
+            <div style={{ 
+              padding: "1.5rem", 
+              backgroundColor: "var(--card)", 
+              borderRadius: "8px", 
+              border: "2px solid var(--primary)",
+              marginBottom: "1.5rem"
+            }}>
+              <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "1rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                📊 Cómo Funciona el Sistema de Puntos
+              </h3>
+              
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginBottom: "1rem" }}>
+                <div style={{ padding: "1rem", backgroundColor: "var(--muted)", borderRadius: "6px" }}>
+                  <h4 style={{ fontSize: "0.9rem", fontWeight: 700, marginBottom: "0.5rem" }}>🎯 Resultado Exacto</h4>
+                  <p style={{ fontSize: "0.8rem", color: "var(--muted-foreground)", lineHeight: 1.6 }}>
+                    Acertar el resultado EXACTO del partido (ej: 2-1)
+                  </p>
+                  <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--primary)", marginTop: "0.5rem" }}>
+                    = 3 puntos
+                  </div>
+                </div>
+
+                <div style={{ padding: "1rem", backgroundColor: "var(--muted)", borderRadius: "6px" }}>
+                  <h4 style={{ fontSize: "0.9rem", fontWeight: 700, marginBottom: "0.5rem" }}>🏆 Ganador Correcto</h4>
+                  <p style={{ fontSize: "0.8rem", color: "var(--muted-foreground)", lineHeight: 1.6 }}>
+                    Acertar solo quién gana (local, visitante o empate)
+                  </p>
+                  <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--primary)", marginTop: "0.5rem" }}>
+                    = 1 punto
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ padding: "1rem", backgroundColor: "var(--muted)", borderRadius: "6px", marginBottom: "1rem" }}>
+                <h4 style={{ fontSize: "0.9rem", fontWeight: 700, marginBottom: "0.5rem" }}>✖️ Multiplicador por Fase</h4>
+                <p style={{ fontSize: "0.8rem", color: "var(--muted-foreground)", lineHeight: 1.6, marginBottom: "0.75rem" }}>
+                  Los puntos se multiplican según la importancia de la fase:
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.5rem", fontSize: "0.8rem" }}>
+                  <div>Grupos: <strong>x1</strong></div>
+                  <div>16avos: <strong>x1.25</strong></div>
+                  <div>Octavos: <strong>x1.5</strong></div>
+                  <div>Cuartos: <strong>x1.75</strong></div>
+                  <div>Semifinales: <strong>x2</strong></div>
+                  <div>Tercer Puesto: <strong>x2.5</strong></div>
+                  <div style={{ gridColumn: "1 / -1" }}>Final: <strong>x3</strong></div>
+                </div>
+              </div>
+
+              <div style={{ padding: "0.75rem", backgroundColor: "rgba(59, 130, 246, 0.1)", borderLeft: "3px solid var(--primary)", borderRadius: "4px", fontSize: "0.8rem" }}>
+                <strong>Ejemplo:</strong> Acertar resultado exacto en Semifinales = 3 puntos × 2 multiplicador = <strong>6 puntos</strong>
+              </div>
+            </div>
+
+            {/* Configuración de Puntuación */}
             <div className={styles.settingsCard}>
               <h3 className={styles.settingsCardTitle}>📊 Sistema de Puntuación</h3>
               <p className={styles.settingsCardDesc}>Puntos otorgados por tipo de acierto.</p>
@@ -686,6 +986,7 @@ export default function MundialAdmin() {
               </div>
             </div>
 
+            {/* Multiplicadores por Fase */}
             <div className={styles.settingsCard}>
               <h3 className={styles.settingsCardTitle}>✖️ Multiplicadores por Fase</h3>
               <p className={styles.settingsCardDesc}>Los puntos se multiplican según la fase.</p>
@@ -697,15 +998,29 @@ export default function MundialAdmin() {
               ))}
             </div>
 
+            {/* Predicciones Especiales (desde ConfiguracionPrediccionEspecial) */}
             <div className={styles.settingsCard}>
-              <h3 className={styles.settingsCardTitle}>⭐ Predicciones Especiales (pts)</h3>
-              <p className={styles.settingsCardDesc}>Puntos por aciertos en predicciones especiales.</p>
-              {specialSettings.map((sp, idx) => (
-                <div key={idx} className={styles.settingsRow}>
-                  <span>{sp.name || `Especial ${idx + 1}`}</span>
-                  <input type="number" defaultValue={sp.pts} className={styles.settingsInput} />
+              <h3 className={styles.settingsCardTitle}>⭐ Predicciones Especiales</h3>
+              <p className={styles.settingsCardDesc}>Puntos adicionales configurados en predicciones especiales. Se gestionan en la pestaña "Especiales".</p>
+              {specialSettings.filter((sp) => ["campeon", "subcampeon", "tercer_lugar"].includes(sp.tipo)).length > 0 ? (
+                specialSettings
+                  .filter((sp) => ["campeon", "subcampeon", "tercer_lugar"].includes(sp.tipo))
+                  .map((sp, idx) => (
+                  <div key={idx} className={styles.settingsRow}>
+                    <span>
+                      {sp.tipo === "campeon" && "🏆"} 
+                      {sp.tipo === "subcampeon" && "🥈"}
+                      {sp.tipo === "tercer_lugar" && "🥉"}
+                      {" "}{sp.tipo_display || sp.tipo}
+                    </span>
+                    <span style={{ fontWeight: 600, color: "var(--primary)" }}>{sp.puntos_acierto || 50} pts</span>
+                  </div>
+                ))
+              ) : (
+                <div style={{ padding: "1rem", textAlign: "center", color: "var(--muted-foreground)", fontSize: "0.875rem" }}>
+                  No hay predicciones especiales configuradas. Créalas en la pestaña "Especiales".
                 </div>
-              ))}
+              )}
             </div>
 
             <button className={styles.btnPrimary} style={{ width: "100%", marginTop: "1rem" }}>
@@ -816,15 +1131,16 @@ export default function MundialAdmin() {
         <div className={styles.modalOverlay} onClick={() => setShowResultModal(false)}>
           <div className={styles.modalSmall} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>🎯 Registrar Resultado</h2>
+              <h2 className={styles.modalTitle}>⚽ Registrar Resultado</h2>
               <button className={styles.modalClose} onClick={() => setShowResultModal(false)}>✕</button>
             </div>
             <div className={styles.modalBody}>
-              <p style={{ textAlign: "center", fontSize: "0.875rem", color: "var(--muted-foreground)", marginBottom: "1.5rem" }}>
-                {resultMatch.fase || resultMatch.phase}{(resultMatch.grupo || resultMatch.group) ? ` - Grupo ${resultMatch.grupo || resultMatch.group}` : ""} | {formatDateES(resultMatch.fecha || resultMatch.date || "")}
+              <p style={{ textAlign: "center", fontSize: "0.875rem", color: "var(--muted-foreground)", marginBottom: "1.5rem", fontWeight: 500 }}>
+                <strong>{resultMatch.fase || resultMatch.phase}</strong>
+                {(resultMatch.grupo || resultMatch.group) ? ` - Grupo ${resultMatch.grupo || resultMatch.group}` : ""} | {formatDateES(resultMatch.fecha || resultMatch.date || "")} {resultMatch.hora || resultMatch.time}
               </p>
 
-              <div className={styles.scoreContainer}>
+              <div className={styles.scoreContainer} style={{ marginBottom: "1.5rem" }}>
                 <div className={styles.scoreTeam}>
                   <img src={resultMatch.equipo_local_bandera || resultMatch.homeFlag} alt={resultMatch.equipo_local_nombre || resultMatch.homeTeam} className={styles.scoreTeamFlagImg} />
                   <span className={styles.scoreTeamName}>{resultMatch.equipo_local_nombre || resultMatch.homeTeam}</span>
@@ -834,9 +1150,10 @@ export default function MundialAdmin() {
                     value={resultHome}
                     onChange={(e) => setResultHome(parseInt(e.target.value) || 0)}
                     className={styles.resultInput}
+                    style={{ fontSize: "1.5rem", fontWeight: 700, textAlign: "center" }}
                   />
                 </div>
-                <span className={styles.scoreDivider}>-</span>
+                <span className={styles.scoreDivider} style={{ fontSize: "1.5rem", fontWeight: 700 }}>-</span>
                 <div className={styles.scoreTeam}>
                   <img src={resultMatch.equipo_visitante_bandera || resultMatch.awayFlag} alt={resultMatch.equipo_visitante_nombre || resultMatch.awayTeam} className={styles.scoreTeamFlagImg} />
                   <span className={styles.scoreTeamName}>{resultMatch.equipo_visitante_nombre || resultMatch.awayTeam}</span>
@@ -846,13 +1163,14 @@ export default function MundialAdmin() {
                     value={resultAway}
                     onChange={(e) => setResultAway(parseInt(e.target.value) || 0)}
                     className={styles.resultInput}
+                    style={{ fontSize: "1.5rem", fontWeight: 700, textAlign: "center" }}
                   />
                 </div>
               </div>
 
               {/* Penaltis Section */}
               {resultHome === resultAway && (
-                <div style={{ marginTop: "1.5rem", padding: "1rem", backgroundColor: "var(--muted)", borderRadius: "8px" }}>
+                <div style={{ marginTop: "1.5rem", padding: "1rem", backgroundColor: "var(--muted)", borderRadius: "8px", border: "2px solid var(--warning)" }}>
                   <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", fontSize: "14px", fontWeight: "500", color: "var(--foreground)" }}>
                     <input
                       type="checkbox"
@@ -866,40 +1184,42 @@ export default function MundialAdmin() {
                       }}
                       style={{ width: "18px", height: "18px", cursor: "pointer" }}
                     />
-                    <span>El partido se fue a penaltis/desempate</span>
+                    <span>⚠️ El partido se fue a penaltis</span>
                   </label>
 
                   {wentToPenalties && (
                     <div style={{ marginTop: "1rem" }}>
-                      <p style={{ fontSize: "12px", color: "var(--muted-foreground)", marginBottom: "0.5rem" }}>
-                        Ingresa los goles del desempate:
+                      <p style={{ fontSize: "12px", color: "var(--muted-foreground)", marginBottom: "1rem", fontWeight: 600 }}>
+                        Resultado en penaltis:
                       </p>
                       <div className={styles.scoreContainer}>
                         <div className={styles.scoreTeam}>
-                          <span className={styles.scoreTeamName} style={{ fontSize: "12px" }}>
-                            {resultMatch.equipo_local_nombre || resultMatch.homeTeam} (P)
+                          <span className={styles.scoreTeamName} style={{ fontSize: "12px", fontWeight: 600 }}>
+                            {resultMatch.equipo_local_nombre || resultMatch.homeTeam}
                           </span>
+                          <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>Penaltis</span>
                           <input
                             type="number"
                             min="0"
                             value={penaltiesHome}
                             onChange={(e) => setPenaltiesHome(parseInt(e.target.value) || 0)}
                             className={styles.resultInput}
-                            style={{ marginTop: "0.5rem" }}
+                            style={{ marginTop: "0.5rem", fontSize: "1.25rem", fontWeight: 700, textAlign: "center" }}
                           />
                         </div>
-                        <span className={styles.scoreDivider}>-</span>
+                        <span className={styles.scoreDivider} style={{ fontSize: "1.25rem" }}>-</span>
                         <div className={styles.scoreTeam}>
-                          <span className={styles.scoreTeamName} style={{ fontSize: "12px" }}>
-                            {resultMatch.equipo_visitante_nombre || resultMatch.awayTeam} (P)
+                          <span className={styles.scoreTeamName} style={{ fontSize: "12px", fontWeight: 600 }}>
+                            {resultMatch.equipo_visitante_nombre || resultMatch.awayTeam}
                           </span>
+                          <span style={{ fontSize: "0.75rem", color: "var(--muted-foreground)" }}>Penaltis</span>
                           <input
                             type="number"
                             min="0"
                             value={penaltiesAway}
                             onChange={(e) => setPenaltiesAway(parseInt(e.target.value) || 0)}
                             className={styles.resultInput}
-                            style={{ marginTop: "0.5rem" }}
+                            style={{ marginTop: "0.5rem", fontSize: "1.25rem", fontWeight: 700, textAlign: "center" }}
                           />
                         </div>
                       </div>
@@ -908,14 +1228,21 @@ export default function MundialAdmin() {
                 </div>
               )}
 
-              <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", textAlign: "center", marginTop: "1rem", lineHeight: 1.6 }}>
-                Al guardar el resultado, el sistema calculará automáticamente los puntos de cada participante según las reglas configuradas (multiplicador {resultMatch.multiplicador || resultMatch.multiplier}).
-              </p>
+              {/* Info Box */}
+              <div style={{ marginTop: "1.5rem", padding: "1rem", backgroundColor: "var(--card)", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", lineHeight: 1.6, margin: 0 }}>
+                  <strong>ℹ️ Información:</strong><br />
+                  Al guardar el resultado, el sistema calculará automáticamente los puntos de cada participante según:<br />
+                  • Fase: <strong>{resultMatch.fase}</strong><br />
+                  • Multiplicador: <strong>{resultMatch.multiplicador || "x1"}</strong><br />
+                  • Se registran <strong>{resultMatch.total_predicciones || 0}</strong> predicciones para este partido
+                </p>
+              </div>
             </div>
             <div className={styles.modalFooter}>
               <button className={styles.btnOutline} onClick={() => setShowResultModal(false)}>Cancelar</button>
-              <button className={styles.btnPrimary} onClick={handleSaveResult}>
-                Guardar Resultado y Calcular Puntos
+              <button className={styles.btnPrimary} onClick={handleSaveResult} style={{ flex: 1 }}>
+                ✓ Guardar Resultado y Calcular Puntos
               </button>
             </div>
           </div>
@@ -1043,21 +1370,37 @@ export default function MundialAdmin() {
             </div>
             <div className={styles.modalBody}>
               <div className={styles.formGroup}>
-                <label>Tipo de Predicción</label>
+                <label>Edición del Mundial <span style={{ color: "var(--destructive)" }}>*</span></label>
+                <select
+                  value={formSpecialEdicion}
+                  onChange={(e) => setFormSpecialEdicion(e.target.value)}
+                  className={styles.formInput}
+                >
+                  <option value="">Seleccionar edición...</option>
+                  {ediciones.map((ed: any) => (
+                    <option key={ed.id} value={String(ed.id)}>
+                      {ed.nombre || ed.anio || `Edición ${ed.id}`} {ed.activa ? "(Activa)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className={styles.formGroup}>
+                <label>Tipo de Predicción <span style={{ color: "var(--destructive)" }}>*</span></label>
                 <select
                   value={formSpecialType}
                   onChange={(e) => setFormSpecialType(e.target.value)}
                   className={styles.formInput}
                 >
-                  <option value="">Seleccionar...</option>
+                  <option value="">Seleccionar tipo...</option>
                   <option value="campeon">🏆 Campeón</option>
                   <option value="subcampeon">🥈 Subcampeón</option>
                   <option value="tercer_lugar">🥉 Tercer Lugar</option>
-                  <option value="maximo_goleador">⚽ Máximo Goleador</option>
                 </select>
               </div>
+
               <div className={styles.formGroup}>
-                <label>Puntos por Acierto</label>
+                <label>Puntos por Acierto <span style={{ color: "var(--destructive)" }}>*</span></label>
                 <input
                   type="number"
                   value={formSpecialPoints}
@@ -1065,58 +1408,119 @@ export default function MundialAdmin() {
                   className={styles.formInput}
                   min="10"
                   step="10"
+                  placeholder="Ej: 50, 100, 150"
                 />
+                <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: "0.25rem" }}>
+                  Mínimo 10 puntos. Estos puntos se suman directamente si la predicción es correcta.
+                </p>
               </div>
+
               <div className={styles.formGroup}>
-                <label>Fecha y Hora de Cierre</label>
+                <label>Fecha y Hora de Cierre <span style={{ color: "var(--destructive)" }}>*</span></label>
                 <input
                   type="datetime-local"
                   value={formSpecialDeadline}
                   onChange={(e) => setFormSpecialDeadline(e.target.value)}
                   className={styles.formInput}
                 />
+                <p style={{ fontSize: "0.75rem", color: "var(--muted-foreground)", marginTop: "0.25rem" }}>
+                  Después de esta fecha, nadie podrá hacer la predicción
+                </p>
               </div>
+
               <div className={styles.formGroup}>
-                <label>Descripción</label>
+                <label>Descripción <span style={{ color: "var(--destructive)" }}>*</span></label>
                 <textarea
                   value={formSpecialDescription}
                   onChange={(e) => setFormSpecialDescription(e.target.value)}
-                  placeholder="Describe esta predicción especial..."
+                  placeholder="Describe esta predicción especial... Ej: Quién ganará la Copa Mundial"
                   className={styles.formInput}
                   rows={3}
+                  style={{ resize: "vertical" }}
                 />
               </div>
-              <div className={styles.formGroup} style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+
+              <div className={styles.formGroup} style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
                 <input
                   type="checkbox"
                   id="specialEnabled"
                   checked={formSpecialEnabled}
                   onChange={(e) => setFormSpecialEnabled(e.target.checked)}
+                  style={{ width: "18px", height: "18px", cursor: "pointer" }}
                 />
-                <label htmlFor="specialEnabled" style={{ marginBottom: 0 }}>Habilitada</label>
+                <label htmlFor="specialEnabled" style={{ marginBottom: 0, cursor: "pointer", fontSize: "0.9rem" }}>
+                  ✓ Habilitada (Activa para que los usuarios hagan predicciones)
+                </label>
+              </div>
+
+              {/* Info Box */}
+              <div style={{ 
+                padding: "1rem", 
+                backgroundColor: "var(--muted)", 
+                borderRadius: "6px", 
+                marginTop: "1rem",
+                fontSize: "0.8rem",
+                color: "var(--muted-foreground)",
+                lineHeight: 1.6
+              }}>
+                <strong>📌 Recomendaciones:</strong><br/>
+                • Establece el cierre antes de que comience el evento (ej: Final)<br/>
+                • Campeón: ✓ Predecible  |  Máximo Goleador: ✓ Más competitivo<br/>
+                • Mayor cantidad de puntos = Mayor dificultad/importancia
               </div>
             </div>
             <div className={styles.modalFooter}>
-              <button className={styles.btnOutline} onClick={() => setShowCreateSpecialModal(false)}>Cancelar</button>
+              <button className={styles.btnOutline} onClick={() => {
+                setShowCreateSpecialModal(false);
+                setEditingSpecialId(null);
+              }}>Cancelar</button>
               <button className={styles.btnPrimary} onClick={async () => {
-                if (!formSpecialType || !formSpecialDeadline) return;
+                if (!formSpecialType || !formSpecialDeadline || !formSpecialDescription) {
+                  alert("Por favor completa todos los campos requeridos");
+                  return;
+                }
+                
+                if (!formSpecialEdicion) {
+                  alert("Por favor selecciona una edición del mundial");
+                  return;
+                }
+
+                if (formSpecialPoints < 10) {
+                  alert("Los puntos deben ser al menos 10");
+                  return;
+                }
+
                 try {
-                  await createConfigEspecial({
+                  const payload = {
+                    edicion: parseInt(formSpecialEdicion),
                     tipo: formSpecialType,
                     puntos_acierto: formSpecialPoints,
                     fecha_cierre: formSpecialDeadline,
                     descripcion: formSpecialDescription,
                     habilitada: formSpecialEnabled,
                     estado: "abierta"
-                  });
+                  };
+
+                  if (editingSpecialId) {
+                    // Editar predicción especial existente
+                    await updateConfigEspecial(editingSpecialId, payload);
+                    triggerSuccess("Predicción especial actualizada ✓");
+                  } else {
+                    // Crear nueva predicción especial
+                    await createConfigEspecial(payload);
+                    triggerSuccess("Predicción especial creada ✓");
+                  }
+
                   await reloadSpecialSettings();
                   setShowCreateSpecialModal(false);
-                  triggerSuccess("Predicción especial creada");
-                } catch (error) {
-                  console.error("Error creando predicción especial:", error);
+                  setEditingSpecialId(null);
+                } catch (error: any) {
+                  console.error("Error guardando predicción especial:", error);
+                  const errorMsg = error.response?.data?.error || error.message || "Error desconocido";
+                  alert(`Error: ${errorMsg}`);
                 }
-              }}>
-                Crear Predicción Especial
+              }} disabled={!formSpecialType || !formSpecialDeadline || !formSpecialDescription || !formSpecialEdicion}>
+                ✓ {editingSpecialId ? "Actualizar" : "Crear"} Predicción Especial
               </button>
             </div>
           </div>

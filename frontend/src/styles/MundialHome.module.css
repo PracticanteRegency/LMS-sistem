@@ -9,6 +9,7 @@
   margin-left: auto;
   width: 100%;
   flex: 1;
+  overflow-x: hidden;
 }
 
 /* ===== SECTION SHARED ===== */
@@ -16,6 +17,8 @@
   max-width: 1200px;
   margin: 0 auto;
   padding: 0 20px;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .sectionHeader {
@@ -357,10 +360,23 @@
   cursor: pointer;
   text-decoration: none;
   transition: background 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .btnPrimary:hover {
   background: #43A047;
+}
+
+@media (max-width: 480px) {
+  .btnPrimary {
+    padding: 8px 12px;
+    font-size: 12px;
+    gap: 4px;
+  }
 }
 
 .btnOutline {
@@ -435,8 +451,8 @@
   display: flex;
   align-items: center;
   border-radius: 16px;
-  margin: 20px 0 20px 0;
-  height: 44px;
+  margin: 10px 0 20px 0;
+  height: 50px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   position: relative;
@@ -470,7 +486,7 @@
   display: flex;
   width: max-content;
   will-change: transform;
-  animation: marquee 26s linear infinite;
+  animation: marquee 60s linear infinite;
 }
 .marquee:hover .marqueeTrack {
   animation-play-state: paused;
@@ -478,8 +494,8 @@
 .marqueeText {
   display: inline-block;
   padding-right: 40px;
-  font-size: 14px;
-  line-height: 1.4;
+  font-size: 22px;
+  line-height: 2;
   color: #f7fff8;
   font-weight: 500;
   white-space: normal;
@@ -543,6 +559,8 @@
   flex-direction: column;
   gap: 16px;
   transition: all 0.3s ease;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .matchCard:hover {
@@ -553,8 +571,14 @@
 
 @media (max-width: 480px) {
   .matchCard {
-    padding: 18px;
-    gap: 14px;
+    padding: 16px;
+    gap: 12px;
+  }
+  
+  .matchCard .btnPrimary {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 13px;
   }
 }
 
@@ -807,6 +831,9 @@
 .rankingContainer {
   max-width: 700px;
   margin: 0 auto;
+  width: 100%;
+  padding: 0 16px;
+  box-sizing: border-box;
 }
 
 /* Podium */
@@ -816,6 +843,10 @@
   justify-content: center;
   gap: 24px;
   margin-bottom: 32px;
+  width: 100%;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 @media (max-width: 768px) {
@@ -1307,7 +1338,7 @@
   }
 
   .marqueeText {
-    font-size: 13px;
+    font-size: 20px;
   }
 }
 
@@ -1336,7 +1367,7 @@
   }
 
   .marqueeText {
-    font-size: 11px;
+    font-size: 20px;
     padding-right: 30px;
   }
 }

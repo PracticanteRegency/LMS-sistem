@@ -25,6 +25,7 @@ from .serializers import (
     ConfiguracionTorneoSerializer,
     ConfiguracionPrediccionEspecialSerializer,
     EstadisticasSerializer,
+    PrediccionEspecialRespuestaSerializer,
 )
 from .utils import (
     obtener_edicion_activa,
@@ -260,7 +261,16 @@ class PartidoAdminListView(APIView):
             qs = qs.filter(estado=estado_filtro)
 
         data = PartidoAdminSerializer(qs, many=True, context={"request": request}).data
-        return Response({"partidos": data, "total": qs.count()})
+
+        # Contadores por estado (siempre sobre el total sin filtros)
+        all_partidos = Partido.objects.filter(edicion=edicion)
+        return Response({
+            "partidos": data,
+            "total": all_partidos.count(),
+            "abiertos": all_partidos.filter(estado=EstadoPartido.ABIERTO).count(),
+            "bloqueados": all_partidos.filter(estado=EstadoPartido.BLOQUEADO).count(),
+            "finalizados": all_partidos.filter(estado=EstadoPartido.FINALIZADO).count(),
+        })
 
 
 class PartidoDetailView(APIView):
@@ -421,7 +431,7 @@ class PrediccionEspecialListCreateView(APIView):
         ).select_related("equipo_seleccionado")
 
         return Response({
-            "predicciones": PrediccionEspecialSerializer(predicciones, many=True).data,
+            "predicciones": PrediccionEspecialSerializer(predicciones, many=True, context={"request": request}).data,
         })
 
     def post(self, request):
@@ -435,17 +445,36 @@ class PrediccionEspecialListCreateView(APIView):
             colaborador=colaborador, tipo=tipo
         ).first()
 
+        # Si existe y el usuario no puede editar, rechazar
+        if existente and not existente.puede_editarse():
+            config = existente._get_config()
+            if config:
+                return Response(
+                    {"error": f"No puedes editar: se cerró el {config.fecha_cierre.strftime('%d/%m/%Y a las %H:%M')}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
         serializer = PrediccionEspecialSerializer(
-            existente, data=request.data, partial=bool(existente)
+            existente, data=request.data, partial=bool(existente),
+            context={"colaborador": colaborador, "request": request}
         )
         serializer.is_valid(raise_exception=True)
-        prediccion = serializer.save(colaborador=colaborador)
+        prediccion = serializer.save()
 
         created = existente is None
         return Response(
-            PrediccionEspecialSerializer(prediccion).data,
+            PrediccionEspecialSerializer(prediccion, context={"request": request}).data,
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
         )
+    
+    
+class PrediccionEspecialDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    PrediccionEspecialRespuestaSerializer
+
+
+    
 
 
 # ================================================================
@@ -584,18 +613,18 @@ class ConfiguracionPrediccionEspecialDetailView(APIView):
     permission_classes = [IsAuthenticated, IsSuperUserOrAdmin]
 
     def put(self, request, pk):
-        """Admin edita una configuración especial, bloqueado cuando inicia el mundial."""
+        """Admin edita una configuración especial."""
         config = get_object_or_404(ConfiguracionPrediccionEspecial, pk=pk)
-        edicion = config.edicion
-        if edicion and edicion.bloqueo_configuracion:
-            return Response(
-                {"error": "No se puede editar: el mundial ya ha iniciado."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
         serializer = ConfiguracionPrediccionEspecialSerializer(config, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data)
+
+    def delete(self, request, pk):
+        """Admin elimina una configuración de predicción especial."""
+        config = get_object_or_404(ConfiguracionPrediccionEspecial, pk=pk)
+        config.delete()
+        return Response({"mensaje": "Configuración especial eliminada."}, status=status.HTTP_204_NO_CONTENT)
 
 
 # ================================================================
@@ -656,11 +685,10 @@ class HomeDataView(APIView):
                 "partidos_pendientes": qs_partidos.exclude(estado=EstadoPartido.FINALIZADO).count(),
             }
 
-            # Obtener equipos únicos que participan en esta edición (usando distinct)
-            equipos_list = Equipo.objects.filter(
-                Q(partidos_local__edicion=edicion) | Q(partidos_visitante__edicion=edicion)
-            ).distinct()
-            equipos = EquipoSerializer(equipos_list, many=True).data
+            # Obtener TODOS los equipos activos para que los usuarios puedan seleccionarlos
+            # en predicciones especiales (campeón, subcampeón, tercer lugar)
+            equipos_list = Equipo.objects.filter(activo=True)
+            equipos = EquipoSerializer(equipos_list, many=True, context={"request": request}).data
 
             partidos_response = {
                 "partidos": partidos,
@@ -676,8 +704,14 @@ class HomeDataView(APIView):
                 colaborador=colaborador
             ).select_related("equipo_seleccionado") if colaborador else PrediccionEspecial.objects.none()
 
+            # Configuraciones de predicciones especiales habilitadas
+            configs_especiales_qs = ConfiguracionPrediccionEspecial.objects.filter(
+                edicion=edicion, habilitada=True
+            )
+
             predicciones_especiales_response = {
-                "predicciones": PrediccionEspecialSerializer(predicciones_especiales_qs, many=True).data,
+                "predicciones": PrediccionEspecialSerializer(predicciones_especiales_qs, many=True, context={"request": request}).data,
+                "configuraciones": ConfiguracionPrediccionEspecialSerializer(configs_especiales_qs, many=True).data,
             }
 
             # ============================================

@@ -109,6 +109,10 @@ export const getConfigEspecial = (id) =>
 export const updateConfigEspecial = (id, data) =>
   api.put(`${BASE}/configuracion-especiales/${id}/`, data);
 
+/** Eliminar configuración especial */
+export const deleteConfigEspecial = (id) =>
+  api.delete(`${BASE}/configuracion-especiales/${id}/`);
+
 // ===== ESTADÍSTICAS =====
 
 /** Obtener estadísticas generales */

@@ -47,6 +47,8 @@ export interface Match extends MatchData {
   goles_visitante?: number;
   penaltis_local?: number;
   penaltis_visitante?: number;
+  total_predicciones?: number;
+  mi_prediccion?: any;
 }
 
 export interface Prediction {

@@ -43,10 +43,12 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 .mainContent {
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   flex: 1 1 0%;
   width: 100%;
   box-sizing: border-box;
