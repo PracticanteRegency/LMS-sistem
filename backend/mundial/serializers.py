@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from .models import (
     EdicionMundial, Equipo, Partido, Prediccion, PrediccionEspecial,
-    RankingMundial, ConfiguracionTorneo, ConfiguracionPrediccionEspecial,
+    RankingMundial, RankingEspecial, ConfiguracionTorneo, ConfiguracionPrediccionEspecial,
     get_nombre_completo, EstadoPartido,
 )
 
@@ -44,18 +44,35 @@ class EquipoSerializer(serializers.ModelSerializer):
         fields = ["id", "nombre", "bandera", "bandera_emoji", "activo"]
 
     def get_bandera(self, obj):
+        # Prioridad: imagen local > URL Cloudinary > emoji
         request = self.context.get("request")
         if obj.bandera_imagen and request:
             return request.build_absolute_uri(obj.bandera_imagen.url)
+        if obj.bandera_url:
+            return obj.bandera_url
         return obj.bandera_emoji or ""
 
 
 class EquipoCreateUpdateSerializer(serializers.ModelSerializer):
-    bandera_imagen = serializers.ImageField(required=False, allow_null=True)
+    bandera_imagen = serializers.FileField(required=False, allow_null=True)
+
+    EXTENSIONES_PERMITIDAS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".ico"}
 
     class Meta:
         model = Equipo
         fields = ["nombre", "bandera_imagen", "bandera_emoji", "activo"]
+
+    def validate_bandera_imagen(self, archivo):
+        if archivo is None:
+            return archivo
+        import os
+        ext = os.path.splitext(archivo.name)[1].lower()
+        if ext not in self.EXTENSIONES_PERMITIDAS:
+            raise serializers.ValidationError(
+                f"Formato no soportado '{ext}'. Formatos permitidos: "
+                f"{', '.join(sorted(self.EXTENSIONES_PERMITIDAS))}"
+            )
+        return archivo
 
 
 # ================================================================
@@ -112,6 +129,8 @@ class PartidoSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if equipo.bandera_imagen and request:
             return request.build_absolute_uri(equipo.bandera_imagen.url)
+        if equipo.bandera_url:
+            return equipo.bandera_url
         return equipo.bandera_emoji or ""
 
     def get_resultado(self, obj):
@@ -333,15 +352,16 @@ class PrediccionEspecialSerializer(serializers.ModelSerializer):
     def get_equipo_bandera(self, obj):
         if not obj.equipo_seleccionado:
             return None
-        # Retorna URL de imagen si existe (igual que en partidos)
+        equipo = obj.equipo_seleccionado
         request = self.context.get("request")
-        if obj.equipo_seleccionado.bandera_imagen and request:
+        if equipo.bandera_imagen and request:
             try:
-                return request.build_absolute_uri(obj.equipo_seleccionado.bandera_imagen.url)
+                return request.build_absolute_uri(equipo.bandera_imagen.url)
             except Exception:
-                # Si hay error, devolver emoji
-                return obj.equipo_seleccionado.bandera_emoji or ""
-        return obj.equipo_seleccionado.bandera_emoji or ""
+                pass
+        if equipo.bandera_url:
+            return equipo.bandera_url
+        return equipo.bandera_emoji or ""
 
     def get_equipo_emoji(self, obj):
         return obj.equipo_seleccionado.bandera_emoji if obj.equipo_seleccionado else None
@@ -353,15 +373,36 @@ class PrediccionEspecialSerializer(serializers.ModelSerializer):
         config = obj._get_config()
         return config.fecha_cierre.isoformat() if config else None
 
+    def validate(self, data):
+        """Validaciones antes de crear/actualizar."""
+        tipo = data.get("tipo") or (self.instance.tipo if self.instance else None)
+
+        # Verificar que tenga equipo o jugador según el tipo
+        from .models import TipoPrediccionEspecial
+        tipos_equipo = [TipoPrediccionEspecial.CAMPEON, TipoPrediccionEspecial.SUBCAMPEON, TipoPrediccionEspecial.TERCER_LUGAR]
+        if tipo in tipos_equipo:
+            equipo = data.get("equipo_seleccionado") or (self.instance.equipo_seleccionado if self.instance else None)
+            if not equipo:
+                raise serializers.ValidationError({"equipo_seleccionado": "Debes seleccionar un equipo."})
+        elif tipo == TipoPrediccionEspecial.MAXIMO_GOLEADOR:
+            jugador = data.get("jugador_seleccionado") or (self.instance.jugador_seleccionado if self.instance else None)
+            if not jugador:
+                raise serializers.ValidationError({"jugador_seleccionado": "Debes seleccionar un jugador."})
+
+        return data
+
     def create(self, validated_data):
         colaborador = self.context.get("colaborador")
         if not colaborador:
             raise serializers.ValidationError("Colaborador no especificado")
         validated_data["colaborador"] = colaborador
-        return super().create(validated_data)
+        return PrediccionEspecial.objects.create(**validated_data)
 
     def update(self, instance, validated_data):
-        return super().update(instance, validated_data)
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save(update_fields=list(validated_data.keys()) + ["actualizado_en"])
+        return instance
     
 
 class PrediccionEspecialRespuestaSerializer(serializers.ModelSerializer):
@@ -390,8 +431,39 @@ class RankingSerializer(serializers.ModelSerializer):
         model = RankingMundial
         fields = [
             "posicion", "nombre", "iniciales", "email",
-            "puntos_totales", "puntos_partidos", "puntos_especiales",
-            "aciertos_exactos", "predicciones_especiales_acertadas",
+            "puntos_totales", "puntos_partidos",
+            "aciertos_exactos",
+            "tendencia", "tendencia_str",
+        ]
+
+    def get_nombre(self, obj):
+        return get_nombre_completo(obj.colaborador)
+
+    def get_iniciales(self, obj):
+        partes = get_nombre_completo(obj.colaborador).split()
+        if len(partes) >= 2:
+            return (partes[0][0] + partes[-1][0]).upper()
+        return partes[0][0].upper() if partes else "?"
+
+    def get_email(self, obj):
+        return obj.colaborador.correocolaborador
+
+    def get_tendencia_str(self, obj):
+        return f"+{obj.tendencia}" if obj.tendencia > 0 else str(obj.tendencia)
+
+
+class RankingEspecialSerializer(serializers.ModelSerializer):
+    nombre = serializers.SerializerMethodField()
+    iniciales = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+    tendencia_str = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RankingEspecial
+        fields = [
+            "posicion", "nombre", "iniciales", "email",
+            "puntos_totales", "puntos_especiales",
+            "predicciones_especiales_acertadas",
             "tendencia", "tendencia_str",
         ]
 
@@ -467,16 +539,37 @@ class ConfiguracionTorneoSerializer(serializers.ModelSerializer):
 class ConfiguracionPrediccionEspecialSerializer(serializers.ModelSerializer):
     tipo_display = serializers.CharField(source="get_tipo_display", read_only=True)
     esta_abierta = serializers.SerializerMethodField()
+    resultado_equipo_nombre = serializers.SerializerMethodField()
+    resultado_equipo_bandera = serializers.SerializerMethodField()
 
     class Meta:
         model = ConfiguracionPrediccionEspecial
         fields = [
             "id", "edicion", "tipo", "tipo_display", "habilitada",
             "fecha_cierre", "descripcion", "estado", "puntos_acierto", "esta_abierta",
+            "resultado_equipo", "resultado_equipo_nombre", "resultado_equipo_bandera",
+            "resultado_jugador",
         ]
 
     def get_esta_abierta(self, obj):
         return obj.esta_abierta()
+
+    def get_resultado_equipo_nombre(self, obj):
+        return obj.resultado_equipo.nombre if obj.resultado_equipo else None
+
+    def get_resultado_equipo_bandera(self, obj):
+        if not obj.resultado_equipo:
+            return None
+        equipo = obj.resultado_equipo
+        request = self.context.get("request")
+        if equipo.bandera_imagen and request:
+            try:
+                return request.build_absolute_uri(equipo.bandera_imagen.url)
+            except Exception:
+                pass
+        if equipo.bandera_url:
+            return equipo.bandera_url
+        return equipo.bandera_emoji or ""
 
 
 # ================================================================

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import styles from "./Navbar.module.css";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 // @ts-ignore
 import perfilService from "../services/perfil.js";
 
@@ -16,6 +16,7 @@ export default function Navbar({ username: propUsername, onMenuToggle }: NavbarP
   const [username, setUsername] = useState(propUsername || "Usuario");
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -103,7 +104,7 @@ export default function Navbar({ username: propUsername, onMenuToggle }: NavbarP
       </div>
 
       <div className={styles.branding}>
-        <h1>MIConocimiento</h1>
+        <h1>{location.pathname.includes('/mundial') ? 'MICampeonato' : 'MIConocimiento'}</h1>
       </div>
 
       <div className={styles.right}>

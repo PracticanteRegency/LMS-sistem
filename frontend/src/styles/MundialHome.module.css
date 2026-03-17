@@ -279,15 +279,28 @@
   color: #fff;
 }
 
+@media (max-width: 480px) {
+  .heroStatValue {
+    font-size: 18px;
+  }
+}
+
 .heroStatLabel {
   font-size: 12px;
   color: #aaa;
+}
+
+@media (max-width: 480px) {
+  .heroStatLabel {
+    font-size: 11px;
+  }
 }
 
 /* ===== BUTTONS ===== */
 .btnPrimaryLg {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   padding: 12px 24px;
   background: #4CAF50;
@@ -301,6 +314,10 @@
   transition: background 0.2s, transform 0.15s;
   white-space: nowrap;
   min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .btnPrimaryLg:hover {
@@ -308,16 +325,27 @@
   transform: translateY(-1px);
 }
 
+@media (max-width: 768px) {
+  .btnPrimaryLg {
+    padding: 10px 18px;
+    font-size: 14px;
+  }
+}
+
 @media (max-width: 480px) {
   .btnPrimaryLg {
-    padding: 10px 16px;
+    padding: 10px 14px;
     font-size: 13px;
+    width: 100%;
+    white-space: normal;
+    text-align: center;
   }
 }
 
 .btnOutlineLg {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   padding: 12px 24px;
   background: transparent;
@@ -331,6 +359,10 @@
   transition: background 0.2s, border-color 0.2s;
   white-space: nowrap;
   min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .btnOutlineLg:hover {
@@ -338,10 +370,20 @@
   border-color: rgba(255, 255, 255, 0.5);
 }
 
+@media (max-width: 768px) {
+  .btnOutlineLg {
+    padding: 10px 18px;
+    font-size: 14px;
+  }
+}
+
 @media (max-width: 480px) {
   .btnOutlineLg {
-    padding: 10px 16px;
+    padding: 10px 14px;
     font-size: 13px;
+    width: 100%;
+    white-space: normal;
+    text-align: center;
   }
 }
 
@@ -456,7 +498,7 @@
   border-bottom: 1px solid rgba(255,255,255,0.06);
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   position: relative;
-  z-index: 40;
+  z-index: 0;
   overflow: hidden;
 }
 .topBannerInner {
@@ -595,16 +637,29 @@
   gap: 12px;
 }
 
+@media (max-width: 480px) {
+  .matchTeams {
+    gap: 6px;
+  }
+}
+
 .matchTeam {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   flex: 1;
+  min-width: 0;
 }
 
 .matchFlag {
   font-size: 32px;
+}
+
+@media (max-width: 480px) {
+  .matchFlag {
+    font-size: 24px;
+  }
 }
 
 .matchFlagImg {
@@ -614,11 +669,28 @@
   border-radius: 0.2rem;
 }
 
+@media (max-width: 480px) {
+  .matchFlagImg {
+    width: 1.5rem;
+    height: 1rem;
+  }
+}
+
 .matchTeamName {
   font-size: 13px;
   font-weight: 600;
   color: #262626;
   text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+@media (max-width: 480px) {
+  .matchTeamName {
+    font-size: 11px;
+  }
 }
 
 .matchVs {
@@ -626,12 +698,27 @@
   font-weight: 800;
   color: #999;
   padding: 0 8px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .matchVs {
+    font-size: 12px;
+    padding: 0 4px;
+  }
 }
 
 .matchDetails {
   display: flex;
   gap: 16px;
   justify-content: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 480px) {
+  .matchDetails {
+    gap: 8px;
+  }
 }
 
 .matchDetail {
@@ -640,6 +727,12 @@
   gap: 4px;
   font-size: 12px;
   color: #777;
+}
+
+@media (max-width: 480px) {
+  .matchDetail {
+    font-size: 11px;
+  }
 }
 
 .matchDetailIcon {
@@ -720,7 +813,7 @@
 /* Scoring Cards */
 .scoringGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: 20px;
 }
 
@@ -917,12 +1010,30 @@
   font-weight: 600;
   color: #262626;
   margin: 0;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+@media (max-width: 480px) {
+  .podiumName {
+    font-size: 11px;
+    max-width: 70px;
+  }
 }
 
 .podiumPoints {
   font-size: 12px;
   color: #777;
   margin: 0;
+}
+
+@media (max-width: 480px) {
+  .podiumPoints {
+    font-size: 10px;
+  }
 }
 
 .podiumBarFirst,
@@ -1055,6 +1166,7 @@
 .rankingInfo {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .rankingName {
@@ -1062,6 +1174,15 @@
   font-weight: 600;
   color: #262626;
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .rankingName {
+    font-size: 12px;
+  }
 }
 
 .rankingHits {
@@ -1070,10 +1191,23 @@
   margin: 0;
 }
 
+@media (max-width: 480px) {
+  .rankingHits {
+    font-size: 10px;
+  }
+}
+
 .rankingRight {
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .rankingRight {
+    gap: 8px;
+  }
 }
 
 .rankingTrend {
@@ -1188,6 +1322,13 @@
   font-weight: 800;
   color: #262626;
   margin: 0 0 4px 0;
+  word-break: break-word;
+}
+
+@media (max-width: 480px) {
+  .prizeAmount {
+    font-size: 22px;
+  }
 }
 
 .prizePercent {
@@ -1601,6 +1742,14 @@
   border-radius: 12px;
   padding: 20px;
   transition: all 0.3s ease;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+@media (max-width: 480px) {
+  .specialPredictionCard {
+    padding: 14px;
+  }
 }
 
 .specialPredictionCard:hover {
@@ -1660,6 +1809,15 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 480px) {
+  .specialSubmitBtn {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
 }
 
 .specialSubmitBtn:hover:not(:disabled) {

@@ -1,5 +1,6 @@
   import { Link } from "react-router-dom";
-  import styles from "./Navbar.module.css";
+import { useLocation } from "react-router-dom";
+import styles from "./Navbar.module.css";
 
   interface SidebarProps {
     userType?: number; // 1 = usuario, 2 = admin, 3 = staff especial, 4 = superadmin
@@ -9,11 +10,13 @@
   
 
   export default function Sidebar({ userType = 1, isOpen = true, userId }: SidebarProps) {
-    const isSuperAdmin = userType === 4;
-    const isAdmin = userType === 2 || isSuperAdmin;
-    // allow specific user IDs to see Usuarios menu
-    const allowedUserIdsForUsuarios = new Set([1, 3, 4]);
-    const canSeeUsuarios = isAdmin || (typeof userId === 'number' && allowedUserIdsForUsuarios.has(userId));
+  const location = useLocation();
+  const isMundial = location.pathname.includes('/mundial');
+  const isSuperAdmin = userType === 4;
+  const isAdmin = userType === 2 || isSuperAdmin;
+  // allow specific user IDs to see Usuarios menu
+  const allowedUserIdsForUsuarios = new Set([1, 3, 4]);
+  const canSeeUsuarios = isAdmin || (typeof userId === 'number' && allowedUserIdsForUsuarios.has(userId));
 
     return (
       <aside className={`${styles.sidebar} ${isOpen ? styles.open : styles.closed}`}
@@ -22,7 +25,7 @@
           <Link to="/perfil" className={styles.logoLink}>
             <div className="logo-placeholder">
               <img
-                src="/img/REGENCYL.png"
+                src={isMundial ? "/img/logo.png" : "/img/REGENCYL.png"}
                 alt="Logo"
                 className="logo-img"
               />

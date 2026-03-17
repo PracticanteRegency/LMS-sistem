@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from .models import (
     EdicionMundial, Equipo, Partido, Prediccion,
-    PrediccionEspecial, RankingMundial,
+    PrediccionEspecial, RankingMundial, RankingEspecial,
     ConfiguracionTorneo, ConfiguracionPrediccionEspecial,
 )
 
@@ -124,7 +124,14 @@ class PrediccionEspecialAdmin(admin.ModelAdmin):
 
 @admin.register(RankingMundial)
 class RankingMundialAdmin(admin.ModelAdmin):
-    list_display = ("posicion", "colaborador", "puntos_totales", "puntos_partidos", "puntos_especiales", "aciertos_exactos", "edicion")
+    list_display = ("posicion", "colaborador", "puntos_totales", "puntos_partidos", "aciertos_exactos", "edicion")
+    list_filter = ("edicion",)
+    ordering = ("posicion",)
+
+
+@admin.register(RankingEspecial)
+class RankingEspecialAdmin(admin.ModelAdmin):
+    list_display = ("posicion", "colaborador", "puntos_totales", "puntos_especiales", "predicciones_especiales_acertadas", "edicion")
     list_filter = ("edicion",)
     ordering = ("posicion",)
 

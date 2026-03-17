@@ -33,7 +33,11 @@ export const createEquipo = (data) => api.post(`${BASE}/equipos/`, data, {
 export const getEquipo = (id) => api.get(`${BASE}/equipos/${id}/`);
 
 /** Actualizar un equipo */
-export const updateEquipo = (id, data) => api.put(`${BASE}/equipos/${id}/`, data);
+export const updateEquipo = (id, data) => api.put(`${BASE}/equipos/${id}/`, data, {
+  headers: {
+    'Content-Type': 'multipart/form-data'
+  }
+});
 
 // ===== PARTIDOS =====
 
@@ -80,7 +84,10 @@ export const upsertPrediccionEspecial = (data) =>
 // ===== RANKING =====
 
 /** Obtener ranking (top + mi_posicion) */
-export const getRanking = () => api.get(`${BASE}/ranking/`);
+export const getRanking = (limite) => api.get(`${BASE}/ranking/`, { params: limite ? { limite } : {} });
+
+/** Obtener ranking especial (top + mi_posicion) */
+export const getRankingEspecial = (limite) => api.get(`${BASE}/ranking-especial/`, { params: limite ? { limite } : {} });
 
 // ===== CONFIGURACIÓN =====
 
@@ -112,6 +119,10 @@ export const updateConfigEspecial = (id, data) =>
 /** Eliminar configuración especial */
 export const deleteConfigEspecial = (id) =>
   api.delete(`${BASE}/configuracion-especiales/${id}/`);
+
+/** Resolver una predicción especial (admin establece resultado y otorga puntos) */
+export const resolverPrediccionEspecial = (id, data) =>
+  api.post(`${BASE}/configuracion-especiales/${id}/resolver/`, data);
 
 // ===== ESTADÍSTICAS =====
 

@@ -289,6 +289,11 @@ function ScoringRulesGrid() {
 function MatchesSection({ initialMatches = [] }: { initialMatches?: MatchData[] }) {
   const [matches, setMatches] = useState<MatchData[]>(initialMatches);
 
+  // Helper function to normalize estado values (handle both Spanish and English)
+  const isEstadoFinalizado = (estado: string | undefined): boolean => {
+    return estado === "finalizado" || estado === "finished";
+  };
+
   useEffect(() => {
     setMatches(initialMatches);
   }, [initialMatches]);
@@ -336,9 +341,15 @@ function MatchesSection({ initialMatches = [] }: { initialMatches?: MatchData[] 
                   </div>
                 </div>
 
-                <Link to="/mundial/partidos" className={styles.btnPrimary} style={{ width: "100%", textAlign: "center", boxSizing: "border-box", overflow: "hidden" }}>
-                  Hacer Predicción →
-                </Link>
+                {isEstadoFinalizado(match.estado) ? (
+                  <button disabled className={styles.btnPrimary} style={{ width: "100%", textAlign: "center", boxSizing: "border-box", overflow: "hidden", opacity: 0.6, cursor: "not-allowed" }}>
+                    ✔️ Finalizado
+                  </button>
+                ) : (
+                  <Link to="/mundial/partidos" className={styles.btnPrimary} style={{ width: "100%", textAlign: "center", boxSizing: "border-box", overflow: "hidden" }}>
+                    Hacer Predicción →
+                  </Link>
+                )}
               </div>
             ))}
         </div>
@@ -552,7 +563,7 @@ function SpecialPredictionsSection({ initialSpecialPredictions = [], initialTeam
 }
 function RankingSection({ initialPlayers = [] }: { initialPlayers?: RankingEntry[] }) {
   const [userRank, setUserRank] = useState<RankingEntry | null>(null);
-  const [topPlayers, setTopPlayers] = useState<RankingEntry[]>([]);
+  const [top10List, setTop10List] = useState<RankingEntry[]>([]);
   const [allSortedPlayers, setAllSortedPlayers] = useState<RankingEntry[]>([]);
 
   useEffect(() => {
@@ -564,21 +575,12 @@ function RankingSection({ initialPlayers = [] }: { initialPlayers?: RankingEntry
       
       // Buscar al usuario actual
       const currentUserRank = sortedPlayers.find((p: any) => p.isCurrentUser);
-      
-      if (currentUserRank) {
-        setUserRank(currentUserRank);
-        // Mostrar top 10 del resto
-        const withoutUser = sortedPlayers.filter((p: any) => !p.isCurrentUser);
-        setTopPlayers(withoutUser.slice(0, 10));
-      } else {
-        // Si no hay usuario identificado, mostrar solo los top 10
-        setTopPlayers(sortedPlayers.slice(0, 10));
-      }
+      setUserRank(currentUserRank || null);
+
+      // Top 10 siempre son las posiciones 1-10
+      setTop10List(sortedPlayers.slice(0, 10));
     }
   }, [initialPlayers]);
-
-  // Construir la lista para mostrar: usuario primero (si existe) + top 10
-  const displayPlayers = userRank ? [userRank, ...topPlayers] : topPlayers;
 
   return (
     <section id="ranking" className={styles.rankingSection}>
@@ -591,7 +593,7 @@ function RankingSection({ initialPlayers = [] }: { initialPlayers?: RankingEntry
         </div>
 
         <div className={styles.rankingContainer}>
-          {/* Podium - Always show top 3 (positions 1, 2, 3) regardless of user rank */}
+          {/* Podium - Always show top 3 (positions 1, 2, 3) */}
           <div className={styles.podium}>
             {/* 2nd Place (Left) */}
             <div className={styles.podiumEntry}>
@@ -623,52 +625,95 @@ function RankingSection({ initialPlayers = [] }: { initialPlayers?: RankingEntry
             </div>
           </div>
 
-          {/* Full Table - Top 10 + User */}
-          <div className={styles.rankingTable}>
-            {displayPlayers.slice(0, 11).map((player: RankingEntry, idx: number) => {
-              const trendType = getTrendColor(player.trend);
-              const rankEmoji = player.rank === 1 ? "🏆" : player.rank === 2 ? "🥈" : player.rank === 3 ? "🥉" : null;
-              const isCurrentUser = userRank?.rank === player.rank;
+          {/* Top 10 Table - Posiciones 1 a 10 con ordenamiento por puntos y desempate por fecha primera predicción */}
+          <div style={{ marginTop: "2rem" }}>
+            <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "1rem", color: "var(--foreground)" }}>
+              🏅 Top 10
+            </h3>
+            <div className={styles.rankingTable}>
+              {top10List.map((player: RankingEntry, idx: number) => {
+                const trendType = getTrendColor(player.trend);
+                const rankEmoji = player.rank === 1 ? "🏆" : player.rank === 2 ? "🥈" : player.rank === 3 ? "🥉" : null;
+                const isCurrentUser = userRank?.rank === player.rank;
 
-              return (
-                <div
-                  key={`${player.name}-${idx}`}
-                  className={`${player.rank <= 3 ? styles.rankingRowTop : styles.rankingRow} ${isCurrentUser ? styles.rankingRowCurrentUser : ""}`}
-                >
-                  <div className={styles.rankingRank}>
-                    {rankEmoji ? (
-                      <span className={styles.rankingRankEmoji}>{rankEmoji}</span>
-                    ) : (
-                      <span>{player.rank}</span>
-                    )}
+                return (
+                  <div
+                    key={`${player.name}-${idx}`}
+                    className={`${player.rank <= 3 ? styles.rankingRowTop : styles.rankingRow} ${isCurrentUser ? styles.rankingRowCurrentUser : ""}`}
+                  >
+                    <div className={styles.rankingRank}>
+                      {rankEmoji ? (
+                        <span className={styles.rankingRankEmoji}>{rankEmoji}</span>
+                      ) : (
+                        <span>{player.rank}</span>
+                      )}
+                    </div>
+                    <div className={styles.rankingAvatar}>{player.avatar}</div>
+                    <div className={styles.rankingInfo}>
+                      <p className={styles.rankingName}>
+                        {player.name}
+                        {isCurrentUser && <span className={styles.userBadge}> (Tú)</span>}
+                      </p>
+                      <p className={styles.rankingHits}>{player.exactHits} aciertos exactos</p>
+                    </div>
+                    <div className={styles.rankingRight}>
+                      <span className={`${styles.rankingTrend} ${
+                        trendType === "up" ? styles.trendUp : trendType === "down" ? styles.trendDown : styles.trendNeutral
+                      }`}>
+                        {player.trend ? (player.trend.startsWith("+") ? "↑" : player.trend.startsWith("-") ? "↓" : "—") : "—"}
+                        {player.trend || "—"}
+                      </span>
+                      <div className={styles.rankingScore}>
+                        <p className={styles.rankingScoreValue}>{player.points}</p>
+                        <p className={styles.rankingScoreLabel}>puntos</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className={styles.rankingAvatar}>{player.avatar}</div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Si el usuario está fuera del top 10, mostrar su posición */}
+          {userRank && userRank.rank > 10 && (
+            <div style={{ marginTop: "2rem", paddingTop: "2rem", borderTop: "1px solid var(--border)" }}>
+              <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "1rem", color: "var(--foreground)" }}>
+                📍 Tu Posición
+              </h3>
+              <div className={styles.rankingTable}>
+                <div className={`${styles.rankingRow} ${styles.rankingRowCurrentUser}`}>
+                  <div className={styles.rankingRank}>
+                    <span>{userRank.rank}</span>
+                  </div>
+                  <div className={styles.rankingAvatar}>{userRank.avatar}</div>
                   <div className={styles.rankingInfo}>
                     <p className={styles.rankingName}>
-                      {player.name}
-                      {isCurrentUser && <span className={styles.userBadge}> (Tú)</span>}
+                      {userRank.name}
+                      <span className={styles.userBadge}> (Tú)</span>
                     </p>
-                    <p className={styles.rankingHits}>{player.exactHits} aciertos exactos</p>
+                    <p className={styles.rankingHits}>{userRank.exactHits} aciertos exactos</p>
                   </div>
                   <div className={styles.rankingRight}>
                     <span className={`${styles.rankingTrend} ${
-                      trendType === "up" ? styles.trendUp : trendType === "down" ? styles.trendDown : styles.trendNeutral
+                      (userRank.trend?.startsWith("+") ? "up" : userRank.trend?.startsWith("-") ? "down" : "neutral") === "up" ? styles.trendUp : (userRank.trend?.startsWith("+") ? "up" : userRank.trend?.startsWith("-") ? "down" : "neutral") === "down" ? styles.trendDown : styles.trendNeutral
                     }`}>
-                      {player.trend ? (player.trend.startsWith("+") ? "↑" : player.trend.startsWith("-") ? "↓" : "—") : "—"}
-                      {player.trend || "—"}
+                      {userRank.trend ? (userRank.trend.startsWith("+") ? "↑" : userRank.trend.startsWith("-") ? "↓" : "—") : "—"}
+                      {userRank.trend || "—"}
                     </span>
                     <div className={styles.rankingScore}>
-                      <p className={styles.rankingScoreValue}>{player.points}</p>
+                      <p className={styles.rankingScoreValue}>{userRank.points}</p>
                       <p className={styles.rankingScoreLabel}>puntos</p>
                     </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            </div>
+          )}
 
           <div className={styles.sectionCta} style={{ marginTop: "2rem" }}>
-            <button className={styles.btnOutline}>Ver Ranking Completo →</button>
+            <Link to="/mundial/ranking" className={styles.btnOutline}>
+              Ver Ranking Completo →
+            </Link>
           </div>
         </div>
       </div>

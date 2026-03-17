@@ -1,0 +1,804 @@
+/* ===== MUNDIAL RANKING PAGE ===== */
+.pageWrapper {
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0 16px 60px;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+@media (max-width: 480px) {
+  .pageWrapper {
+    padding: 0 10px 40px;
+  }
+}
+
+/* ===== BANNER (Same as Home) ===== */
+.topBanner {
+  width: 100%;
+  background: linear-gradient(90deg, #0b3b1f 0%, #123c2b 50%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  border-radius: 16px;
+  margin: 10px 0 20px 0;
+  height: 50px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  position: relative;
+  z-index: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .topBanner {
+    margin: 8px 0 16px 0;
+    height: 42px;
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .topBanner {
+    margin: 6px 0 12px 0;
+    height: 38px;
+    border-radius: 10px;
+  }
+}
+.topBannerInner {
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 0 20px;
+}
+.marquee {
+  overflow: hidden;
+  white-space: nowrap;
+  position: relative;
+  mask-image: linear-gradient(90deg, transparent 0%, black 12%, black 88%, transparent 100%);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 12%, black 88%, transparent 100%);
+}
+.marqueeTrack {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+  animation: marquee 60s linear infinite;
+}
+.marquee:hover .marqueeTrack {
+  animation-play-state: paused;
+}
+.marqueeText {
+  display: inline-block;
+  padding-right: 40px;
+  font-size: 22px;
+  line-height: 2;
+  color: #f7fff8;
+  font-weight: 500;
+  white-space: normal;
+}
+
+@media (max-width: 768px) {
+  .marqueeText {
+    font-size: 18px;
+    padding-right: 30px;
+  }
+}
+
+@media (max-width: 480px) {
+  .marqueeText {
+    font-size: 16px;
+    padding-right: 24px;
+  }
+}
+@keyframes marquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ===== PAGE HEADER ===== */
+.pageHeader {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+@media (max-width: 480px) {
+  .pageHeader {
+    margin-bottom: 24px;
+  }
+}
+
+.pageTitle {
+  font-size: 32px;
+  font-weight: 800;
+  color: #262626;
+  margin: 0 0 8px 0;
+}
+
+@media (max-width: 768px) {
+  .pageTitle {
+    font-size: 26px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pageTitle {
+    font-size: 22px;
+  }
+}
+
+.pageSubtitle {
+  font-size: 16px;
+  color: #777;
+  margin: 0;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (max-width: 480px) {
+  .pageSubtitle {
+    font-size: 13px;
+  }
+}
+
+/* ===== SECTION WRAPPER ===== */
+.section {
+  margin-bottom: 48px;
+}
+
+@media (max-width: 480px) {
+  .section {
+    margin-bottom: 32px;
+  }
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #f0f0f0;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 480px) {
+  .sectionHeader {
+    gap: 8px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+  }
+}
+
+.sectionIcon {
+  font-size: 28px;
+}
+
+@media (max-width: 480px) {
+  .sectionIcon {
+    font-size: 22px;
+  }
+}
+
+.sectionTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: #262626;
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .sectionTitle {
+    font-size: 18px;
+  }
+}
+.sectionBadge {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(76, 175, 80, 0.1);
+  color: #4CAF50;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .sectionBadge {
+    font-size: 11px;
+    padding: 3px 8px;
+    margin-left: 0;
+  }
+}
+
+/* ===== RANKING CONTAINER ===== */
+.rankingContainer {
+  max-width: 740px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ===== PODIUM ===== */
+.podium {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 24px;
+  margin-bottom: 32px;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.podiumEntry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.podiumFirstWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.podiumTrophy {
+  font-size: 28px;
+  margin-bottom: 2px;
+}
+.podiumAvatarFirst,
+.podiumAvatarSecond,
+.podiumAvatarThird {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+}
+.podiumAvatarFirst {
+  background: linear-gradient(135deg, #FFD700, #FFA000);
+  width: 64px;
+  height: 64px;
+  font-size: 18px;
+  box-shadow: 0 0 16px rgba(255, 193, 7, 0.4);
+}
+.podiumAvatarSecond {
+  background: linear-gradient(135deg, #bbb, #888);
+}
+.podiumAvatarThird {
+  background: linear-gradient(135deg, #CD7F32, #A0522D);
+}
+.podiumName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+  margin: 0;
+  max-width: 100px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .podiumName {
+    font-size: 11px;
+    max-width: 65px;
+  }
+}
+
+.podiumPoints {
+  font-size: 12px;
+  color: #777;
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .podiumPoints {
+    font-size: 10px;
+  }
+}
+.podiumBarFirst,
+.podiumBarSecond,
+.podiumBarThird {
+  width: 80px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  border-radius: 6px 6px 0 0;
+  padding-bottom: 8px;
+}
+.podiumBarFirst {
+  height: 100px;
+  background: linear-gradient(to top, rgba(255, 193, 7, 0.15), rgba(255, 193, 7, 0.05));
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-bottom: none;
+}
+.podiumBarSecond {
+  height: 72px;
+  background: linear-gradient(to top, rgba(180, 180, 180, 0.12), rgba(180, 180, 180, 0.04));
+  border: 1px solid rgba(180, 180, 180, 0.25);
+  border-bottom: none;
+}
+.podiumBarThird {
+  height: 56px;
+  background: linear-gradient(to top, rgba(205, 127, 50, 0.12), rgba(205, 127, 50, 0.04));
+  border: 1px solid rgba(205, 127, 50, 0.25);
+  border-bottom: none;
+}
+.podiumBarNumberFirst {
+  font-size: 20px;
+  font-weight: 800;
+  color: #FFC107;
+}
+.podiumBarNumberOther {
+  font-size: 18px;
+  font-weight: 800;
+  color: #999;
+}
+
+/* ===== RANKING TABLE ===== */
+.rankingTable {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tableHeader {
+  font-size: 15px;
+  font-weight: 700;
+  color: #262626;
+  margin: 0 0 12px 0;
+}
+
+.rankingRow,
+.rankingRowTop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  transition: background 0.15s;
+}
+.rankingRow:hover,
+.rankingRowTop:hover {
+  background: #fafafa;
+}
+.rankingRowTop {
+  border-left: 3px solid #4CAF50;
+}
+.rankingRowCurrentUser {
+  background: linear-gradient(135deg, #fff8f0 0%, #fffbf7 100%);
+  border-left: 4px solid #ff9500;
+  box-shadow: 0 2px 8px rgba(255, 149, 0, 0.15);
+  font-weight: 500;
+}
+.rankingRowCurrentUser:hover {
+  background: linear-gradient(135deg, #fff4e6 0%, #fffaf3 100%);
+}
+
+.userBadge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 8px;
+  background: #ff9500;
+  color: white;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.rankingRank {
+  min-width: 28px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #262626;
+}
+.rankingRankEmoji {
+  font-size: 20px;
+}
+.rankingAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #555;
+  flex-shrink: 0;
+}
+.rankingInfo {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.rankingName {
+  font-size: 14px;
+  font-weight: 600;
+  color: #262626;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .rankingName {
+    font-size: 12px;
+  }
+}
+
+.rankingHits {
+  font-size: 12px;
+  color: #999;
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .rankingHits {
+    font-size: 10px;
+  }
+}
+.rankingRight {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .rankingRight {
+    gap: 6px;
+  }
+}
+
+.rankingTrend {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .rankingTrend {
+    font-size: 10px;
+    padding: 2px 5px;
+  }
+}
+.trendUp {
+  color: #4CAF50;
+  background: rgba(76, 175, 80, 0.1);
+}
+.trendDown {
+  color: #F44336;
+  background: rgba(244, 67, 54, 0.1);
+}
+.trendNeutral {
+  color: #999;
+  background: rgba(153, 153, 153, 0.1);
+}
+.rankingScore {
+  text-align: right;
+}
+.rankingScoreValue {
+  font-size: 18px;
+  font-weight: 800;
+  color: #262626;
+  margin: 0;
+}
+
+@media (max-width: 480px) {
+  .rankingScoreValue {
+    font-size: 14px;
+  }
+}
+
+.rankingScoreLabel {
+  font-size: 10px;
+  color: #999;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+@media (max-width: 480px) {
+  .rankingScoreLabel {
+    font-size: 8px;
+  }
+}
+
+/* ===== YOUR POSITION ===== */
+.userPositionSection {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+}
+.userPositionTitle {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 12px 0;
+  color: #262626;
+}
+
+/* ===== EMPTY STATE ===== */
+.emptyState {
+  text-align: center;
+  padding: 40px 20px;
+  background: #f9f9f9;
+  border-radius: 12px;
+  border: 1px dashed #ddd;
+}
+.emptyIcon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+.emptyTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: #262626;
+  margin: 0 0 6px 0;
+}
+.emptyDesc {
+  font-size: 14px;
+  color: #999;
+  margin: 0;
+}
+
+/* ===== ESPECIAL SECTION (List, no podium) ===== */
+.especialSection {
+  margin-bottom: 48px;
+}
+
+@media (max-width: 480px) {
+  .especialSection {
+    margin-bottom: 32px;
+  }
+}
+
+.especialHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e8e0f0;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 480px) {
+  .especialHeader {
+    gap: 8px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+  }
+}
+
+.especialBadge {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: rgba(139, 92, 246, 0.1);
+  color: #7c3aed;
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .especialBadge {
+    font-size: 11px;
+    padding: 3px 8px;
+    margin-left: 0;
+  }
+}
+
+/* ===== LOADING ===== */
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 80px 20px;
+  text-align: center;
+}
+.loadingSpinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #4CAF50;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.loadingText {
+  font-size: 14px;
+  color: #999;
+}
+
+/* ===== BACK LINK ===== */
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #4CAF50;
+  text-decoration: none;
+  margin-bottom: 24px;
+  transition: color 0.15s;
+}
+
+@media (max-width: 480px) {
+  .backLink {
+    font-size: 12px;
+    margin-bottom: 16px;
+    gap: 4px;
+  }
+}
+
+.backLink:hover {
+  color: #388E3C;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .pageTitle {
+    font-size: 26px;
+  }
+  .pageSubtitle {
+    font-size: 14px;
+  }
+  .podium {
+    gap: 16px;
+  }
+  .podiumBarFirst, .podiumBarSecond, .podiumBarThird {
+    width: 64px;
+  }
+  .podiumAvatarFirst {
+    width: 52px;
+    height: 52px;
+  }
+  .podiumAvatarSecond, .podiumAvatarThird {
+    width: 44px;
+    height: 44px;
+  }
+  .topBanner {
+    margin: 16px 0 32px 0;
+  }
+  .marqueeText {
+    font-size: 20px;
+  }
+  .sectionHeader, .especialHeader {
+    flex-wrap: wrap;
+  }
+  .sectionBadge, .especialBadge {
+    margin-left: 0;
+  }
+  .rankingRight {
+    gap: 10px;
+  }
+  .rankingScoreValue {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pageWrapper {
+    padding: 0 10px 40px;
+  }
+  .pageTitle {
+    font-size: 22px;
+  }
+  .topBanner {
+    margin: 12px 0 24px 0;
+    height: 38px;
+    border-radius: 10px;
+  }
+  .marqueeText {
+    font-size: 20px;
+    padding-right: 30px;
+  }
+  .podium {
+    gap: 8px;
+  }
+  .podiumBarFirst, .podiumBarSecond, .podiumBarThird {
+    width: 56px;
+  }
+  .podiumName {
+    font-size: 11px;
+    max-width: 70px;
+  }
+  .rankingRow, .rankingRowTop {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .rankingAvatar {
+    width: 30px;
+    height: 30px;
+    font-size: 11px;
+  }
+  .rankingName {
+    font-size: 13px;
+  }
+  .rankingRight {
+    gap: 8px;
+  }
+  .rankingScoreValue {
+    font-size: 15px;
+  }
+}
+
+/* ===== DARK MODE ===== */
+@media (prefers-color-scheme: dark) {
+  .pageTitle {
+    color: #f0f0f0;
+  }
+  .pageSubtitle {
+    color: #999;
+  }
+  .sectionTitle {
+    color: #f0f0f0;
+  }
+  .sectionHeader, .especialHeader {
+    border-bottom-color: #333;
+  }
+  .tableHeader, .userPositionTitle {
+    color: #e0e0e0;
+  }
+  .rankingRow, .rankingRowTop {
+    background: #1e1e1e;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  }
+  .rankingRow:hover, .rankingRowTop:hover {
+    background: #252525;
+  }
+  .rankingRank {
+    color: #e0e0e0;
+  }
+  .rankingAvatar {
+    background: #333;
+    color: #ccc;
+  }
+  .rankingName {
+    color: #e0e0e0;
+  }
+  .rankingScoreValue {
+    color: #f0f0f0;
+  }
+  .podiumName {
+    color: #e0e0e0;
+  }
+  .podiumPoints {
+    color: #999;
+  }
+  .emptyState {
+    background: #1a1a1a;
+    border-color: #333;
+  }
+  .emptyTitle {
+    color: #e0e0e0;
+  }
+  .emptyDesc {
+    color: #777;
+  }
+  .userPositionSection {
+    border-top-color: #333;
+  }
+  .backLink {
+    color: #66BB6A;
+  }
+  .backLink:hover {
+    color: #81C784;
+  }
+}

@@ -30,6 +30,7 @@ urlpatterns = [
 
     # ── Ranking ───────────────────────────────────────────────────
     path("ranking/", views.RankingView.as_view(), name="ranking"),
+    path("ranking-especial/", views.RankingEspecialView.as_view(), name="ranking-especial"),
 
     # ── Configuración del torneo ──────────────────────────────────
     path("configuracion/", views.ConfiguracionTorneoView.as_view(), name="configuracion-torneo"),
@@ -37,6 +38,7 @@ urlpatterns = [
     # ── Configuración predicciones especiales ─────────────────────
     path("configuracion-especiales/", views.ConfiguracionPrediccionEspecialListView.as_view(), name="config-especiales-list"),
     path("configuracion-especiales/<int:pk>/", views.ConfiguracionPrediccionEspecialDetailView.as_view(), name="config-especiales-detail"),
+    path("configuracion-especiales/<int:pk>/resolver/", views.ResolverPrediccionEspecialView.as_view(), name="config-especiales-resolver"),
 
     # ── Estadísticas ──────────────────────────────────────────────
     path("estadisticas/", views.EstadisticasView.as_view(), name="estadisticas"),

@@ -24,6 +24,8 @@ import {
   // @ts-ignore
   createEquipo,
   // @ts-ignore
+  updateEquipo,
+  // @ts-ignore
   createConfigEspecial,
   // @ts-ignore
   getConfigEspeciales,
@@ -31,6 +33,8 @@ import {
   updateConfigEspecial,
   // @ts-ignore
   deleteConfigEspecial,
+  // @ts-ignore
+  resolverPrediccionEspecial,
   // @ts-ignore
   getEdiciones,
 } from "../services/mundial.js";
@@ -79,6 +83,9 @@ export default function MundialAdmin() {
   const [formTeamBanderaImagen, setFormTeamBanderaImagen] = useState<File | null>(null);
   const [formTeamActive, setFormTeamActive] = useState(true);
 
+  // Team editing state
+  const [editingTeam, setEditingTeam] = useState<any | null>(null);
+
   // Special prediction form state
   const [formSpecialType, setFormSpecialType] = useState("");
   const [formSpecialPoints, setFormSpecialPoints] = useState(50);
@@ -87,6 +94,12 @@ export default function MundialAdmin() {
   const [formSpecialEnabled, setFormSpecialEnabled] = useState(true);
   const [formSpecialEdicion, setFormSpecialEdicion] = useState("");
   const [editingSpecialId, setEditingSpecialId] = useState<number | null>(null);
+
+  // Special prediction result state
+  const [showResolveSpecialModal, setShowResolveSpecialModal] = useState(false);
+  const [resolvingSpecialId, setResolvingSpecialId] = useState<number | null>(null);
+  const [formResolveEquipo, setFormResolveEquipo] = useState<number | null>(null);
+  const [formResolveJugador, setFormResolveJugador] = useState("");
 
   // Ediciones del mundial
   const [ediciones, setEdiciones] = useState<any[]>([]);
@@ -321,6 +334,47 @@ export default function MundialAdmin() {
     setTimeout(() => setShowSuccess(null), 2000);
   };
 
+  const handleResolveSpecial = async () => {
+    if (!resolvingSpecialId) return;
+    
+    const special = specialSettings.find(s => s.id === resolvingSpecialId);
+    if (!special) return;
+
+    const payload: any = {};
+    
+    // Para tipos de equipo
+    if (["campeon", "subcampeon", "tercer_lugar"].includes(special.tipo)) {
+      if (!formResolveEquipo) {
+        alert("Por favor selecciona el equipo ganador");
+        return;
+      }
+      payload.resultado_equipo = formResolveEquipo;
+    }
+    // Para máximo goleador
+    else if (special.tipo === "maximo_goleador") {
+      if (!formResolveJugador.trim()) {
+        alert("Por favor escribe el nombre del jugador");
+        return;
+      }
+      payload.resultado_jugador = formResolveJugador;
+    }
+
+    try {
+      const res = await resolverPrediccionEspecial(resolvingSpecialId, payload);
+      alert(`✓ Predicción especial resuelta!\n\n${res.data.resumen.acertadas} usuarios acertaron\n${res.data.resumen.fallidas} usuarios fallaron`);
+      await reloadSpecialSettings();
+      setShowResolveSpecialModal(false);
+      setResolvingSpecialId(null);
+      setFormResolveEquipo(null);
+      setFormResolveJugador("");
+      triggerSuccess("Predicción especial resuelta");
+    } catch (error: any) {
+      console.error("Error resolviendo predicción especial:", error);
+      const errorMsg = error.response?.data?.error || error.message || "Error desconocido";
+      alert(`Error: ${errorMsg}`);
+    }
+  };
+
   const reloadSpecialSettings = async () => {
     try {
       const res = await getConfigEspeciales();
@@ -336,6 +390,10 @@ export default function MundialAdmin() {
       const res = await getEquipos();
       const data = Array.isArray(res.data) ? res.data : res.data?.equipos || [];
       setTeams(data);
+      // Recargar partidos para que reflejen las banderas actualizadas
+      const resP = await getPartidosAdmin();
+      const dataP = Array.isArray(resP.data) ? resP.data : resP.data?.partidos || [];
+      setMatches(dataP);
     } catch (error) {
       console.error("Error recargando equipos:", error);
     }
@@ -720,6 +778,7 @@ export default function MundialAdmin() {
                 setFormTeamEmoji("");
                 setFormTeamBanderaImagen(null);
                 setFormTeamActive(true);
+                setEditingTeam(null);
                 setShowCreateTeamModal(true);
               }}>
                 ➕ Crear Equipo
@@ -734,7 +793,20 @@ export default function MundialAdmin() {
                   <div style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", marginBottom: "1rem" }}>
                     {team.activo ? "✅ Activo" : "❌ Inactivo"}
                   </div>
-                  <button className={styles.btnOutline} style={{ width: "100%" }}>Editar</button>
+                  <button 
+                    className={styles.btnOutline} 
+                    style={{ width: "100%" }}
+                    onClick={() => {
+                      setEditingTeam(team);
+                      setFormTeamName(team.nombre);
+                      setFormTeamCodigo(team.codigo || "");
+                      setFormTeamEdicion(team.edicion || "");
+                      setFormTeamEmoji(team.bandera_emoji || "");
+                      setFormTeamBanderaImagen(null);
+                      setFormTeamActive(team.activo);
+                      setShowCreateTeamModal(true);
+                    }}
+                  >Editar</button>
                 </div>
               ))}
             </div>
@@ -872,37 +944,53 @@ export default function MundialAdmin() {
                             <div style={{ fontSize: "0.7rem", fontWeight: 600, color: "var(--muted-foreground)", marginBottom: "0.25rem" }}>
                               ESTADO
                             </div>
-                            {sp.habilitada ? "✅ Habilitada" : "❌ Deshabilitada"}
+                            {sp.estado === "abierta" && "⏱️ Abierta"}
+                            {sp.estado === "bloqueada" && "🔒 Bloqueada"}
+                            {sp.estado === "resuelta" && "✅ Resuelta"}
                           </div>
                         </div>
 
-                        <div style={{ display: "flex", gap: "0.5rem" }}>
-                          <button className={styles.btnOutline} style={{ flex: 1, fontSize: "0.8rem" }} onClick={() => {
-                            setEditingSpecialId(sp.id);
-                            setFormSpecialType(sp.tipo);
-                            setFormSpecialPoints(sp.puntos_acierto || 50);
-                            setFormSpecialDeadline(sp.fecha_cierre || "");
-                            setFormSpecialDescription(sp.descripcion || "");
-                            setFormSpecialEnabled(sp.habilitada || false);
-                            setFormSpecialEdicion(String(sp.edicion || ""));
-                            setShowCreateSpecialModal(true);
-                          }}>
-                            ✏️ Editar
-                          </button>
-                          <button className={styles.btnOutline} style={{ flex: 1, fontSize: "0.8rem", color: "var(--destructive)" }} onClick={async () => {
-                            if (confirm("¿Eliminar esta predicción especial?")) {
-                              try {
-                                await deleteConfigEspecial(sp.id);
-                                await reloadSpecialSettings();
-                                triggerSuccess("Predicción especial eliminada");
-                              } catch (error) {
-                                console.error("Error eliminando predicción especial:", error);
-                                alert("Error al eliminar la predicción especial");
-                              }
-                            }
-                          }}>
-                            🗑️ Eliminar
-                          </button>
+                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                          {sp.estado === "bloqueada" && (
+                            <button className={styles.btnPrimary} style={{ flex: "1 1 auto", minWidth: "120px", fontSize: "0.8rem" }} onClick={() => {
+                              setResolvingSpecialId(sp.id);
+                              setFormResolveEquipo(null);
+                              setFormResolveJugador("");
+                              setShowResolveSpecialModal(true);
+                            }}>
+                              ✓ Resolver
+                            </button>
+                          )}
+                          {sp.estado === "abierta" && (
+                            <>
+                              <button className={styles.btnOutline} style={{ flex: "1 1 auto", minWidth: "80px", fontSize: "0.8rem" }} onClick={() => {
+                                setEditingSpecialId(sp.id);
+                                setFormSpecialType(sp.tipo);
+                                setFormSpecialPoints(sp.puntos_acierto || 50);
+                                setFormSpecialDeadline(sp.fecha_cierre || "");
+                                setFormSpecialDescription(sp.descripcion || "");
+                                setFormSpecialEnabled(sp.habilitada || false);
+                                setFormSpecialEdicion(String(sp.edicion || ""));
+                                setShowCreateSpecialModal(true);
+                              }}>
+                                ✏️ Editar
+                              </button>
+                              <button className={styles.btnOutline} style={{ flex: "1 1 auto", minWidth: "80px", fontSize: "0.8rem", color: "var(--destructive)" }} onClick={async () => {
+                                if (confirm("¿Eliminar esta predicción especial?")) {
+                                  try {
+                                    await deleteConfigEspecial(sp.id);
+                                    await reloadSpecialSettings();
+                                    triggerSuccess("Predicción especial eliminada");
+                                  } catch (error) {
+                                    console.error("Error eliminando predicción especial:", error);
+                                    alert("Error al eliminar la predicción especial");
+                                  }
+                                }
+                              }}>
+                                🗑️ Eliminar
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     );
@@ -1254,8 +1342,11 @@ export default function MundialAdmin() {
         <div className={styles.modalOverlay} onClick={() => setShowCreateTeamModal(false)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>➕ Crear Nuevo Equipo</h2>
-              <button className={styles.modalClose} onClick={() => setShowCreateTeamModal(false)}>✕</button>
+              <h2 className={styles.modalTitle}>{editingTeam ? "✏️ Editar Equipo" : "➕ Crear Nuevo Equipo"}</h2>
+              <button className={styles.modalClose} onClick={() => {
+                setShowCreateTeamModal(false);
+                setEditingTeam(null);
+              }}>✕</button>
             </div>
             <div className={styles.modalBody}>
               <div className={styles.formGroup}>
@@ -1291,16 +1382,21 @@ export default function MundialAdmin() {
                 </div>
               </div>
               <div className={styles.formGroup}>
-                <label>Imagen de Bandera</label>
+                <label>Imagen de Bandera {!editingTeam && <span style={{ color: "var(--destructive)" }}>*</span>}</label>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,.svg"
                   onChange={(e) => setFormTeamBanderaImagen(e.target.files?.[0] || null)}
                   className={styles.formInput}
                 />
                 {formTeamBanderaImagen && (
                   <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", marginTop: "0.5rem" }}>
                     ✓ {formTeamBanderaImagen.name}
+                  </p>
+                )}
+                {editingTeam && editingTeam.bandera && !formTeamBanderaImagen && (
+                  <p style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", marginTop: "0.5rem" }}>
+                    🖼️ Imagen actual: {editingTeam.bandera_imagen?.split('/').pop() || "Cloudinary"}
                   </p>
                 )}
               </div>
@@ -1326,34 +1422,47 @@ export default function MundialAdmin() {
               </div>
             </div>
             <div className={styles.modalFooter}>
-              <button className={styles.btnOutline} onClick={() => setShowCreateTeamModal(false)}>Cancelar</button>
+              <button className={styles.btnOutline} onClick={() => {
+                setShowCreateTeamModal(false);
+                setEditingTeam(null);
+              }}>Cancelar</button>
               <button className={styles.btnPrimary} onClick={async () => {
-                if (!formTeamName || !formTeamCodigo || !formTeamEdicion || !formTeamBanderaImagen) {
-                  alert("Por favor completa todos los campos requeridos (Nombre, Código, Edición e Imagen)");
+                // Si es creación, requiere imagen; si es edición, imagen es opcional
+                if (!editingTeam && !formTeamBanderaImagen) {
+                  alert("Por favor carga una imagen para crear el equipo");
+                  return;
+                }
+                if (!formTeamName) {
+                  alert("Por favor ingresa el nombre del equipo");
                   return;
                 }
                 try {
                   const formData = new FormData();
                   formData.append("nombre", formTeamName);
-                  formData.append("codigo", formTeamCodigo);
-                  formData.append("edicion", formTeamEdicion);
                   formData.append("bandera_emoji", formTeamEmoji || "");
                   formData.append("activo", formTeamActive ? "true" : "false");
-                  // Asegurar que el archivo se añade correctamente
+                  
                   if (formTeamBanderaImagen instanceof File) {
                     formData.append("bandera_imagen", formTeamBanderaImagen);
                   }
                   
-                  await createEquipo(formData);
+                  if (editingTeam) {
+                    await updateEquipo(editingTeam.id, formData);
+                    triggerSuccess("Equipo actualizado");
+                  } else {
+                    await createEquipo(formData);
+                    triggerSuccess("Equipo creado");
+                  }
+                  
                   await reloadTeams();
                   setShowCreateTeamModal(false);
-                  triggerSuccess("Equipo creado");
+                  setEditingTeam(null);
                 } catch (error) {
-                  console.error("Error creando equipo:", error);
-                  alert("Error al crear el equipo. Revisa que la imagen sea válida.");
+                  console.error("Error guardando equipo:", error);
+                  alert("Error al guardar el equipo. Revisa que la imagen sea válida.");
                 }
               }}>
-                Crear Equipo
+                {editingTeam ? "✓ Actualizar Equipo" : "➕ Crear Equipo"}
               </button>
             </div>
           </div>
@@ -1521,6 +1630,126 @@ export default function MundialAdmin() {
                 }
               }} disabled={!formSpecialType || !formSpecialDeadline || !formSpecialDescription || !formSpecialEdicion}>
                 ✓ {editingSpecialId ? "Actualizar" : "Crear"} Predicción Especial
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== RESOLVE SPECIAL PREDICTION MODAL ===== */}
+      {showResolveSpecialModal && resolvingSpecialId && (
+        <div className={styles.modalOverlay} onClick={() => setShowResolveSpecialModal(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>✓ Resolver Predicción Especial</h2>
+              <button className={styles.modalClose} onClick={() => setShowResolveSpecialModal(false)}>✕</button>
+            </div>
+            <div className={styles.modalBody}>
+              {(() => {
+                const special = specialSettings.find(s => s.id === resolvingSpecialId);
+                if (!special) return null;
+
+                return (
+                  <>
+                    <div style={{ marginBottom: "1.5rem", padding: "1rem", backgroundColor: "var(--muted)", borderRadius: "6px" }}>
+                      <h3 style={{ margin: "0 0 0.5rem 0", fontWeight: 700, fontSize: "1.1rem" }}>
+                        {special.tipo === "campeon" && "🏆"} 
+                        {special.tipo === "subcampeon" && "🥈"}
+                        {special.tipo === "tercer_lugar" && "🥉"}
+                        {special.tipo === "maximo_goleador" && "🔝"}
+                        {" "}{special.tipo_display || special.tipo}
+                      </h3>
+                      <p style={{ margin: "0.25rem 0 0 0", fontSize: "0.85rem", color: "var(--muted-foreground)" }}>
+                        {special.descripcion}
+                      </p>
+                    </div>
+
+                    {["campeon", "subcampeon", "tercer_lugar"].includes(special.tipo) ? (
+                      <>
+                        <div className={styles.formGroup}>
+                          <label>Equipo Ganador <span style={{ color: "var(--destructive)" }}>*</span></label>
+                          <select
+                            value={formResolveEquipo || ""}
+                            onChange={(e) => setFormResolveEquipo(e.target.value ? parseInt(e.target.value) : null)}
+                            className={styles.formInput}
+                          >
+                            <option value="">Seleccionar equipo...</option>
+                            {teams.map((t) => (
+                              <option key={t.id} value={t.id}>
+                                {t.bandera_emoji || ""} {t.nombre}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        {formResolveEquipo && (
+                          <div style={{ padding: "1rem", backgroundColor: "var(--muted)", borderRadius: "6px", marginTop: "1rem", textAlign: "center" }}>
+                            <p style={{ fontSize: "0.85rem", color: "var(--muted-foreground)", marginBottom: "0.5rem" }}>
+                              Resultado elegido:
+                            </p>
+                            <div style={{ fontSize: "1.5rem", fontWeight: 700 }}>
+                              {teams.find(t => t.id === formResolveEquipo)?.bandera_emoji} {teams.find(t => t.id === formResolveEquipo)?.nombre}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div className={styles.formGroup}>
+                          <label>Nombre del Jugador <span style={{ color: "var(--destructive)" }}>*</span></label>
+                          <input
+                            type="text"
+                            value={formResolveJugador}
+                            onChange={(e) => setFormResolveJugador(e.target.value)}
+                            placeholder="Ej: Lionel Messi"
+                            className={styles.formInput}
+                          />
+                        </div>
+                        {formResolveJugador && (
+                          <div style={{ padding: "1rem", backgroundColor: "var(--muted)", borderRadius: "6px", marginTop: "1rem", textAlign: "center" }}>
+                            <p style={{ fontSize: "0.85rem", color: "var(--muted-foreground)", marginBottom: "0.5rem" }}>
+                              Resultado elegido:
+                            </p>
+                            <div style={{ fontSize: "1.3rem", fontWeight: 700 }}>
+                              {formResolveJugador}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    <div style={{ 
+                      padding: "1rem", 
+                      backgroundColor: "rgba(255, 193, 7, 0.1)", 
+                      borderLeft: "3px solid #FFC107",
+                      borderRadius: "4px", 
+                      marginTop: "1.5rem",
+                      fontSize: "0.8rem"
+                    }}>
+                      <strong>📌 Información:</strong><br />
+                      Al resolver esta predicción, se evaluarán todas las predicciones de usuarios y se otorgarán {special.puntos_acierto} puntos a cada uno que haya acertado correctamente.
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.btnOutline} onClick={() => setShowResolveSpecialModal(false)}>Cancelar</button>
+              <button 
+                className={styles.btnPrimary} 
+                onClick={handleResolveSpecial}
+                disabled={
+                  (() => {
+                    const special = specialSettings.find(s => s.id === resolvingSpecialId);
+                    if (!special) return true;
+                    if (["campeon", "subcampeon", "tercer_lugar"].includes(special.tipo)) {
+                      return !formResolveEquipo;
+                    } else {
+                      return !formResolveJugador.trim();
+                    }
+                  })()
+                }
+              >
+                ✓ Resolver y Otorgar Puntos
               </button>
             </div>
           </div>

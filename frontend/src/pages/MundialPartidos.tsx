@@ -382,8 +382,8 @@ export default function MundialPartidos() {
                 </div>
 
                 <div className={styles.teamsRow}>
-                  {/* Home team */}
-                  <div className={styles.teamSide}>
+                  {/* Home team - Flag first, then name */}
+                  <div className={`${styles.teamSide} ${styles.teamSideHome}`}>
                     <img src={match.equipo_local_bandera || match.homeFlag} alt={match.equipo_local_nombre || match.homeTeam} className={styles.teamFlagImg} />
                     <span className={styles.teamName}>{ match.homeTeam || match.equipo_local_nombre}</span>
                   </div>
@@ -397,13 +397,6 @@ export default function MundialPartidos() {
                           <span className={styles.scoreSeparator}>-</span>
                           <span className={styles.scoreValue}>{pred.away}</span>
                         </div>
-                        <p className={styles.scoreTeamLabel}>
-                          {pred.winner === "home"
-                            ? `Gana ${match.equipo_local_nombre || match.homeTeam}`
-                            : pred.winner === "away"
-                              ? `Gana ${match.equipo_visitante_nombre || match.awayTeam}`
-                              : "Empate"}
-                        </p>
                       </div>
                     ) : (
                       <div className={`${styles.scoreBox} ${styles.scorePending}`}>
@@ -414,7 +407,7 @@ export default function MundialPartidos() {
                     )}
                   </div>
 
-                  {/* Away team */}
+                  {/* Away team - Name first, then flag */}
                   <div className={`${styles.teamSide} ${styles.teamSideAway}`}>
                     <span className={styles.teamName}>{match.equipo_visitante_nombre || match.awayTeam}</span>
                     <img src={match.equipo_visitante_bandera || match.awayFlag} alt={match.equipo_visitante_nombre || match.awayTeam} className={styles.teamFlagImg} />
@@ -474,18 +467,18 @@ export default function MundialPartidos() {
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
               <h2 className={styles.modalTitle}>
-                {predictions[selectedMatch.id] ? "Editar Predicción" : "Nueva Predicción"}
+                🎯 {predictions[selectedMatch.id] ? "Editar Predicción" : "Nueva Predicción"}
               </h2>
               <p className={styles.modalSubtext}>
-                {selectedMatch.fase || selectedMatch.phase}{(selectedMatch.grupo || selectedMatch.group) ? ` - Grupo ${selectedMatch.grupo || selectedMatch.group}` : ""} | {(selectedMatch.fecha || selectedMatch.date) ? formatDateES(selectedMatch.fecha || selectedMatch.date || "") : "N/A"} - {(selectedMatch.hora || selectedMatch.time) || "N/A"}
+                {selectedMatch.fase || selectedMatch.phase}{(selectedMatch.grupo || selectedMatch.group) ? ` • Grupo ${selectedMatch.grupo || selectedMatch.group}` : ""} • {(selectedMatch.fecha || selectedMatch.date) ? formatDateES(selectedMatch.fecha || selectedMatch.date || "") : "N/A"} {(selectedMatch.hora || selectedMatch.time) && `• ${selectedMatch.hora || selectedMatch.time}`}
               </p>
             </div>
 
             <div className={styles.modalBody}>
               {/* Step 1: Who wins? */}
               <div className={styles.stepSection}>
-                <p className={styles.stepLabel}>Paso 1: ¿Quién gana el partido?</p>
-                <div className={styles.winnerGrid}>
+                <p className={styles.stepLabel}>🏁 Paso 1: ¿Quién gana el partido?</p>
+                <div className={`${styles.winnerGrid} ${(selectedMatch.fase || selectedMatch.phase) === "Grupos" ? styles.groupsPhase : ''}`}>
                   <button
                     type="button"
                     onClick={() => setWinner("home")}
@@ -500,17 +493,21 @@ export default function MundialPartidos() {
                     {winner === "home" && <span className={styles.checkIcon}>✓</span>}
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setWinner("draw")}
-                    className={`${styles.winnerOption} ${styles.winnerOptionDraw} ${
-                      winner === "draw" ? styles.winnerOptionSelected : ""
-                    }`}
-                  >
-                    <span className={styles.winnerFlag}>=</span>
-                    <span className={styles.winnerLabel}>Empate</span>
-                    {winner === "draw" && <span className={styles.checkIcon}>✓</span>}
-                  </button>
+                  {(selectedMatch.fase || selectedMatch.phase) !== "Grupos" ? (
+                    <button
+                      type="button"
+                      onClick={() => setWinner("draw")}
+                      className={`${styles.winnerOption} ${styles.winnerOptionDraw} ${
+                        winner === "draw" ? styles.winnerOptionSelected : ""
+                      }`}
+                    >
+                      <span className={styles.winnerFlag}>=</span>
+                      <span className={styles.winnerLabel}>Empate</span>
+                      {winner === "draw" && <span className={styles.checkIcon}>✓</span>}
+                    </button>
+                  ) : (
+                    <div className={styles.winnerVsSeparator}>VS</div>
+                  )}
 
                   <button
                     type="button"
@@ -530,58 +527,56 @@ export default function MundialPartidos() {
 
               {/* Step 2: Score */}
               <div className={styles.stepSection}>
-                <p className={styles.stepLabel}>Paso 2: Marcador exacto</p>
+                <p className={styles.stepLabel}>⚽ Paso 2: Marcador exacto</p>
                 <div className={styles.scoreSection}>
                   {/* Home score */}
                   <div className={styles.scoreTeam}>
                     <span className={styles.scoreTeamLabel}>
+                      <img src={selectedMatch.equipo_local_bandera || selectedMatch.homeFlag} alt="" style={{ width: '16px', height: '11px' }} />
                       {selectedMatch.equipo_local_nombre || selectedMatch.homeTeam}
                     </span>
-                    <div className={styles.scoreControls}>
+                    <div className={styles.scoreInputGroup}>
                       <button
                         type="button"
                         onClick={() => adjustScore("home", -1)}
-                        className={styles.scoreButton}
+                        className={styles.scoreButtonMinus}
                       >
-                        ➖
+                        −
                       </button>
-                      <div className={styles.scoreBigBox}>
-                        <span className={styles.scoreBigValue}>{homeScore}</span>
-                      </div>
+                      <div className={styles.scoreDisplay}>{homeScore}</div>
                       <button
                         type="button"
                         onClick={() => adjustScore("home", 1)}
-                        className={styles.scoreButton}
+                        className={styles.scoreButtonPlus}
                       >
-                        ➕
+                        +
                       </button>
                     </div>
                   </div>
 
-                  <span className={styles.scoreSeparatorBig}>-</span>
+                  <span className={styles.scoreSeparatorBig}>vs</span>
 
                   {/* Away score */}
                   <div className={styles.scoreTeam}>
                     <span className={styles.scoreTeamLabel}>
+                      <img src={selectedMatch.equipo_visitante_bandera || selectedMatch.awayFlag} alt="" style={{ width: '16px', height: '11px' }} />
                       {selectedMatch.equipo_visitante_nombre || selectedMatch.awayTeam}
                     </span>
-                    <div className={styles.scoreControls}>
+                    <div className={styles.scoreInputGroup}>
                       <button
                         type="button"
                         onClick={() => adjustScore("away", -1)}
-                        className={styles.scoreButton}
+                        className={styles.scoreButtonMinus}
                       >
-                        ➖
+                        −
                       </button>
-                      <div className={styles.scoreBigBox}>
-                        <span className={styles.scoreBigValue}>{awayScore}</span>
-                      </div>
+                      <div className={styles.scoreDisplay}>{awayScore}</div>
                       <button
                         type="button"
                         onClick={() => adjustScore("away", 1)}
-                        className={styles.scoreButton}
+                        className={styles.scoreButtonPlus}
                       >
-                        ➕
+                        +
                       </button>
                     </div>
                   </div>
@@ -601,7 +596,7 @@ export default function MundialPartidos() {
               {/* Step 3: Penalty shootout (only if draw) */}
               {winner === "draw" && (
                 <div className={styles.stepSection}>
-                  <p className={styles.stepLabel}>Paso 3: Resultado de penaltis/desempate (Opcional)</p>
+                  <p className={styles.stepLabel}>🔥 Paso 3: Penaltis/Desempate (Opcional)</p>
                   <p className={styles.stepDescription}>Si crees que el partido se decide por penaltis, ingresa los goles predichos.</p>
                   
                   {penaltisHome === penaltisAway && (penaltisHome !== 0 || penaltisAway !== 0) && (
@@ -614,53 +609,51 @@ export default function MundialPartidos() {
                     {/* Home penaltis */}
                     <div className={styles.scoreTeam}>
                       <span className={styles.scoreTeamLabel}>
+                        <img src={selectedMatch.equipo_local_bandera || selectedMatch.homeFlag} alt="" style={{ width: '16px', height: '11px' }} />
                         {selectedMatch.equipo_local_nombre || selectedMatch.homeTeam} (P)
                       </span>
-                      <div className={styles.scoreControls}>
+                      <div className={styles.scoreInputGroup}>
                         <button
                           type="button"
                           onClick={() => adjustPenaltis("home", -1)}
-                          className={styles.scoreButton}
+                          className={styles.scoreButtonMinus}
                         >
-                          ➖
+                          −
                         </button>
-                        <div className={styles.scoreBigBox}>
-                          <span className={styles.scoreBigValue}>{penaltisHome}</span>
-                        </div>
+                        <div className={styles.scoreDisplay}>{penaltisHome}</div>
                         <button
                           type="button"
                           onClick={() => adjustPenaltis("home", 1)}
-                          className={styles.scoreButton}
+                          className={styles.scoreButtonPlus}
                         >
-                          ➕
+                          +
                         </button>
                       </div>
                     </div>
 
-                    <span className={styles.scoreSeparatorBig}>-</span>
+                    <span className={styles.scoreSeparatorBig}>vs</span>
 
                     {/* Away penaltis */}
                     <div className={styles.scoreTeam}>
                       <span className={styles.scoreTeamLabel}>
+                        <img src={selectedMatch.equipo_visitante_bandera || selectedMatch.awayFlag} alt="" style={{ width: '16px', height: '11px' }} />
                         {selectedMatch.equipo_visitante_nombre || selectedMatch.awayTeam} (P)
                       </span>
-                      <div className={styles.scoreControls}>
+                      <div className={styles.scoreInputGroup}>
                         <button
                           type="button"
                           onClick={() => adjustPenaltis("away", -1)}
-                          className={styles.scoreButton}
+                          className={styles.scoreButtonMinus}
                         >
-                          ➖
+                          −
                         </button>
-                        <div className={styles.scoreBigBox}>
-                          <span className={styles.scoreBigValue}>{penaltisAway}</span>
-                        </div>
+                        <div className={styles.scoreDisplay}>{penaltisAway}</div>
                         <button
                           type="button"
                           onClick={() => adjustPenaltis("away", 1)}
-                          className={styles.scoreButton}
+                          className={styles.scoreButtonPlus}
                         >
-                          ➕
+                          +
                         </button>
                       </div>
                     </div>
@@ -671,13 +664,13 @@ export default function MundialPartidos() {
               {/* Points Info */}
               <div className={styles.pointsInfo}>
                 <div className={styles.pointsRow}>
-                  <span className={styles.pointsLabel}>Resultado exacto</span>
+                  <span className={styles.pointsLabel}>📊 Resultado exacto</span>
                   <span className={styles.pointsValue}>
                     {selectedMatch.multiplier ? (3 * parseFloat(selectedMatch.multiplier.replace("x", ""))) : 0} pts
                   </span>
                 </div>
                 <div className={styles.pointsRow}>
-                  <span className={styles.pointsLabel}>Ganador correcto</span>
+                  <span className={styles.pointsLabel}>🎯 Ganador correcto</span>
                   <span className={styles.pointsValue}>
                     {selectedMatch.multiplier ? (1 * parseFloat(selectedMatch.multiplier.replace("x", ""))) : 0} pts
                   </span>
@@ -694,7 +687,7 @@ export default function MundialPartidos() {
                 disabled={!winner}
                 onClick={handleSavePrediction}
               >
-                Guardar Predicción
+                ✓ Guardar Predicción
               </button>
             </div>
           </div>

@@ -6,13 +6,14 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework import status
+import cloudinary.uploader
 
 from usuarios.permissions import IsSuperUserOrAdmin
 
 from .models import (
     EdicionMundial, Equipo, Partido, Prediccion, PrediccionEspecial,
-    RankingMundial, ConfiguracionTorneo, ConfiguracionPrediccionEspecial,
-    EstadoPartido,
+    RankingMundial, RankingEspecial, ConfiguracionTorneo, ConfiguracionPrediccionEspecial,
+    EstadoPartido, EstadoPrediccionEspecial,
 )
 from .serializers import (
     EdicionMundialSerializer,
@@ -21,7 +22,7 @@ from .serializers import (
     PartidoCreateUpdateSerializer, PartidoResultadoSerializer,
     PrediccionSerializer, PrediccionCreateSerializer,
     PrediccionEspecialSerializer,
-    RankingSerializer,
+    RankingSerializer, RankingEspecialSerializer,
     ConfiguracionTorneoSerializer,
     ConfiguracionPrediccionEspecialSerializer,
     EstadisticasSerializer,
@@ -36,6 +37,8 @@ from .utils import (
     obtener_posicion_usuario,
     registrar_primera_prediccion,
     obtener_estadisticas,
+    resolver_prediccion_especial,
+    verificar_y_bloquear_predicciones_especiales,
 )
 
 
@@ -115,10 +118,29 @@ class EquipoListCreateView(APIView):
         return Response(EquipoSerializer(equipos, many=True, context={"request": request}).data)
 
     def post(self, request):
-        """Admin crea un equipo nuevo."""
+        """Admin crea un equipo nuevo. Sube bandera a Cloudinary."""
         serializer = EquipoCreateUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        equipo = serializer.save()
+
+        # Extraer imagen antes de guardar (no se guarda en media local)
+        imagen = serializer.validated_data.pop("bandera_imagen", None)
+        bandera_url = None
+
+        if imagen:
+            try:
+                resultado = cloudinary.uploader.upload(
+                    imagen,
+                    folder="mundial/banderas",
+                    resource_type="image",
+                )
+                bandera_url = resultado.get("secure_url")
+            except Exception as e:
+                return Response(
+                    {"error": f"Error al subir imagen a Cloudinary: {str(e)}"},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+        equipo = serializer.save(bandera_url=bandera_url)
         return Response(
             EquipoSerializer(equipo, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
@@ -440,19 +462,32 @@ class PrediccionEspecialListCreateView(APIView):
         if not colaborador:
             return Response({"error": "Usuario sin colaborador asociado."}, status=400)
 
+        edicion = _get_edicion_o_404()
+        if not edicion:
+            return Response({"error": "No hay edición activa."}, status=404)
+
         tipo = request.data.get("tipo")
+        if not tipo:
+            return Response({"error": "Debes especificar el tipo de predicción."}, status=400)
+
+        # Verificar que la configuración exista y esté abierta
+        config = ConfiguracionPrediccionEspecial.objects.filter(
+            edicion=edicion, tipo=tipo, habilitada=True
+        ).first()
+        if not config:
+            return Response(
+                {"error": "Esta predicción especial no está disponible."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not config.esta_abierta():
+            return Response(
+                {"error": f"Las predicciones para {config.get_tipo_display()} se cerraron el {config.fecha_cierre.strftime('%d/%m/%Y a las %H:%M')}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         existente = PrediccionEspecial.objects.filter(
             colaborador=colaborador, tipo=tipo
         ).first()
-
-        # Si existe y el usuario no puede editar, rechazar
-        if existente and not existente.puede_editarse():
-            config = existente._get_config()
-            if config:
-                return Response(
-                    {"error": f"No puedes editar: se cerró el {config.fecha_cierre.strftime('%d/%m/%Y a las %H:%M')}"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
 
         serializer = PrediccionEspecialSerializer(
             existente, data=request.data, partial=bool(existente),
@@ -460,6 +495,11 @@ class PrediccionEspecialListCreateView(APIView):
         )
         serializer.is_valid(raise_exception=True)
         prediccion = serializer.save()
+
+        # Registrar primera predicción especial para desempate en ranking
+        if existente is None:
+            from .utils import registrar_primera_prediccion_especial
+            registrar_primera_prediccion_especial(colaborador, edicion, prediccion.creado_en)
 
         created = existente is None
         return Response(
@@ -471,10 +511,39 @@ class PrediccionEspecialListCreateView(APIView):
 class PrediccionEspecialDetailView(APIView):
     permission_classes = [IsAuthenticated]
 
-    PrediccionEspecialRespuestaSerializer
+    def get(self, request, pk):
+        """Obtiene una predicción especial específica del usuario."""
+        colaborador = _get_colaborador(request)
+        if not colaborador:
+            return Response({"error": "Usuario sin colaborador asociado."}, status=400)
 
+        prediccion = get_object_or_404(PrediccionEspecial, pk=pk, colaborador=colaborador)
+        return Response(PrediccionEspecialSerializer(prediccion, context={"request": request}).data)
 
-    
+    def put(self, request, pk):
+        """Actualiza una predicción especial del usuario."""
+        colaborador = _get_colaborador(request)
+        if not colaborador:
+            return Response({"error": "Usuario sin colaborador asociado."}, status=400)
+
+        prediccion = get_object_or_404(PrediccionEspecial, pk=pk, colaborador=colaborador)
+        
+        if not prediccion.puede_editarse():
+            config = prediccion._get_config()
+            if config:
+                return Response(
+                    {"error": f"No puedes editar: se cerró el {config.fecha_cierre.strftime('%d/%m/%Y a las %H:%M')}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        serializer = PrediccionEspecialSerializer(
+            prediccion, data=request.data, partial=True,
+            context={"colaborador": colaborador, "request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        prediccion = serializer.save()
+
+        return Response(PrediccionEspecialSerializer(prediccion, context={"request": request}).data)
 
 
 # ================================================================
@@ -485,7 +554,7 @@ class RankingView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        """Retorna el top 10 del ranking y la posición del usuario actual."""
+        """Retorna el top 10 del ranking de partidos y la posición del usuario actual."""
         edicion = _get_edicion_o_404()
         if not edicion:
             return Response({"ranking": [], "mi_posicion": None})
@@ -500,6 +569,28 @@ class RankingView(APIView):
             "ranking": RankingSerializer(top, many=True).data,
             "total_participantes": RankingMundial.objects.filter(edicion=edicion).count(),
             "mi_posicion": RankingSerializer(mi_ranking).data if mi_ranking else None,
+        })
+
+
+class RankingEspecialView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """Retorna el top 10 del ranking de predicciones especiales y la posición del usuario actual."""
+        edicion = _get_edicion_o_404()
+        if not edicion:
+            return Response({"ranking": [], "mi_posicion": None})
+
+        limite = int(request.query_params.get("limite", 10))
+        top = RankingEspecial.objects.filter(edicion=edicion).select_related("colaborador").order_by("posicion")[:limite]
+
+        colaborador = _get_colaborador(request)
+        mi_ranking = RankingEspecial.objects.filter(edicion=edicion, colaborador=colaborador).first() if colaborador else None
+
+        return Response({
+            "ranking": RankingEspecialSerializer(top, many=True).data,
+            "total_participantes": RankingEspecial.objects.filter(edicion=edicion).count(),
+            "mi_posicion": RankingEspecialSerializer(mi_ranking).data if mi_ranking else None,
         })
 
 
@@ -596,6 +687,9 @@ class ConfiguracionPrediccionEspecialListView(APIView):
     def get(self, request):
         """Todos pueden ver la lista de predicciones especiales habilitadas."""
         edicion = _get_edicion_o_404()
+        # Verificar y bloquear predicciones que han llegado a su cierre
+        if edicion:
+            verificar_y_bloquear_predicciones_especiales(edicion)
         configs = ConfiguracionPrediccionEspecial.objects.filter(
             edicion=edicion, habilitada=True
         ) if edicion else ConfiguracionPrediccionEspecial.objects.none()
@@ -625,6 +719,79 @@ class ConfiguracionPrediccionEspecialDetailView(APIView):
         config = get_object_or_404(ConfiguracionPrediccionEspecial, pk=pk)
         config.delete()
         return Response({"mensaje": "Configuración especial eliminada."}, status=status.HTTP_204_NO_CONTENT)
+
+
+class ResolverPrediccionEspecialView(APIView):
+    """
+    Admin resuelve una predicción especial: establece el resultado real
+    y otorga puntos a todos los usuarios que acertaron.
+    """
+    permission_classes = [IsAuthenticated, IsSuperUserOrAdmin]
+
+    def post(self, request, pk):
+        config = get_object_or_404(ConfiguracionPrediccionEspecial, pk=pk)
+
+        # 1. Verificar que no esté ya resuelta
+        if config.estado == EstadoPrediccionEspecial.RESUELTA:
+            return Response(
+                {"error": "Esta predicción especial ya fue resuelta."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 2. Verificar que esté bloqueada (fecha de cierre alcanzada)
+        if config.estado != EstadoPrediccionEspecial.BLOQUEADA:
+            return Response(
+                {"error": "Solo puedes resolver predicciones que estén bloqueadas. Espera a la fecha de cierre."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        tipo = config.tipo
+        resultado_equipo = None
+        resultado_jugador = None
+
+        # Para tipos de equipo (campeón, subcampeón, tercer lugar)
+        if tipo in ["campeon", "subcampeon", "tercer_lugar"]:
+            equipo_id = request.data.get("resultado_equipo")
+            if not equipo_id:
+                return Response(
+                    {"error": "Debes especificar el equipo ganador (resultado_equipo)."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            resultado_equipo = get_object_or_404(Equipo, pk=equipo_id)
+
+        # Para máximo goleador
+        elif tipo == "maximo_goleador":
+            resultado_jugador = request.data.get("resultado_jugador")
+            if not resultado_jugador:
+                return Response(
+                    {"error": "Debes especificar el nombre del jugador (resultado_jugador)."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # Resolver y calcular puntos
+        try:
+            resumen = resolver_prediccion_especial(
+                config_especial=config,
+                resultado_equipo=resultado_equipo,
+                resultado_jugador=resultado_jugador,
+            )
+
+            if "error" in resumen:
+                return Response({"error": resumen["error"]}, status=status.HTTP_400_BAD_REQUEST)
+
+            return Response({
+                "configuracion": ConfiguracionPrediccionEspecialSerializer(config, context={"request": request}).data,
+                "resumen": resumen,
+                "mensaje": f"Predicción especial resuelta. {resumen['acertadas']} usuarios acertaron.",
+            })
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception(f"Error resolviendo predicción especial {pk}: {str(e)}")
+            return Response(
+                {"error": f"Error al resolver predicción: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 # ================================================================
@@ -721,7 +888,7 @@ class HomeDataView(APIView):
             configuracion_response = ConfiguracionTorneoSerializer(config).data
 
             # ============================================
-            # 4. RANKING (RankingView)
+            # 4. RANKING (RankingView - Partidos)
             # ============================================
             limite = int(request.query_params.get("limite", 10))
             top = obtener_ranking_top(edicion, limite)
@@ -734,11 +901,25 @@ class HomeDataView(APIView):
                 "mi_posicion": RankingSerializer(mi_ranking).data if mi_ranking else None,
             }
 
+            # ============================================
+            # 5. RANKING ESPECIAL (RankingEspecialView)
+            # ============================================
+            top_especial = RankingEspecial.objects.filter(edicion=edicion).select_related("colaborador").order_by("posicion")[:limite]
+
+            mi_ranking_especial = RankingEspecial.objects.filter(edicion=edicion, colaborador=colaborador).first() if colaborador else None
+
+            ranking_especial_response = {
+                "ranking": RankingEspecialSerializer(top_especial, many=True).data,
+                "total_participantes": RankingEspecial.objects.filter(edicion=edicion).count(),
+                "mi_posicion": RankingEspecialSerializer(mi_ranking_especial).data if mi_ranking_especial else None,
+            }
+
             return Response({
                 "partidos": partidos_response,
                 "predicciones_especiales": predicciones_especiales_response,
                 "configuracion": configuracion_response,
                 "ranking": ranking_response,
+                "ranking_especial": ranking_especial_response,
             })
 
         except Exception as e:

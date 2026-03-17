@@ -197,6 +197,132 @@ def recalcular_posiciones_ranking(edicion):
         ranking.save(update_fields=["posicion", "tendencia"])
 
 
+def recalcular_posiciones_ranking_especial(edicion):
+    """
+    Recalcula y guarda las posiciones del ranking especial para una edición.
+    Criterio: mayor puntaje de predicciones especiales primero. Empate: quien predijo primero.
+    """
+    from .models import RankingEspecial
+    rankings = list(
+        RankingEspecial.objects
+        .filter(edicion=edicion)
+        .order_by("-puntos_totales", "-predicciones_especiales_acertadas", "fecha_primera_prediccion")
+    )
+    for i, ranking in enumerate(rankings, start=1):
+        posicion_anterior = ranking.posicion
+        ranking.posicion = i
+        ranking.tendencia = posicion_anterior - i  # positivo = subió, negativo = bajó
+        ranking.save(update_fields=["posicion", "tendencia"])
+
+
+def verificar_y_bloquear_predicciones_especiales(edicion=None):
+    """
+    Verifica y bloquea todas las predicciones especiales que han llegado a su fecha de cierre.
+    Si la fecha de cierre pasó, cambia estado de ABIERTA a BLOQUEADA.
+    
+    Args:
+        edicion: EdicionMundial opcional. Si no se proporciona, revisa TODAS.
+    
+    Returns:
+        int: Cantidad de predicciones bloqueadas en esta ejecución.
+    """
+    from .models import ConfiguracionPrediccionEspecial, EstadoPrediccionEspecial
+    
+    ahora = timezone.now()
+    filtros = {"estado": EstadoPrediccionEspecial.ABIERTA}
+    if edicion:
+        filtros["edicion"] = edicion
+    
+    configs = ConfiguracionPrediccionEspecial.objects.filter(**filtros)
+    bloqueadas = 0
+    
+    for config in configs:
+        if ahora >= config.fecha_cierre:
+            config.cerrar_prediccion()  # Cambia a CERRADA
+            bloqueadas += 1
+            logger.info(f"Predicción especial bloqueada: {config}")
+    
+    return bloqueadas
+
+
+@transaction.atomic
+def resolver_prediccion_especial(config_especial, resultado_equipo=None, resultado_jugador=None):
+    """
+    Resuelve una predicción especial: guarda el resultado real, evalúa todas
+    las predicciones de los usuarios y otorga puntos a quienes acertaron.
+    Actualiza el ranking especial de la edición.
+
+    Args:
+        config_especial: Instancia de ConfiguracionPrediccionEspecial
+        resultado_equipo: Instancia de Equipo (para campeón, subcampeón, tercer lugar)
+        resultado_jugador: Nombre del jugador (para máximo goleador)
+
+    Returns:
+        dict: Resumen del cálculo (total_evaluadas, acertadas, fallidas, puntos_totales_otorgados)
+    """
+    from .models import PrediccionEspecial, RankingEspecial, TipoPrediccionEspecial
+
+    # 1. Resolver la configuración guardando el resultado
+    config_especial.resolver_prediccion(
+        resultado_equipo=resultado_equipo,
+        resultado_jugador=resultado_jugador,
+    )
+
+    # 2. Determinar el valor de resultado_correcto según el tipo
+    if config_especial.tipo in [
+        TipoPrediccionEspecial.CAMPEON,
+        TipoPrediccionEspecial.SUBCAMPEON,
+        TipoPrediccionEspecial.TERCER_LUGAR,
+    ]:
+        resultado_correcto = resultado_equipo.id if resultado_equipo else None
+    elif config_especial.tipo == TipoPrediccionEspecial.MAXIMO_GOLEADOR:
+        resultado_correcto = resultado_jugador
+    else:
+        resultado_correcto = None
+
+    if resultado_correcto is None:
+        return {"error": "No se pudo determinar el resultado correcto."}
+
+    # 3. Obtener todas las predicciones de usuarios para este tipo
+    predicciones = PrediccionEspecial.objects.filter(
+        tipo=config_especial.tipo,
+    ).select_related("colaborador", "equipo_seleccionado")
+
+    resumen = {
+        "total_evaluadas": 0,
+        "acertadas": 0,
+        "fallidas": 0,
+        "puntos_totales_otorgados": 0,
+    }
+
+    for prediccion in predicciones:
+        resumen["total_evaluadas"] += 1
+        puntos = prediccion.calcular_puntos(resultado_correcto)
+        # Usar update() para bypassear validaciones (admin puede resolver aunque esté cerrada)
+        PrediccionEspecial.objects.filter(pk=prediccion.pk).update(puntos_obtenidos=prediccion.puntos_obtenidos)
+
+        if puntos and puntos > 0:
+            resumen["acertadas"] += 1
+            resumen["puntos_totales_otorgados"] += puntos
+        else:
+            resumen["fallidas"] += 1
+
+        # 4. Actualizar ranking especial de la edición
+        if config_especial.edicion:
+            ranking, _ = RankingEspecial.objects.get_or_create(
+                edicion=config_especial.edicion,
+                colaborador=prediccion.colaborador,
+            )
+            ranking.agregar_puntos_especial(puntos or 0)
+            ranking.save()
+
+    # 5. Recalcular posiciones del ranking especial
+    if config_especial.edicion:
+        recalcular_posiciones_ranking_especial(config_especial.edicion)
+
+    return resumen
+
+
 def obtener_ranking_top(edicion, limite=10):
     """Retorna los top N del ranking de una edición."""
     from .models import RankingMundial
@@ -221,6 +347,20 @@ def registrar_primera_prediccion(colaborador, edicion, fecha):
     """
     from .models import RankingMundial
     ranking, _ = RankingMundial.objects.get_or_create(
+        edicion=edicion, colaborador=colaborador
+    )
+    if ranking.fecha_primera_prediccion is None:
+        ranking.fecha_primera_prediccion = fecha
+        ranking.save(update_fields=["fecha_primera_prediccion"])
+
+
+def registrar_primera_prediccion_especial(colaborador, edicion, fecha):
+    """
+    Actualiza la fecha_primera_prediccion en el ranking especial si es la primera
+    predicción especial del colaborador en esta edición (para desempate).
+    """
+    from .models import RankingEspecial
+    ranking, _ = RankingEspecial.objects.get_or_create(
         edicion=edicion, colaborador=colaborador
     )
     if ranking.fecha_primera_prediccion is None:

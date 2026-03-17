@@ -72,7 +72,7 @@ export default function Layout() {
         <Navbar userType={userType} onMenuToggle={setSidebarOpen} />
         <main 
           style={{ 
-          padding: "16px",
+          padding: "0",
           overflow: "auto", 
           flex: 1,
           width: "100%",

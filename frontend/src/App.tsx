@@ -33,6 +33,7 @@ import CargoNivelRegion from "./pages/CargoNivelRegion";
 import MundialHome from "./pages/MundialHome";
 import MundialPartidos from "./pages/MundialPartidos";
 import MundialAdmin from "./pages/MundialAdmin";
+import MundialRanking from "./pages/MundialRanking";
 
 export default function App() {
   const user = getUser();
@@ -113,6 +114,7 @@ export default function App() {
             {/* RUTAS MUNDIAL */}
             <Route path="/mundial" element={<ProtectedRoute><MundialHome /></ProtectedRoute>} />
             <Route path="/mundial/partidos" element={<ProtectedRoute><MundialPartidos /></ProtectedRoute>} />
+            <Route path="/mundial/ranking" element={<ProtectedRoute><MundialRanking /></ProtectedRoute>} />
             <Route path="/mundial/admin" element={<AdminRoute><MundialAdmin /></AdminRoute>} />
 
           </Route>

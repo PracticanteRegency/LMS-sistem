@@ -43,7 +43,7 @@ class TipoPrediccionEspecial(models.TextChoices):
 
 class EstadoPrediccionEspecial(models.TextChoices):
     ABIERTA = "abierta", "Abierta"
-    CERRADA = "cerrada", "Cerrada"
+    BLOQUEADA = "bloqueada", "Bloqueada"
     RESUELTA = "resuelta", "Resuelta"
 
 
@@ -106,7 +106,10 @@ class Equipo(models.Model):
     nombre = models.CharField(max_length=100, unique=True)
     bandera_imagen = models.ImageField(
         upload_to="mundial/banderas/", null=True, blank=True
-    )  # Imagen subida por admin en media/mundial/banderas/
+    )  # Imagen local (usada al EDITAR)
+    bandera_url = models.URLField(
+        max_length=500, blank=True, null=True
+    )  # URL Cloudinary (usada al CREAR)
     bandera_emoji = models.CharField(max_length=10, blank=True)  # Emoji fallback "🇲🇽"
     activo = models.BooleanField(default=True)
     creado_en = models.DateTimeField(auto_now_add=True)
@@ -122,9 +125,11 @@ class Equipo(models.Model):
 
     @property
     def bandera(self):
-        """Retorna la URL de imagen si existe, sino el emoji."""
+        """Retorna imagen local > URL Cloudinary > emoji."""
         if self.bandera_imagen:
             return self.bandera_imagen.url
+        if self.bandera_url:
+            return self.bandera_url
         return self.bandera_emoji or ""
 
 
@@ -160,6 +165,23 @@ class ConfiguracionPrediccionEspecial(models.Model):
         max_length=20, choices=EstadoPrediccionEspecial.choices, default=EstadoPrediccionEspecial.ABIERTA
     )
     puntos_acierto = models.IntegerField(default=50)
+
+    # Resultado real (definido por el admin cuando se resuelve)
+    resultado_equipo = models.ForeignKey(
+        'Equipo',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='resultados_especiales',
+        help_text="Equipo ganador real (para campeón, subcampeón, tercer lugar)"
+    )
+    resultado_jugador = models.CharField(
+        max_length=200,
+        null=True,
+        blank=True,
+        help_text="Jugador ganador real (para máximo goleador)"
+    )
+
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
 
@@ -173,31 +195,33 @@ class ConfiguracionPrediccionEspecial(models.Model):
         return f"{self.get_tipo_display()} - {self.fecha_cierre.strftime('%d/%m/%Y %H:%M')}"
 
     def esta_abierta(self):
+        """Verifica si la predicción especial está abierta para responder."""
         ahora = timezone.now()
-        # Verificar condiciones básicas
-        if not (self.habilitada and self.estado == EstadoPrediccionEspecial.ABIERTA and ahora < self.fecha_cierre):
-            return False
-        
-        # Verificar que no falten menos de 1 hora para el primer partido
-        if self.edicion:
-            fecha_hora_inicio = self.edicion.fecha_hora_inicio()
-            if fecha_hora_inicio:
-                # Si faltan menos de 1 hora para el primer partido, cerrar predicciones
-                una_hora_antes = fecha_hora_inicio - timedelta(hours=1)
-                if ahora >= una_hora_antes:
-                    return False
-        
-        return True
+        # Solo verifica: habilitada, estado abierta, y que no haya pasado la fecha de cierre
+        # Las predicciones especiales tienen su propia fecha de cierre, NO dependen del torneo
+        return (
+            self.habilitada 
+            and self.estado == EstadoPrediccionEspecial.ABIERTA 
+            and ahora < self.fecha_cierre
+        )
 
     def puede_editarse(self):
         return self.esta_abierta()
 
     def cerrar_prediccion(self):
-        self.estado = EstadoPrediccionEspecial.CERRADA
-        self.save()
+        """Cambia el estado a BLOQUEADA cuando la fecha de cierre se alcanza."""
+        ahora = timezone.now()
+        if ahora >= self.fecha_cierre and self.estado == EstadoPrediccionEspecial.ABIERTA:
+            self.estado = EstadoPrediccionEspecial.BLOQUEADA
+            self.save(update_fields=["estado"])
 
-    def resolver_prediccion(self):
+    def resolver_prediccion(self, resultado_equipo=None, resultado_jugador=None):
+        """Resuelve la predicción especial guardando el resultado real."""
         self.estado = EstadoPrediccionEspecial.RESUELTA
+        if resultado_equipo:
+            self.resultado_equipo = resultado_equipo
+        if resultado_jugador:
+            self.resultado_jugador = resultado_jugador
         self.save()
 
 
@@ -487,7 +511,7 @@ class PrediccionEspecial(models.Model):
             raise ValidationError("Esta predicción especial no está disponible en este momento")
 
     def clean(self):
-        """Valida antes de guardar."""
+        """Valida antes de guardar (solo se ejecuta desde Django Admin/forms)."""
         super().clean()
         self.validar_edicion()
         
@@ -498,11 +522,6 @@ class PrediccionEspecial(models.Model):
         elif self.tipo == TipoPrediccionEspecial.MAXIMO_GOLEADOR:
             if not self.jugador_seleccionado:
                 raise ValidationError("Debes seleccionar un jugador para máximo goleador")
-
-    def save(self, *args, **kwargs):
-        """Guarda la predicción después de validar."""
-        self.clean()
-        super().save(*args, **kwargs)
 
     def calcular_puntos(self, resultado_correcto):
         """
@@ -531,7 +550,7 @@ class PrediccionEspecial(models.Model):
 
 
 class RankingMundial(models.Model):
-    """Ranking de participantes por edición del mundial."""
+    """Ranking de participantes por edición del mundial (solo predicciones de partidos)."""
     edicion = models.ForeignKey(
         EdicionMundial, on_delete=models.CASCADE, related_name="ranking"
     )
@@ -544,11 +563,7 @@ class RankingMundial(models.Model):
     puntos_partidos = models.IntegerField(default=0)
     aciertos_exactos = models.IntegerField(default=0)
 
-    # Puntos predicciones especiales
-    puntos_especiales = models.IntegerField(default=0)
-    predicciones_especiales_acertadas = models.IntegerField(default=0)
-
-    # Total
+    # Total (solo de partidos)
     puntos_totales = models.IntegerField(default=0)
     tendencia = models.IntegerField(default=0)  # Cambio de posición (+5, -1, 0)
 
@@ -574,7 +589,7 @@ class RankingMundial(models.Model):
         )
 
     def calcular_puntos_totales(self):
-        self.puntos_totales = self.puntos_partidos + self.puntos_especiales
+        self.puntos_totales = self.puntos_partidos
         return self.puntos_totales
 
     def agregar_puntos_partido(self, puntos, puntos_penaltis=0, es_acierto_exacto=False):
@@ -582,6 +597,75 @@ class RankingMundial(models.Model):
         if es_acierto_exacto:
             self.aciertos_exactos += 1
         self.calcular_puntos_totales()
+
+    def obtener_datos_usuario(self):
+        iniciales = ""
+        partes = get_nombre_completo(self.colaborador).split()
+        if len(partes) >= 2:
+            iniciales = partes[0][0] + partes[-1][0]
+        elif partes:
+            iniciales = partes[0][0]
+        return {
+            "id": self.colaborador.idcolaborador,
+            "nombre": get_nombre_completo(self.colaborador),
+            "iniciales": iniciales.upper(),
+            "email": self.colaborador.correocolaborador,
+            "posicion": self.posicion,
+            "puntos_totales": self.puntos_totales,
+            "puntos_partidos": self.puntos_partidos,
+            "aciertos_exactos": self.aciertos_exactos,
+            "tendencia": self.tendencia,
+        }
+
+    def obtener_desglose_puntos(self):
+        return {
+            "partidos": {"puntos": self.puntos_partidos, "aciertos_exactos": self.aciertos_exactos},
+            "total": self.puntos_totales,
+        }
+
+
+class RankingEspecial(models.Model):
+    """Ranking de participantes por edición del mundial (solo predicciones especiales)."""
+    edicion = models.ForeignKey(
+        EdicionMundial, on_delete=models.CASCADE, related_name="ranking_especial"
+    )
+    colaborador = models.ForeignKey(
+        Colaboradores, on_delete=models.CASCADE, related_name="rankings_especiales"
+    )
+    posicion = models.IntegerField(default=0)
+
+    # Puntos predicciones especiales
+    puntos_especiales = models.IntegerField(default=0)
+    predicciones_especiales_acertadas = models.IntegerField(default=0)
+
+    # Total (solo de predicciones especiales)
+    puntos_totales = models.IntegerField(default=0)
+    tendencia = models.IntegerField(default=0)  # Cambio de posición (+5, -1, 0)
+
+    # Desempate: quien predijo primero va adelante si hay igualdad de puntos
+    fecha_primera_prediccion = models.DateTimeField(null=True, blank=True)
+
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Ranking Especial"
+        verbose_name_plural = "Rankings Especiales"
+        unique_together = ("edicion", "colaborador")
+        ordering = ["posicion", "fecha_primera_prediccion"]
+        indexes = [
+            models.Index(fields=["edicion", "puntos_totales"]),
+            models.Index(fields=["edicion", "posicion"]),
+        ]
+
+    def __str__(self):
+        return (
+            f"#{self.posicion} [{self.edicion.nombre}] "
+            f"{get_nombre_completo(self.colaborador)} ({self.puntos_totales} pts especiales)"
+        )
+
+    def calcular_puntos_totales(self):
+        self.puntos_totales = self.puntos_especiales
+        return self.puntos_totales
 
     def agregar_puntos_especial(self, puntos):
         self.puntos_especiales += puntos
@@ -603,16 +687,13 @@ class RankingMundial(models.Model):
             "email": self.colaborador.correocolaborador,
             "posicion": self.posicion,
             "puntos_totales": self.puntos_totales,
-            "puntos_partidos": self.puntos_partidos,
             "puntos_especiales": self.puntos_especiales,
-            "aciertos_exactos": self.aciertos_exactos,
             "predicciones_especiales_acertadas": self.predicciones_especiales_acertadas,
             "tendencia": self.tendencia,
         }
 
     def obtener_desglose_puntos(self):
         return {
-            "partidos": {"puntos": self.puntos_partidos, "aciertos_exactos": self.aciertos_exactos},
             "especiales": {"puntos": self.puntos_especiales, "acertadas": self.predicciones_especiales_acertadas},
             "total": self.puntos_totales,
         }
