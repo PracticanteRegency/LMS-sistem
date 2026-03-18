@@ -381,6 +381,13 @@ const descargarReporteRangoFechas = async (fechaInicio, fechaFin) => {
   });
 };
 
+const getInducciones = async () => {
+  return dedupe('cap:getInducciones', null, async () => {
+    const response = await api.get("capacitaciones/inducciones/");
+    return response.data;
+  });
+};
+
 const CapListService = {
   getCapList,
   getMisCapacitaciones,
@@ -413,6 +420,7 @@ const CapListService = {
   GetUsersCapacitacion,
   descargarReporteCapacitacion,
   descargarReporteRangoFechas,
+  getInducciones,
 };
 
 export default CapListService;

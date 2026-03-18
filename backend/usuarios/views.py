@@ -403,8 +403,24 @@ class RegisterTemporal(APIView):
             user.set_password(payload['password'])
             user.save()
 
+            # Si viene capacitacion_id, registrar el colaborador a esa capacitación
+            capacitacion_id = payload.get('capacitacion_id')
+            if capacitacion_id:
+                try:
+                    from capacitaciones.models import Capacitaciones, progresoCapacitaciones
+                    capacitacion = Capacitaciones.objects.get(id=capacitacion_id)
+                    progresoCapacitaciones.objects.get_or_create(
+                        capacitacion_id=capacitacion_id,
+                        colaborador_id=colaborador.idcolaborador,
+                        defaults={'completada': 0, 'progreso': 0}
+                    )
+                except Capacitaciones.DoesNotExist:
+                    return JsonResponse({'error': f'Capacitación {capacitacion_id} no encontrada'}, status=404)
+                except Exception as e:
+                    return JsonResponse({'error': f'Error registrando a capacitación: {str(e)}'}, status=500)
+
             return JsonResponse({
-                'mensaje': 'Usuario temporal creado',
+                'mensaje': 'Usuario temporal creado' + (' y registrado a capacitación' if capacitacion_id else ''),
                 'usuario_id': user.id,
                 'colaborador_id': colaborador.idcolaborador,
             }, status=201)

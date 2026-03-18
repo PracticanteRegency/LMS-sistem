@@ -68,7 +68,7 @@ from capacitaciones.serializers import (
 )
 from capacitaciones.utils import actualizar_progreso_leccion
 from usuarios.models import Colaboradores
-from usuarios.permissions import IsAdminUser, IsSuperAdmin
+from usuarios.permissions import IsAdminUser, IsSuperAdmin, IsUsuarioEspecial
 
 
 # ==================== HELPERS DE CACHE ====================
@@ -2773,3 +2773,15 @@ class ReporteCapacitacionesView(APIView):
                 {'error': f'Error al generar reporte de rango de fechas: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class InduccionesView(APIView):
+    permission_classes = [IsAuthenticated, IsSuperAdmin | IsUsuarioEspecial]
+    """
+    Listado de inducciones disponibles para crear usuarios temporales.
+    GET /capacitaciones/inducciones/ → Devuelve todas las capacitaciones tipo INDUCCIÓN CORPORATIVA (sin importar estado)
+    Solo usuarios tipo 3+ (staff) pueden acceder.
+    """
+    def get(self, request, *args, **kwargs):
+            inducciones = Capacitaciones.objects.filter(tipo="INDUCCIÓN CORPORATIVA").values('id', 'titulo', 'estado', 'descripcion').order_by('titulo')
+            return Response(list(inducciones), status=status.HTTP_200_OK)

@@ -85,32 +85,33 @@ export default function CrearCapacitacion() {
           ...prev,
           titulo: data.titulo || prev.titulo,
           descripcion: data.descripcion || prev.descripcion,
-          imagen: normalizeDataUrl(data.imagen) || "",
+          imagen: data.imagen || "",  // URL raw del backend (NO normalizar para almacenamiento)
           fecha_inicio: data.fecha_inicio ? (data.fecha_inicio.split("T")[0]) : prev.fecha_inicio,
           fecha_fin: data.fecha_fin ? (data.fecha_fin.split("T")[0]) : prev.fecha_fin,
           tipo: data.tipo || prev.tipo,
           imagenFile: null,
-          imagenPreview: normalizeDataUrl(data.imagen) || "",
+          imagenPreview: normalizeDataUrl(data.imagen) || "",  // Normalizada solo para display
         }));
 
         // Normalizar URLs de imágenes en módulos, lecciones y respuestas, y mapear escorrecto a es_correcto
+        // URLs raw del backend para almacenamiento, normalizeDataUrl SOLO en JSX para display
         const modulosNorm = (data.modulos || []).map((mod: Modulo) => ({
           ...mod,
           lecciones: (mod.lecciones || []).map((lec: Leccion) => ({
             ...lec,
             file: null,  // ← Inicializar file para que no se envíe vacío en edición
-            url: normalizeDataUrl(lec.url),
-            preview: lec.preview ? normalizeDataUrl(lec.preview) : undefined,
+            url: lec.url || "",  // URL raw (NO normalizar)
+            preview: lec.preview || undefined,
             preguntas: (lec.preguntas || []).map((preg: Pregunta) => ({
               ...preg,
               file: null,  // ← Inicializar file para preguntas
-              url_multimedia: normalizeDataUrl(preg.url_multimedia),
-              preview: preg.preview ? normalizeDataUrl(preg.preview) : undefined,
+              url_multimedia: preg.url_multimedia || "",  // URL raw (NO normalizar)
+              preview: preg.preview || undefined,
               respuestas: (preg.respuestas || []).map((resp: any) => ({
                 valor: resp.valor || "",
                 file: null,  // ← Inicializar file para respuestas
-                url_imagen: normalizeDataUrl(resp.url_imagen),
-                preview: resp.preview ? normalizeDataUrl(resp.preview) : undefined,
+                url_imagen: resp.url_imagen || "",  // URL raw (NO normalizar)
+                preview: resp.preview || undefined,
                 es_correcto: typeof resp.escorrecto !== 'undefined' ? (resp.escorrecto === 1 ? 1 : 0) : (typeof resp.es_correcto !== 'undefined' ? (resp.es_correcto === 1 ? 1 : 0) : 0),
               })),
             })),
@@ -144,6 +145,7 @@ export default function CrearCapacitacion() {
     "HABILIDADES TECNICAS",
     "SOCIAL",
     "LEGAL",
+    "INDUCCIÓN CORPORATIVA",
   ];
 
   const [modulos, setModulos] = useState<Modulo[]>([]);

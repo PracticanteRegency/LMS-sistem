@@ -57,6 +57,17 @@
                   )}
                 </li>
               </>
+            ) : userType === 3 ? (
+              <>
+                <li className={styles.menuSection}>
+                  <span className={styles.sectionTitle}>Capacitaciones</span>
+                  <Link to="/" className={styles.submenuItem}>Mis Capacitaciones</Link>
+                </li>
+                <li className={styles.menuSection}>
+                  <span className={styles.sectionTitle}>Usuarios</span>
+                  <Link to="/usuarios/crear" className={styles.submenuItem}>Crear Usuario Temporal</Link>
+                </li>
+              </>
             ) : (
               <li className={styles.menuSection}>
                 <span className={styles.sectionTitle}>Capacitaciones</span>
