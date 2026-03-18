@@ -1636,6 +1636,9 @@ class ImprimirReporteCorreosView(APIView):
                     )
                     return Response({"error": msg}, status=status.HTTP_404_NOT_FOUND)
 
+            # Optimizar queryset para incluir colaborador que envió el correo
+            registros = registros.select_related('correo_lote__enviado_por')
+
             # Obtener todos los exámenes activos
             examenes_activos = Examen.objects.filter(
                 activo=True).order_by('nombre')
@@ -1666,7 +1669,7 @@ class ImprimirReporteCorreosView(APIView):
             )
 
             # Título del reporte
-            num_cols = 12 + len(nombres_examenes)  # 12 columnas base + exámenes (incluyendo Ciudad)
+            num_cols = 13 + len(nombres_examenes)  # 13 columnas base (incluyendo "Enviado Por") + exámenes
             ws.merge_cells(f'A1:{get_column_letter(num_cols)}1')
             ws['A1'] = "REPORTE DETALLADO DE EXÁMENES POR TRABAJADOR"
             ws['A1'].font = Font(bold=True, size=14)
@@ -1702,6 +1705,7 @@ class ImprimirReporteCorreosView(APIView):
             headers = [
                 "UUID Trabajador",
                 "UUID Correo",
+                "Enviado Por",
                 "Empresa",
                 "Unidad",
                 "Proyecto",
@@ -1742,6 +1746,14 @@ class ImprimirReporteCorreosView(APIView):
                     if centro and getattr(centro, 'id_proyecto', None) else ''
                 )
 
+                # Obtener nombre completo de quien envió el correo
+                enviado_por_nombre = ''
+                if registro.correo_lote and registro.correo_lote.enviado_por:
+                    colaborador = registro.correo_lote.enviado_por
+                    nombre_col = getattr(colaborador, 'nombrecolaborador', '')
+                    apellido_col = getattr(colaborador, 'apellidocolaborador', '')
+                    enviado_por_nombre = f"{nombre_col} {apellido_col}".strip()
+
                 # OPTIMIZADO: Usar exámenes precargados con Prefetch (sin query adicional)
                 examenes_enviados = getattr(registro, 'examenes_enviados_precargados', [])
 
@@ -1763,6 +1775,7 @@ class ImprimirReporteCorreosView(APIView):
                 row_data = [
                     registro.uuid_trabajador or '',
                     registro.correo_lote.uuid_correo if registro.correo_lote else '',
+                    enviado_por_nombre,
                     registro.empresa.nombre_empresa if registro.empresa else '',
                     unidad_nombre,
                     proyecto_nombre,
@@ -1785,8 +1798,8 @@ class ImprimirReporteCorreosView(APIView):
                 for col_num, value in enumerate(row_data, start=1):
                     cell = ws.cell(row=row, column=col_num, value=value)
                     cell.border = border_style
-                    # Centrar desde columna 11 en adelante (Ciudad + Tipo Examen + Total + Exámenes)
-                    if col_num >= 11:
+                    # Centrar desde columna 12 en adelante (Ciudad + Tipo Examen + Total + Exámenes)
+                    if col_num >= 12:
                         cell.alignment = center_alignment
 
                 row += 1
@@ -1805,13 +1818,13 @@ class ImprimirReporteCorreosView(APIView):
             ws.cell(row=row, column=1).border = border_style
 
             # Aplicar estilo a celdas vacías de la fila de totales
-            for col in range(2, 12):  # Columnas 2-11 (hasta Tipo Examen)
+            for col in range(2, 13):  # Columnas 2-12 (hasta Tipo Examen - ahora con Enviado Por)
                 cell = ws.cell(row=row, column=col)
                 cell.fill = totales_fill
                 cell.border = border_style
 
             # Total de la columna "Total Exámenes" (suma que ya calculamos)
-            col_total_examenes = 12
+            col_total_examenes = 13
             cell_total_vertical = ws.cell(row=row, column=col_total_examenes, value=suma_total_examenes)
             cell_total_vertical.font = Font(bold=True, size=11)
             cell_total_vertical.fill = totales_fill
@@ -1819,7 +1832,7 @@ class ImprimirReporteCorreosView(APIView):
             cell_total_vertical.border = border_style
 
             # Totales verticales por cada columna de examen
-            col_inicio_examenes = 13  # Columna donde empiezan los exámenes
+            col_inicio_examenes = 14  # Columna donde empiezan los exámenes (ahora 14 por Enviado Por)
             gran_total_examenes = 0  # Para el total general
             
             for col_num, nombre_examen in enumerate(nombres_examenes, start=col_inicio_examenes):
