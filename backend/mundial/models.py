@@ -588,6 +588,20 @@ class RankingMundial(models.Model):
             f"{get_nombre_completo(self.colaborador)} ({self.puntos_totales} pts)"
         )
 
+    def save(self, *args, **kwargs):
+        """
+        Sobrescribir save para asignar automáticamente la última posición
+        cuando se crea un nuevo ranking (posicion=0).
+        """
+        if self.posicion == 0:
+            # Asignar la última posición disponible + 1
+            max_posicion = RankingMundial.objects.filter(
+                edicion=self.edicion
+            ).aggregate(max_pos=models.Max('posicion'))['max_pos'] or 0
+            self.posicion = max_posicion + 1
+        
+        super().save(*args, **kwargs)
+
     def calcular_puntos_totales(self):
         self.puntos_totales = self.puntos_partidos
         return self.puntos_totales
@@ -662,6 +676,20 @@ class RankingEspecial(models.Model):
             f"#{self.posicion} [{self.edicion.nombre}] "
             f"{get_nombre_completo(self.colaborador)} ({self.puntos_totales} pts especiales)"
         )
+
+    def save(self, *args, **kwargs):
+        """
+        Sobrescribir save para asignar automáticamente la última posición
+        cuando se crea un nuevo ranking (posicion=0).
+        """
+        if self.posicion == 0:
+            # Asignar la última posición disponible + 1
+            max_posicion = RankingEspecial.objects.filter(
+                edicion=self.edicion
+            ).aggregate(max_pos=models.Max('posicion'))['max_pos'] or 0
+            self.posicion = max_posicion + 1
+        
+        super().save(*args, **kwargs)
 
     def calcular_puntos_totales(self):
         self.puntos_totales = self.puntos_especiales

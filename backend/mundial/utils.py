@@ -183,6 +183,7 @@ def recalcular_posiciones_ranking(edicion):
     Recalcula y guarda las posiciones del ranking para una edición.
     Criterio: mayor puntaje primero. Empate: quien predijo primero.
     Solo muestra las posiciones 1-N con todos los participantes.
+    Asegura que NO haya posiciones duplicadas.
     """
     from .models import RankingMundial
     rankings = list(
@@ -190,17 +191,22 @@ def recalcular_posiciones_ranking(edicion):
         .filter(edicion=edicion)
         .order_by("-puntos_totales", "-aciertos_exactos", "fecha_primera_prediccion")
     )
+    
+    # Asignar posiciones secuenciales sin duplicados
     for i, ranking in enumerate(rankings, start=1):
         posicion_anterior = ranking.posicion
         ranking.posicion = i
         ranking.tendencia = posicion_anterior - i  # positivo = subió, negativo = bajó
-        ranking.save(update_fields=["posicion", "tendencia"])
+    
+    # Usar bulk_update para guardar todos de una sola vez, más eficiente y seguro
+    RankingMundial.objects.bulk_update(rankings, ['posicion', 'tendencia'], batch_size=100)
 
 
 def recalcular_posiciones_ranking_especial(edicion):
     """
     Recalcula y guarda las posiciones del ranking especial para una edición.
     Criterio: mayor puntaje de predicciones especiales primero. Empate: quien predijo primero.
+    Asegura que NO haya posiciones duplicadas.
     """
     from .models import RankingEspecial
     rankings = list(
@@ -208,11 +214,16 @@ def recalcular_posiciones_ranking_especial(edicion):
         .filter(edicion=edicion)
         .order_by("-puntos_totales", "-predicciones_especiales_acertadas", "fecha_primera_prediccion")
     )
+    
+    # Asignar posiciones secuenciales sin duplicados
     for i, ranking in enumerate(rankings, start=1):
         posicion_anterior = ranking.posicion
         ranking.posicion = i
         ranking.tendencia = posicion_anterior - i  # positivo = subió, negativo = bajó
-        ranking.save(update_fields=["posicion", "tendencia"])
+    
+    # Usar bulk_update para guardar todos de una sola vez, más eficiente y seguro
+    RankingEspecial.objects.bulk_update(rankings, ['posicion', 'tendencia'], batch_size=100)
+
 
 
 def verificar_y_bloquear_predicciones_especiales(edicion=None):

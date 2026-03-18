@@ -152,12 +152,12 @@ function Hero() {
         <div className={styles.heroStats}>
           <div className={styles.heroStatCard}>
             <span className={styles.heroStatEmoji}>👥</span>
-            <span className={styles.heroStatValue}>10,000+</span>
+            <span className={styles.heroStatValue}>1,000+</span>
             <span className={styles.heroStatLabel}>Participantes</span>
           </div>
           <div className={styles.heroStatCard}>
             <span className={styles.heroStatEmoji}>🏆</span>
-            <span className={styles.heroStatValue}>$50,000</span>
+            <span className={styles.heroStatValue}>$5,000,000</span>
             <span className={styles.heroStatLabel}>En Premios</span>
           </div>
           <div className={styles.heroStatCard}>

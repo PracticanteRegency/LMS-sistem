@@ -12,7 +12,7 @@
   --border: #e5e7eb;
   --muted: #f3f4f6;
   --muted-foreground: #777777;
-  --secondary: #4CAF50;
+  --secondary: #8B2335;
   --success: #4CAF50;
   --warning: #ff9800;
   --destructive: #f44336;
@@ -28,7 +28,7 @@
     --border: #333333;
     --muted: #2a2a2a;
     --muted-foreground: #999999;
-    --secondary: #4CAF50;
+    --secondary: #D4606E;
   }
 }
 
@@ -676,8 +676,8 @@
   display: inline-block;
   padding: 0.25rem 0.5rem;
   border-radius: 0.25rem;
-  background-color: rgba(76, 175, 80, 0.1);
-  color: var(--success);
+  background-color: rgba(139, 35, 53, 0.1);
+  color: var(--secondary);
   font-size: 0.7rem;
   font-weight: 500;
 }
@@ -1040,7 +1040,7 @@
 
 .btnSecondary:hover {
   opacity: 0.9;
-  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.3);
+  box-shadow: 0 2px 8px rgba(139, 35, 53, 0.3);
 }
 
 .btnOutline {

@@ -54,7 +54,7 @@
   padding: 80px 20px 60px;
   text-align: center;
   overflow: hidden;
-  background: linear-gradient(135deg, #1a472a 0%, #0d2818 50%, #0a1f12 100%);
+  background: linear-gradient(135deg, #4A1520 0%, #2A0C12 50%, #1F080E 100%);
   border-radius: 12px;
   margin-bottom: 40px;
 }
@@ -76,7 +76,7 @@
 .heroBg {
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse at 30% 20%, rgba(76, 175, 80, 0.15), transparent 60%),
+  background: radial-gradient(ellipse at 30% 20%, rgba(139, 35, 53, 0.15), transparent 60%),
               radial-gradient(ellipse at 70% 80%, rgba(255, 193, 7, 0.1), transparent 60%);
   pointer-events: none;
 }
@@ -93,7 +93,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: rgba(76, 175, 80, 0.3);
+  background: rgba(139, 35, 53, 0.3);
   animation: heroDotFloat 6s ease-in-out infinite;
 }
 
@@ -116,8 +116,8 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(76, 175, 80, 0.15);
-  border: 1px solid rgba(76, 175, 80, 0.3);
+  background: rgba(139, 35, 53, 0.15);
+  border: 1px solid rgba(139, 35, 53, 0.3);
   border-radius: 50px;
   padding: 6px 16px;
   margin-bottom: 24px;
@@ -132,7 +132,7 @@
 .heroPillDotCore {
   position: absolute;
   inset: 0;
-  background: #4CAF50;
+  background: #8B2335;
   border-radius: 50%;
 }
 
@@ -140,7 +140,7 @@
   position: absolute;
   inset: -2px;
   border-radius: 50%;
-  background: rgba(76, 175, 80, 0.5);
+  background: rgba(139, 35, 53, 0.5);
   animation: heroPing 2s ease-out infinite;
 }
 
@@ -176,7 +176,7 @@
 }
 
 .heroHighlight {
-  background: linear-gradient(135deg, #4CAF50, #FFC107);
+  background: linear-gradient(135deg, #8B2335, #FFC107);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -184,7 +184,7 @@
 
 .heroSubtitle {
   font-size: 17px;
-  color: #b8d4b8;
+  color: #d4b8be;
   margin: 0 0 32px 0;
   max-width: 620px;
   margin-left: auto;
@@ -303,7 +303,7 @@
   justify-content: center;
   gap: 6px;
   padding: 12px 24px;
-  background: #4CAF50;
+  background: #8B2335;
   color: #fff;
   border: none;
   border-radius: 8px;
@@ -321,7 +321,7 @@
 }
 
 .btnPrimaryLg:hover {
-  background: #43A047;
+  background: #7A1F2E;
   transform: translateY(-1px);
 }
 
@@ -393,7 +393,7 @@
   justify-content: center;
   gap: 6px;
   padding: 10px 20px;
-  background: #4CAF50;
+  background: #8B2335;
   color: #fff;
   border: none;
   border-radius: 6px;
@@ -410,7 +410,7 @@
 }
 
 .btnPrimary:hover {
-  background: #43A047;
+  background: #7A1F2E;
 }
 
 @media (max-width: 480px) {
@@ -428,8 +428,8 @@
   gap: 6px;
   padding: 10px 20px;
   background: transparent;
-  color: #4CAF50;
-  border: 1px solid #4CAF50;
+  color: #8B2335;
+  border: 1px solid #8B2335;
   border-radius: 6px;
   font-size: 14px;
   font-weight: 600;
@@ -439,7 +439,7 @@
 }
 
 .btnOutline:hover {
-  background: rgba(76, 175, 80, 0.08);
+  background: rgba(139, 35, 53, 0.08);
 }
 
 .btnGhost {
@@ -469,9 +469,9 @@
 }
 
 .btnActive {
-  background: #4CAF50 !important;
+  background: #8B2335 !important;
   color: #fff !important;
-  border-color: #4CAF50 !important;
+  border-color: #8B2335 !important;
 }
 
 /* ===== BADGES ===== */
@@ -488,7 +488,7 @@
 /* ===== TOP BANNER MARQUEE (MundialHome only) ===== */
 .topBanner {
   width: 100%;
-  background: linear-gradient(90deg, #0b3b1f 0%, #123c2b 50%);
+  background: linear-gradient(90deg, #3B0F18 0%, #4A1520 50%);
   color: #fff;
   display: flex;
   align-items: center;
@@ -554,8 +554,8 @@
   font-size: 11px;
   font-weight: 700;
   border-radius: 50px;
-  background: rgba(76, 175, 80, 0.12);
-  color: #4CAF50;
+  background: rgba(139, 35, 53, 0.12);
+  color: #8B2335;
 }
 
 /* ===== MATCHES SECTION ===== */
@@ -608,7 +608,7 @@
 .matchCard:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  border-color: #4CAF50;
+  border-color: #8B2335;
 }
 
 @media (max-width: 480px) {
@@ -867,7 +867,7 @@
 .scoringPointsValue {
   font-size: 22px;
   font-weight: 800;
-  color: #4CAF50;
+  color: #8B2335;
 }
 
 .scoringPointsLabel {
@@ -910,8 +910,8 @@
 .multiplierValue {
   font-size: 15px;
   font-weight: 700;
-  color: #4CAF50;
-  background: rgba(76, 175, 80, 0.08);
+  color: #8B2335;
+  background: rgba(139, 35, 53, 0.08);
   padding: 4px 12px;
   border-radius: 6px;
 }
@@ -1111,7 +1111,7 @@
 }
 
 .rankingRowTop {
-  border-left: 3px solid #4CAF50;
+  border-left: 3px solid #8B2335;
 }
 
 /* Highlight current user's ranking */
@@ -1396,7 +1396,7 @@
 .specialItemPoints {
   font-size: 13px;
   font-weight: 700;
-  color: #4CAF50;
+  color: #8B2335;
 }
 
 /* Prizes CTA */
@@ -1601,7 +1601,7 @@
   }
 
   .multiplierValue {
-    background: rgba(76, 175, 80, 0.15);
+    background: rgba(139, 35, 53, 0.15);
   }
 
   /* Ranking */
@@ -1685,7 +1685,7 @@
   }
 
   .badgePrimary {
-    background: rgba(76, 175, 80, 0.2);
+    background: rgba(139, 35, 53, 0.2);
   }
 
   /* Buttons */
@@ -1700,12 +1700,12 @@
   }
 
   .btnOutline {
-    color: #66BB6A;
-    border-color: #66BB6A;
+    color: #D4606E;
+    border-color: #D4606E;
   }
 
   .btnOutline:hover {
-    background: rgba(76, 175, 80, 0.1);
+    background: rgba(139, 35, 53, 0.1);
   }
 }
 

@@ -7,7 +7,7 @@
 :root {
   --primary: #3b82f6;
   --primary-foreground: #ffffff;
-  --secondary: #4CAF50;
+  --secondary: #8B2335;
   --background: #ffffff;
   --foreground: #262626;
   --card: #f9fafb;
@@ -21,7 +21,7 @@
   :root {
     --primary: #3b82f6;
     --primary-foreground: #ffffff;
-    --secondary: #66BB6A;
+    --secondary: #D4606E;
     --background: #1a1a1a;
     --foreground: #e5e5e5;
     --card: #262626;
@@ -472,7 +472,7 @@
 
 .matchCardPredicted {
   border-left-color: var(--secondary);
-  background: linear-gradient(90deg, rgba(76, 175, 80, 0.03) 0%, transparent 100%);
+  background: linear-gradient(90deg, rgba(139, 35, 53, 0.03) 0%, transparent 100%);
 }
 
 .matchCardLocked {
@@ -547,7 +547,7 @@
   gap: 4px;
   padding: 4px 10px;
   background: rgba(76, 175, 80, 0.1);
-  color: var(--secondary);
+  color: #4CAF50;
   border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
@@ -572,7 +572,7 @@
 
 .badgeMultiplier2 {
   background: rgba(76, 175, 80, 0.1);
-  color: var(--secondary);
+  color: #4CAF50;
 }
 
 .badgeMultiplier3 {
@@ -698,7 +698,7 @@
 }
 
 .scorePredicted {
-  background: rgba(76, 175, 80, 0.1);
+  background: rgba(139, 35, 53, 0.1);
   border-color: var(--secondary);
   color: var(--secondary);
   order: 2;
@@ -862,7 +862,7 @@
   gap: 8px;
   padding: 28px 24px;
   border-bottom: 1px solid var(--border);
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(76, 175, 80, 0.05) 100%);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(139, 35, 53, 0.05) 100%);
 }
 
 @media (max-width: 480px) {
@@ -1261,7 +1261,7 @@
 
 /* ===== POINTS INFO ===== */
 .pointsInfo {
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, rgba(76, 175, 80, 0.06) 100%);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.06) 0%, rgba(139, 35, 53, 0.06) 100%);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px 18px;
@@ -1320,7 +1320,7 @@
   font-size: 15px;
   font-weight: 800;
   color: var(--secondary);
-  background: rgba(76, 175, 80, 0.1);
+  background: rgba(139, 35, 53, 0.1);
   padding: 4px 10px;
   border-radius: 6px;
 }
@@ -1421,7 +1421,7 @@
   width: 64px;
   height: 64px;
   border-radius: 9999px;
-  background: rgba(76, 175, 80, 0.1);
+  background: rgba(139, 35, 53, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;

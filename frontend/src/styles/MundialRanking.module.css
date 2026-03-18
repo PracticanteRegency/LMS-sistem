@@ -16,7 +16,7 @@
 /* ===== BANNER (Same as Home) ===== */
 .topBanner {
   width: 100%;
-  background: linear-gradient(90deg, #0b3b1f 0%, #123c2b 50%);
+  background: linear-gradient(90deg, #3B0F18 0%, #4A1520 50%);
   color: #fff;
   display: flex;
   align-items: center;
@@ -198,8 +198,8 @@
   font-weight: 600;
   padding: 4px 12px;
   border-radius: 20px;
-  background: rgba(76, 175, 80, 0.1);
-  color: #4CAF50;
+  background: rgba(139, 35, 53, 0.1);
+  color: #8B2335;
   white-space: nowrap;
 }
 
@@ -370,7 +370,7 @@
   background: #fafafa;
 }
 .rankingRowTop {
-  border-left: 3px solid #4CAF50;
+  border-left: 3px solid #8B2335;
 }
 .rankingRowCurrentUser {
   background: linear-gradient(135deg, #fff8f0 0%, #fffbf7 100%);
@@ -614,7 +614,7 @@
   width: 40px;
   height: 40px;
   border: 3px solid #e0e0e0;
-  border-top-color: #4CAF50;
+  border-top-color: #8B2335;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -631,12 +631,17 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+  border: 1px solid #ddd;
+  border-radius: 6px;
   font-size: 14px;
   font-weight: 600;
-  color: #4CAF50;
+  color: #8B2335;
   text-decoration: none;
   margin-bottom: 24px;
-  transition: color 0.15s;
+  transition: all 0.2s ease;
+  cursor: pointer;
 }
 
 @media (max-width: 480px) {
@@ -644,11 +649,19 @@
     font-size: 12px;
     margin-bottom: 16px;
     gap: 4px;
+    padding: 6px 10px;
   }
 }
 
 .backLink:hover {
-  color: #388E3C;
+  background: linear-gradient(135deg, #efefef 0%, #ddd 100%);
+  color: #6E1C2A;
+  border-color: #ccc;
+  transform: translateX(-2px);
+}
+
+.backLink:active {
+  transform: translateX(0);
 }
 
 /* ===== RESPONSIVE ===== */
@@ -796,9 +809,13 @@
     border-top-color: #333;
   }
   .backLink {
-    color: #66BB6A;
+    background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+    border-color: #444;
+    color: #D4606E;
   }
   .backLink:hover {
-    color: #81C784;
+    background: linear-gradient(135deg, #333 0%, #262626 100%);
+    color: #E08892;
+    border-color: #555;
   }
 }
