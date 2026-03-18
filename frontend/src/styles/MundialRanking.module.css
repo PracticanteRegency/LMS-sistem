@@ -628,6 +628,7 @@
 
 /* ===== BACK LINK ===== */
 .backLink {
+  margin: 24px 0px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -639,7 +640,7 @@
   font-weight: 600;
   color: #8B2335;
   text-decoration: none;
-  margin-bottom: 24px;
+  margin-bottom: 12px;
   transition: all 0.2s ease;
   cursor: pointer;
 }

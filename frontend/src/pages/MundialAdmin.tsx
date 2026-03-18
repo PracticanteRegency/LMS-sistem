@@ -98,6 +98,11 @@ export default function MundialAdmin() {
   // Special prediction result state
   const [showResolveSpecialModal, setShowResolveSpecialModal] = useState(false);
   const [resolvingSpecialId, setResolvingSpecialId] = useState<number | null>(null);
+
+  // Settings form state
+  const [configPointsExacto, setConfigPointsExacto] = useState(3);
+  const [configPointsGanador, setConfigPointsGanador] = useState(1);
+  const [configMultipliers, setConfigMultipliers] = useState<{ [key: string]: string }>({});
   const [formResolveEquipo, setFormResolveEquipo] = useState<number | null>(null);
   const [formResolveJugador, setFormResolveJugador] = useState("");
 
@@ -137,6 +142,19 @@ export default function MundialAdmin() {
           { value: "Final", label: "Final", multiplier: res.data?.multiplicador_final || "x3" },
         ];
         setPhases(phasesArray);
+
+        // Inicializar estados de configuración
+        setConfigPointsExacto(res.data?.puntos_resultado_exacto || 3);
+        setConfigPointsGanador(res.data?.puntos_ganador_correcto || 1);
+        setConfigMultipliers({
+          "Grupos": String(res.data?.multiplicador_grupos || "1"),
+          "16avos": String(res.data?.multiplicador_dieciseisavos || "1.25"),
+          "Octavos": String(res.data?.multiplicador_octavos || "1.5"),
+          "Cuartos": String(res.data?.multiplicador_cuartos || "1.75"),
+          "Semifinales": String(res.data?.multiplicador_semifinales || "2"),
+          "Tercer Puesto": String(res.data?.multiplicador_tercer_puesto || "2.5"),
+          "Final": String(res.data?.multiplicador_final || "3"),
+        });
 
         // Grupos (letras A-H para 8 grupos)
         setGroups(["A", "B", "C", "D", "E", "F", "G", "H","I","J", "K", "L"]);
@@ -396,6 +414,45 @@ export default function MundialAdmin() {
       setMatches(dataP);
     } catch (error) {
       console.error("Error recargando equipos:", error);
+    }
+  };
+
+  const handleSaveConfig = async () => {
+    try {
+      const payload = {
+        puntos_resultado_exacto: configPointsExacto,
+        puntos_ganador_correcto: configPointsGanador,
+        multiplicador_grupos: parseFloat(configMultipliers["Grupos"] || "1"),
+        multiplicador_dieciseisavos: parseFloat(configMultipliers["16avos"] || "1.25"),
+        multiplicador_octavos: parseFloat(configMultipliers["Octavos"] || "1.5"),
+        multiplicador_cuartos: parseFloat(configMultipliers["Cuartos"] || "1.75"),
+        multiplicador_semifinales: parseFloat(configMultipliers["Semifinales"] || "2"),
+        multiplicador_tercer_puesto: parseFloat(configMultipliers["Tercer Puesto"] || "2.5"),
+        multiplicador_final: parseFloat(configMultipliers["Final"] || "3"),
+      };
+
+      const token = localStorage.getItem("user") 
+        ? JSON.parse(localStorage.getItem("user") || "{}").token || 
+          JSON.parse(localStorage.getItem("user") || "{}").access 
+        : "";
+
+      const response = await fetch("/api/mundial/configuracion/", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      triggerSuccess("✅ Configuración guardada exitosamente");
+    } catch (error) {
+      console.error("Error guardando configuración:", error);
+      alert("Error al guardar la configuración. Revisa la consola.");
     }
   };
 
@@ -788,7 +845,10 @@ export default function MundialAdmin() {
             <div className={styles.grid} style={{ gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))" }}>
               {teams.map((team) => (
                 <div key={team.id} className={styles.teamCard} style={{ padding: "1rem", border: "1px solid var(--border)", borderRadius: "8px" }}>
-                  <div style={{ fontSize: "2rem", marginBottom: "0.5rem" }}>{team.bandera_emoji || "🏳️"}</div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", marginBottom: "0.5rem" }}>
+                    <span style={{ fontSize: "2rem", flex: "0 0 auto" }}>{team.bandera_emoji || "🏳️"}</span>
+                    {team.bandera && <img src={team.bandera} alt={team.nombre} style={{ width: "4rem", height: "auto", flex: "0 0 auto" }} />}
+                  </div>
                   <h3 style={{ fontWeight: 700, marginBottom: "0.5rem" }}>{team.nombre}</h3>
                   <div style={{ fontSize: "0.875rem", color: "var(--muted-foreground)", marginBottom: "1rem" }}>
                     {team.activo ? "✅ Activo" : "❌ Inactivo"}
@@ -1066,11 +1126,21 @@ export default function MundialAdmin() {
               <p className={styles.settingsCardDesc}>Puntos otorgados por tipo de acierto.</p>
               <div className={styles.settingsRow}>
                 <span>Resultado exacto</span>
-                <input type="number" defaultValue={3} className={styles.settingsInput} />
+                <input 
+                  type="number" 
+                  value={configPointsExacto} 
+                  onChange={(e) => setConfigPointsExacto(parseInt(e.target.value) || 3)}
+                  className={styles.settingsInput} 
+                />
               </div>
               <div className={styles.settingsRow}>
                 <span>Ganador correcto</span>
-                <input type="number" defaultValue={1} className={styles.settingsInput} />
+                <input 
+                  type="number" 
+                  value={configPointsGanador} 
+                  onChange={(e) => setConfigPointsGanador(parseInt(e.target.value) || 1)}
+                  className={styles.settingsInput} 
+                />
               </div>
             </div>
 
@@ -1081,7 +1151,12 @@ export default function MundialAdmin() {
               {phases.map((phase) => (
                 <div key={phase.value} className={styles.settingsRow}>
                   <span>{phase.label}</span>
-                  <input type="text" defaultValue={phase.multiplier} className={styles.settingsInput} />
+                  <input 
+                    type="text" 
+                    value={configMultipliers[phase.value] || phase.multiplier || ""}
+                    onChange={(e) => setConfigMultipliers({ ...configMultipliers, [phase.value]: e.target.value })}
+                    className={styles.settingsInput} 
+                  />
                 </div>
               ))}
             </div>
@@ -1111,7 +1186,11 @@ export default function MundialAdmin() {
               )}
             </div>
 
-            <button className={styles.btnPrimary} style={{ width: "100%", marginTop: "1rem" }}>
+            <button 
+              className={styles.btnPrimary} 
+              style={{ width: "100%", marginTop: "1rem" }}
+              onClick={handleSaveConfig}
+            >
               💾 Guardar Configuración
             </button>
           </div>
