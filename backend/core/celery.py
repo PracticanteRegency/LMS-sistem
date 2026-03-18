@@ -53,14 +53,6 @@ app.conf.beat_schedule = {
         'task': 'notificaciones.tasks.desactivar_capacitaciones',
         'schedule': crontab(hour=23, minute=59),
     },
-    'limpiar-certificados-antiguos': {
-        'task': 'capacitaciones.tasks.limpiar_certificados_antiguos',
-        'schedule': crontab(hour=8, minute=3, day_of_week='sunday'),
-    },
-    'limpiar-directorio-certificados': {
-        'task': 'capacitaciones.tasks.limpiar_directorio_certificados',
-        'schedule': crontab(hour=8, minute=0, day_of_week='sunday'),
-    },
 }
 
 app.conf.timezone = 'America/Bogota'

@@ -18,11 +18,6 @@ export function normalizeDataUrl(value?: string | null, prefer: 'image' | 'pdf' 
   // Already a data URL
   if (s.startsWith('data:')) return s;
 
-  // Fix URLs that were stored with /api/ prefix in the DB (corrupted data)
-  if (s.startsWith('/api/media/')) {
-    s = s.replace('/api/media/', '/media/');
-  }
-
   // Normalize relative media paths from backend to absolute URL
   const base = (API_URL || '').replace(/\/+$/, '');
   const looksRelativeMedia =
@@ -34,16 +29,12 @@ export function normalizeDataUrl(value?: string | null, prefer: 'image' | 'pdf' 
     (/^uploads\//i.test(s));
 
   if (looksRelativeMedia && base) {
-    // If base is a full URL (dev: http://localhost:8000), use URL constructor
-    if (/^https?:\/\//i.test(base)) {
-      try {
-        return new URL(s, base + '/').href;
-      } catch (e) {
-        return `${base}${s.startsWith('/') ? '' : '/'}${s}`;
-      }
+    try {
+      return new URL(s, base + '/').href;
+    } catch (e) {
+      // fallback: simple concat
+      return `${base}${s.startsWith('/') ? '' : '/'}${s}`;
     }
-    // If base is a relative path (prod: /api), prepend it
-    return `${base}${s.startsWith('/') ? '' : '/'}${s}`;
   }
 
   // Looks like a remote URL
