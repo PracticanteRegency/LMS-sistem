@@ -661,6 +661,14 @@
   flex-shrink: 0;
 }
 
+.logoLink .logo-placeholder {
+  width: 140px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* ===== DARK MODE ===== */
 @media (prefers-color-scheme: dark) {
   .navbar {

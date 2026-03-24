@@ -77,7 +77,7 @@ function BanderaDisplay({ url, nombre, emoji }: { url?: string; nombre?: string;
         onError={handleImageError}
         onLoad={handleImageLoad}
         style={{
-          width: "48px",
+          width: "100%",
           height: "48px",
           borderRadius: "4px",
           objectFit: "cover",
@@ -136,7 +136,7 @@ function Hero() {
         </h1>
 
         <p className={styles.heroSubtitle}>
-          Únete a MICampeonato, la competencia de predicciones más emocionante del Mundial 2026.
+          Participa en MICampeonato, la competencia de predicciones más emocionante del Mundial 2026.
           Registra tus predicciones, acumula puntos y compite por increíbles premios.
         </p>
 
@@ -152,7 +152,7 @@ function Hero() {
         <div className={styles.heroStats}>
           <div className={styles.heroStatCard}>
             <span className={styles.heroStatEmoji}>👥</span>
-            <span className={styles.heroStatValue}>1,000+</span>
+            <span className={styles.heroStatValue}>+ 1,500</span>
             <span className={styles.heroStatLabel}>Participantes</span>
           </div>
           <div className={styles.heroStatCard}>
@@ -365,7 +365,7 @@ function MatchesSection({ initialMatches = [] }: { initialMatches?: MatchData[] 
 }
 
 /* ===== SPECIAL PREDICTIONS ===== */
-function SpecialPredictionsSection({ initialSpecialPredictions = [], initialTeams = [], initialUserPredictions = [] }: { initialSpecialPredictions?: any[], initialTeams?: any[], initialUserPredictions?: any[] }) {
+function SpecialPredictionsSection({ initialSpecialPredictions = [], initialTeams = [], initialUserPredictions = [], onSuccess }: { initialSpecialPredictions?: any[], initialTeams?: any[], initialUserPredictions?: any[], onSuccess?: () => void }) {
   const [predictions, setPredictions] = useState<any[]>(initialSpecialPredictions);
   const [userPredictions, setUserPredictions] = useState<any[]>(initialUserPredictions);
   const [selectedTeam, setSelectedTeam] = useState<{ [key: string]: any }>({});
@@ -417,7 +417,9 @@ function SpecialPredictionsSection({ initialSpecialPredictions = [], initialTeam
         setUserPredictions([...userPredictions, res.data]);
       }
 
-      alert("Predicción guardada ✓");
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (error: any) {
       console.error("Error:", error);
       alert("Error al guardar la predicción");
@@ -729,6 +731,7 @@ export default function MundialHome() {
   const [players, setPlayers] = useState<RankingEntry[]>([]);
   const [equipos, setEquipos] = useState<any[]>([]);
   const [userSpecialPredictions, setUserSpecialPredictions] = useState<any[]>([]);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   useEffect(() => {
     dedupe("home", {}, () => getHomeData())
@@ -835,9 +838,20 @@ export default function MundialHome() {
       <BannerMarquee />
       <Hero />
       <MatchesSection initialMatches={matches} />
-      <SpecialPredictionsSection initialSpecialPredictions={specialPredictions} initialTeams={equipos} initialUserPredictions={userSpecialPredictions} />
+      <SpecialPredictionsSection initialSpecialPredictions={specialPredictions} initialTeams={equipos} initialUserPredictions={userSpecialPredictions} onSuccess={() => { setShowSuccess(true); setTimeout(() => setShowSuccess(false), 1800); }} />
       <RankingSection initialPlayers={players} />
       <HowItWorks steps={steps} />
-    </div>
+      {/* ===== SUCCESS MODAL ===== */}
+      {showSuccess && (
+        <div className={styles.successOverlay} onClick={() => setShowSuccess(false)}>
+          <div className={styles.successModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.successIconContainer}>
+              <div className={styles.successIconBg}>✓</div>
+            </div>
+            <h3 className={styles.successTitle}>Predicción Guardada</h3>
+            <p className={styles.successText}>Tu predicción ha sido registrada correctamente.</p>
+          </div>
+        </div>
+      )}    </div>
   );
 }

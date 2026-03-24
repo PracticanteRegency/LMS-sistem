@@ -933,11 +933,11 @@
 .podium {
   display: flex;
   align-items: flex-end;
-  justify-content: center;
-  gap: 24px;
+  justify-content: space-between;
+  gap: 0;
   margin-bottom: 32px;
-  width: 100%;
-  max-width: 500px;
+  width: 500px;
+  max-width: 100%;
   margin-left: auto;
   margin-right: auto;
 }
@@ -1010,11 +1010,11 @@
   font-weight: 600;
   color: #262626;
   margin: 0;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  max-width: 100px;
+  word-break: break-word;
+  white-space: normal;
   text-align: center;
+  line-height: 1.2;
 }
 
 @media (max-width: 480px) {

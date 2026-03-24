@@ -25,7 +25,7 @@ import styles from "./Navbar.module.css";
           <Link to="/perfil" className={styles.logoLink}>
             <div className="logo-placeholder">
               <img
-                src={isMundial ? "/img/logo.png" : "/img/REGENCYL.png"}
+                src={isMundial ? "/img/logoMICompe.png" : "/img/logoMIC.png"}
                 alt="Logo"
                 className="logo-img"
               />
@@ -42,9 +42,9 @@ import styles from "./Navbar.module.css";
             <li className={styles.menuSection}>
               <span className={styles.sectionTitle}>Mi Campeonato</span>
               <ul className={styles.submenu}>
-                <li><Link to="/mundial" className={styles.submenuItem}>🏆 Home</Link></li>
+                <li><Link to="/mundial" className={styles.submenuItem}>Inicio</Link></li>
                 {(userType === 2 || userType === 4) && (
-                  <li><Link to="/mundial/admin" className={styles.submenuItem}>⚙️ Admin</Link></li>
+                  <li><Link to="/mundial/admin" className={styles.submenuItem}>Administracion</Link></li>
                 )}
               </ul>
             </li>
