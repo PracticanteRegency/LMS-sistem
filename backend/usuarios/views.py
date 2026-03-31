@@ -3,8 +3,10 @@ import csv
 import io
 import os
 from io import BytesIO
+from datetime import datetime
 from django.http import JsonResponse, FileResponse
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.response import Response
 from django.views import View
 from django.utils.decorators import method_decorator
@@ -83,10 +85,28 @@ class Perfil(APIView):
             .values_list('max_id', flat=True)
         )
         
+        # FILTRO: Agregar capacitaciones desactivadas que ya han comenzado
+        # Si una capacitación está desactivada (estado=3):
+        #   - Si fecha_inicio > hoy: NO mostrar
+        #   - Si fecha_inicio <= hoy: SÍ mostrar
+        now = timezone.now()
+        desactivadas_iniciadas = (
+            progresoCapacitaciones.objects
+            .filter(colaborador=colaborador)
+            .filter(capacitacion__estado=3)
+            .filter(capacitacion__fecha_inicio__lte=now)
+            .values('capacitacion')
+            .annotate(max_id=Max('id'))
+            .values_list('max_id', flat=True)
+        )
+        
+        # Combinar los IDs: activas + desactivadas que ya iniciaron
+        all_ids = list(latest_ids) + list(desactivadas_iniciadas)
+        
         # Filtrar solo los registros de progreso más recientes
         progresos = (
             progresoCapacitaciones.objects
-            .filter(id__in=list(latest_ids))
+            .filter(id__in=all_ids)
             .select_related('capacitacion')
             .annotate(
                 total_lecciones=Count(

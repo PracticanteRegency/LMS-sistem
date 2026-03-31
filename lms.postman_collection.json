@@ -1,0 +1,2354 @@
+{
+  "info": {
+    "_postman_id": "ce62ebd4-c405-4dc7-b4d4-47b29e788876",
+    "name": "lms",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "44540807"
+  },
+  "item": [
+    {
+      "name": "notificaciones",
+      "item": [
+        {
+          "name": "empresa",
+          "item": [
+            {
+              "name": "editar empresa",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/analitica/eliminar-empresa/3/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "analitica",
+                    "eliminar-empresa",
+                    "3",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "ver empresa",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/analitica/eliminar-empresa/3/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "analitica",
+                    "eliminar-empresa",
+                    "3",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "crear empresa",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "61d14f4d94518ec6746648faef9e63066482395bdcfae321ca9a7fb2a034b36",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"nombre_empresa\": \"empresa prueba\",\r\n  \"nit_empresa\": \"123456-4\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseURL}}/analitica/crear-empresa/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "analitica",
+                    "crear-empresa",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "lista empresas",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "61d14f4d94518ec6746648faef9e63066482395bdcfae321ca19a7fb2a034b36",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/analitica/lista-empresas/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "analitica",
+                    "lista-empresas",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "cambiar estado empresa",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/analitica/ver-empresa/4/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "analitica",
+                    "ver-empresa",
+                    "4",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "unidad de negocio",
+          "item": [
+            {
+              "name": "crear unidad",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "61d14f4d94518ec6746648faef9e63066482395bdcfae321ca19a7fb2a034b36",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"nombre_unidad\": \"Recursos Humanos\",\r\n  \"descripcion_unidad\": \"Gestión del talento y desarrollo organizacional\",\r\n  \"id_empresa\": 1\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseURL}}/analitica/crear-unidad-negocio/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "analitica",
+                    "crear-unidad-negocio",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "editar unidad",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "61d14f4d94518ec6746648faef9e63066482395bdcfae321ca19a7fb2a034b36",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "DELETE",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"nombre_unidad\": \"Recursos Humanos\",\r\n  \"descripcion_unidad\": \"Gestión del talento y desarrollo organizacional\",\r\n  \"id_empresa\": 1\r\n}"
+                },
+                "url": {
+                  "raw": "{{baseURL}}/analitica/eliminar-unidad-negocio/3/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "analitica",
+                    "eliminar-unidad-negocio",
+                    "3",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "ver unidad",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "61d14f4d94518ec6746648faef9e63066482395bdcfae321ca19a7fb2a034b36",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"nombre_unidad\": \"Recursos Humanos\",\r\n  \"descripcion_unidad\": \"Gestión del talento y desarrollo organizacional\",\r\n  \"id_empresa\": 1\r\n}"
+                },
+                "url": {
+                  "raw": "{{baseURL}}/analitica/eliminar-unidad-negocio/3/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "analitica",
+                    "eliminar-unidad-negocio",
+                    "3",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "lista unidades",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "cwf7hLsVXfuOucyw0pJH672kr4pL3VxL9TDVtCagjH59l0T15N",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/analitica/lista-unidades-negocio/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "analitica",
+                    "lista-unidades-negocio",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "cambiar estado unidad",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/analitica/ver-unidad-negocio/4/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "analitica",
+                    "ver-unidad-negocio",
+                    "4",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "proyecto",
+          "item": [
+            {
+              "name": "crear proyecto",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "61d14f4d94518ec6746648faef9e63066482395bdcfae321ca19a7fb2a034b36",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"nombre_empresa\": \"empresa prueba\",\r\n  \"nit_empresa\": \"123456-4\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseURL}}/analitica/crear-proyecto/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "analitica",
+                    "crear-proyecto",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "editar proyecto",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "cwf7hLsVXfuOucyw0pJH672kr4pL3VxL9TDVtCagjH59l0T15N",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseURL}}/analitica/ver-proyecto/1/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "analitica",
+                    "ver-proyecto",
+                    "1",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "ver proyect",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "cwf7hLsVXfuOucyw0pJH672kr4pL3VxL9TDVtCagjH59l0T15N",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n            \"nombre_empresa\": \"Protinco\",\r\n            \"nit_empresa\": \"4654564\",\r\n            \"estado_empresa\": 0\r\n        }",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseURL}}/analitica/ver-proyecto/1/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "analitica",
+                    "ver-proyecto",
+                    "1",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "lista",
+              "request": {
+                "method": "GET",
+                "header": []
+              },
+              "response": []
+            },
+            {
+              "name": "cambiar estado proyecto",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/analitica/ver-proyecto/1/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "analitica",
+                    "ver-proyecto",
+                    "1",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "centro OP",
+          "item": [
+            {
+              "name": "crear centro op",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "cwf7hLsVXfuOucyw0pJH672kr4pL3VxL9TDVtCagjH59l0T15N",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"nombre_centrop\": \"prueba 1 centro de operacion1\",\r\n    \"id_proyecto\": 1\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseURL}}/analitica/crear-centro-operativo/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "analitica",
+                    "crear-centro-operativo",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "editar centro OP",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "cwf7hLsVXfuOucyw0pJH672kr4pL3VxL9TDVtCagjH59l0T15N",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"nombre_centrop\": \"prueba 1 centro de operacion1\",\r\n    \"id_proyecto\": 1\r\n}"
+                },
+                "url": {
+                  "raw": "{{baseURL}}/analitica/ver-centro-operativo/39/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "analitica",
+                    "ver-centro-operativo",
+                    "39",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "cambiar estado centro op",
+              "request": {
+                "method": "PATCH",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/analitica/ver-centro-operativo/39/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "analitica",
+                    "ver-centro-operativo",
+                    "39",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "lista centros",
+              "request": {
+                "method": "GET",
+                "header": []
+              },
+              "response": []
+            },
+            {
+              "name": "ver centro op",
+              "request": {
+                "method": "GET",
+                "header": []
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "analitica empresarial",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token admin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"nombre_empresa\": \"empresa prueba\",\r\n  \"nit_empresa\": \"123456-4\"\r\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/analitica/progreso/empresa/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "analitica",
+                "progreso",
+                "empresa",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "analitica empresarial por mes y año",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "usuarios",
+      "item": [
+        {
+          "name": "registar usuario",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"usuario\": \"tes45t1\",\r\n    \"clave\": \"123456\",\r\n    \"is_staff\": \"1\",\r\n    \"idcolaborador\": {\r\n        \"cc_colaborador\": \"11111167712111\",\r\n        \"nombre_colaborador\": \"te76s2t1\",\r\n        \"apellido_colaborador\": \"te287st1\",\r\n        \"cargo_colaborador\": 1,\r\n        \"correo_colaborador\": \"steb2a87n@1.com\",\r\n        \"telefo_colaborador\": \"11111897111111\",\r\n        \"nivel_colaborador\": 1,\r\n        \"empresa_colab\": 1,\r\n        \"regional_colab\": 1\r\n    },\r\n    \"centros\": [1]\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseURL}}/user/register/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "user",
+                "register",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "registar usuario Copy",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"usuario\": \"tes45t1\",\r\n    \"clave\": \"123456\",\r\n    \"is_staff\": \"1\",\r\n    \"idcolaborador\": {\r\n        \"cc_colaborador\": \"11111167712111\",\r\n        \"nombre_colaborador\": \"te76s2t1\",\r\n        \"apellido_colaborador\": \"te287st1\",\r\n        \"cargo_colaborador\": 1,\r\n        \"correo_colaborador\": \"steb2a87n@1.com\",\r\n        \"telefo_colaborador\": \"11111897111111\",\r\n        \"nivel_colaborador\": 1,\r\n        \"empresa_colab\": 1,\r\n        \"regional_colab\": 1\r\n    },\r\n    \"centros\": [1]\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseURL}}/user/register/:id/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "user",
+                "register",
+                ":id",
+                ""
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "27"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "perfil de usuario",
+          "protocolProfileBehavior": {
+            "disableBodyPruning": true
+          },
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token admin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseURL}}/user/perfil/54",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "user",
+                "perfil",
+                "54"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "lista usuarios",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "editar usuario",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "editar usuario Copy",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "filtrar usuarios",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token admin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/user/filtrar-usuarios/?q=&page=1&page_size=10",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "user",
+                "filtrar-usuarios",
+                ""
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": ""
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "page_size",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"usuario\": \"tes45t1\",\r\n    \"clave\": \"123456\",\r\n    \"is_staff\": \"1\",\r\n    \"idcolaborador\": {\r\n        \"cc_colaborador\": \"11111167712111\",\r\n        \"nombre_colaborador\": \"te76s2t1\",\r\n        \"apellido_colaborador\": \"te287st1\",\r\n        \"cargo_colaborador\": 1,\r\n        \"correo_colaborador\": \"steb2a87n@1.com\",\r\n        \"telefo_colaborador\": \"11111897111111\",\r\n        \"nivel_colaborador\": 1,\r\n        \"empresa_colab\": 1,\r\n        \"regional_colab\": 1\r\n    },\r\n    \"centros\": [1]\r\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/user/login/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "user",
+                "login",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "editar colaborador",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "x35bDeW3O7B1OWpfzs2l3RsLRYKXRA2q5k045sOZHhY3Y5XYij",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"centroOP\": \"1\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseURL}}/user/perfil/24/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "user",
+                "perfil",
+                "24",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "New Request",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY3NjI3NDMzLCJpYXQiOjE3Njc2MjcxMzMsImp0aSI6IjFjMmIwZTZjM2I2ZDRkN2NiOWRjMTBjZjJkMWVlOGM0IiwidXNlcl9pZCI6IjU1In0.MKZeDP7Zr9HHylI70k-n8f__sdnZUlIfZfjZil81zRM",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/user/perfil/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "user",
+                "perfil",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "capUser",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY3NjIzOTU0LCJpYXQiOjE3Njc2MjM2NTQsImp0aSI6ImNkYmM5OTNkMzdiYjRjYTg5YzU5ZmY2ZWI2NTNlNWFhIiwidXNlcl9pZCI6IjU1In0.PkDdCpJ2Z2tMN4CuaRy9WxauQ7dN4bnanJt6YHKzGYU",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/user/perfil/:colaborador_idr/capacitacion/:id_capacitacion/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "user",
+                "perfil",
+                ":colaborador_idr",
+                "capacitacion",
+                ":id_capacitacion",
+                ""
+              ],
+              "variable": [
+                {
+                  "key": "colaborador_idr",
+                  "value": "54"
+                },
+                {
+                  "key": "id_capacitacion",
+                  "value": "46"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "curear user temp",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token admin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"usuario\": \"1113513628\",\r\n  \"password\": \"1113513628\",\r\n  \"idcolaborador\": {\r\n    \"cc_colaborador\": \"1113513628\",\r\n    \"nombre_colaborador\": \"temporal\",\r\n    \"apellido_colaborador\": \"emporal\",\r\n    \"correo_colaborador\": \"temporal.temporal@emporal.com\",\r\n    \"telefo_colaborador\": \"1113513628\"\r\n  }\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseURL}}/user/registerTemporal/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "user",
+                "registerTemporal",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "cargo, nivel, region",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "capacitaciones",
+      "item": [
+        {
+          "name": "lecciones",
+          "item": [
+            {
+              "name": "responder leccion",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token admin}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"colaborador_id\" : 31,\r\n    \"respuestas\": [17,19]\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseURL}}/capacitaciones/leccion/7/responder/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "capacitaciones",
+                    "leccion",
+                    "7",
+                    "responder",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "completar leccion",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{token admin}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"colaborador_id\" : 31,\r\n    \"respuestas\": [17,19]\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseURL}}/capacitaciones/leccion/7/responder/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "capacitaciones",
+                    "leccion",
+                    "7",
+                    "responder",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "lista capacitaciones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/capacitaciones/capacitaciones/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "capacitaciones",
+                "capacitaciones",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "lista capacitaciones Copy",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/capacitaciones/capacitaciones/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "capacitaciones",
+                "capacitaciones",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "certificado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/capacitaciones/capacitaciones/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "capacitaciones",
+                "capacitaciones",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "crear capacitacion",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"titulo\": \"Prevención de riesgos laborales\",\r\n  \"descripcion\": \"Capacitación obligatoria sobre seguridad en el trabajo.\",\r\n  \"imagen\": \"https://miservidor.com/uploads/seguridad.jpg\",\r\n  \"fecha_inicio\": \"2025-11-01\",\r\n  \"fecha_fin\": \"2025-11-30\",\r\n\r\n  \"modulos\": [\r\n    {\r\n      \"titulo\": \"Seguridad en el trabajo\",\r\n      \"descripcion\": \"Módulo principal sobre protocolos de seguridad.\",\r\n\r\n      \"lecciones\": [\r\n        {\r\n          \"titulo\": \"Video introductorio\",\r\n          \"descripcion\": \"Lección 1 con video explicativo.\",\r\n          \"tipo_leccion\": \"video\",\r\n          \"contenido\": \"https://youtube.com/video-seguridad\"\r\n        },\r\n        {\r\n          \"titulo\": \"Cuestionario sobre seguridad\",\r\n          \"descripcion\": \"Evalúa tus conocimientos.\",\r\n          \"tipo_leccion\": \"formulario\",\r\n          \"preguntas\": [\r\n            {\r\n              \"texto\": \"¿Qué hacer en caso de incendio?\",\r\n              \"tipo_pregunta\": \"seleccion_unica\",\r\n              \"respuestas\": [\r\n                { \"texto\": \"Llamar a emergencias\", \"es_correcta\": true },\r\n                { \"texto\": \"Ignorar la alarma\", \"es_correcta\": false }\r\n              ]\r\n            },\r\n            {\r\n              \"texto\": \"¿Cuál es el número de emergencias en Colombia?\",\r\n              \"tipo_pregunta\": \"seleccion_unica\",\r\n              \"respuestas\": [\r\n                { \"texto\": \"911\", \"es_correcta\": false },\r\n                { \"texto\": \"123\", \"es_correcta\": true }\r\n              ]\r\n            }\r\n          ]\r\n        }\r\n      ]\r\n    }\r\n  ]\r\n}\r\n",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseURL}}/capacitaciones/crear-capacitacion/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "capacitaciones",
+                "crear-capacitacion",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "ver capacitacion",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "cargar colaboradores",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "mi capacitacion",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "ver cap user",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token admin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/capacitaciones/admin/:capacitacion_id/progreso/:colaborador/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "capacitaciones",
+                "admin",
+                ":capacitacion_id",
+                "progreso",
+                ":colaborador",
+                ""
+              ],
+              "variable": [
+                {
+                  "key": "capacitacion_id",
+                  "value": "7"
+                },
+                {
+                  "key": "colaborador",
+                  "value": "33"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "mis capacitaciones",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "subir archivo",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzY3NjI3NDMzLCJpYXQiOjE3Njc2MjcxMzMsImp0aSI6IjFjMmIwZTZjM2I2ZDRkN2NiOWRjMTBjZjJkMWVlOGM0IiwidXNlcl9pZCI6IjU1In0.MKZeDP7Zr9HHylI70k-n8f__sdnZUlIfZfjZil81zRM",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/capacitaciones/subir-archivoImagen/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "capacitaciones",
+                "subir-archivoImagen",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "editar",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "editar Copy",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        },
+        {
+          "name": "usuarios de capacitaciones",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "New Folder",
+      "item": [
+        {
+          "name": "datos empresa desde script",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "empresas",
+      "item": [
+        {
+          "name": "centro",
+          "item": [
+            {
+              "name": "listar centroO",
+              "protocolProfileBehavior": {
+                "disableBodyPruning": true
+              },
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n    \"username\": \"alexis\",\r\n    \"password\": \"12345\"\r\n}"
+                },
+                "url": {
+                  "raw": "http://localhost:8000/api/empresas/centros-operativos/",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8000",
+                  "path": [
+                    "api",
+                    "empresas",
+                    "centros-operativos",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "crear centroO",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzUwOTU5MzA1LCJpYXQiOjE3NTA5NTU3MDUsImp0aSI6IjhmZGQyOTA3MzY2YTRjODg5YzEwYmUxMzViMDFlYzlkIiwidXNlcl9pZCI6MX0.4DVEDyRFP5SWlhgxG-s03RuzSD1TFhL1SnkQoROk2m4",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"nombre\": \"Centro Principal\",\r\n  \"descripcion\": \"Centro de operaciones principal\",\r\n  \"direccion\": \"Avenida 456 # 78-90\",\r\n  \"ciudad\": \"Medellín\",\r\n  \"activo\": 1,\r\n  \"responsable\": 1,    // ID de usuario responsable\r\n  \"proyectos\" : [1] \r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "http://localhost:8000/api/empresas/centros-operativos/",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8000",
+                  "path": [
+                    "api",
+                    "empresas",
+                    "centros-operativos",
+                    ""
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "New Request",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token admin}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/analitica/lista-empresas/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "analitica",
+                "lista-empresas",
+                ""
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "examenes",
+      "item": [
+        {
+          "name": "preview",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{examanes}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/examenes/correo/reporte/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "examenes",
+                "correo",
+                "reporte",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "filtroexamenes",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{examanes}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/examenes/correo/reporte/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "examenes",
+                "correo",
+                "reporte",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "preview Copy",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{examanes}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/examenes/correo/reporte/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "examenes",
+                "correo",
+                "reporte",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "cargo.empresa-examenes",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{examanes}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/examenes/cargo-empresa-examenes/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "examenes",
+                "cargo-empresa-examenes",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "New Request",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{examanes}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n    \"empresa_id\": 6,\r\n    \"cargo_id\": 6,\r\n    \"nombre_trabajador\": \"Juan Pérez Gómez\",\r\n    \"documento_trabajador\": \"1234567890\",\r\n    \"correo_destino\": \"practicante.desarrollogh@regency.com.co\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseURL}}/examenes/correo/enviar/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "examenes",
+                "correo",
+                "enviar",
+                ""
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "New Request",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{examanes}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/examenes/correo/detalle/:correo_id/",
+              "host": [
+                "{{baseURL}}"
+              ],
+              "path": [
+                "examenes",
+                "correo",
+                "detalle",
+                ":correo_id",
+                ""
+              ],
+              "variable": [
+                {
+                  "key": "correo_id",
+                  "value": "63"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "mundial",
+      "item": [
+        {
+          "name": "Ediciones Copy",
+          "item": [
+            {
+              "name": "Listar Ediciones",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/ediciones/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "ediciones",
+                    ""
+                  ]
+                },
+                "description": "Obtener lista de todas las ediciones del mundial"
+              },
+              "response": []
+            },
+            {
+              "name": "Crear Edición",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nombre\": \"Mundial 2026\",\n  \"año\": 2026,\n  \"descripcion\": \"Copa Mundial 2026\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseURL}}/mundial/ediciones/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "ediciones",
+                    ""
+                  ]
+                },
+                "description": "Crear una nueva edición del mundial"
+              },
+              "response": []
+            },
+            {
+              "name": "Obtener Edición",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/ediciones/1/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "ediciones",
+                    "1",
+                    ""
+                  ]
+                },
+                "description": "Obtener detalles de una edición específica"
+              },
+              "response": []
+            },
+            {
+              "name": "Actualizar Edición",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nombre\": \"Mundial 2026 - Actualizado\",\n  \"año\": 2026,\n  \"descripcion\": \"Copa Mundial 2026 Actualizada\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseURL}}/mundial/ediciones/1/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "ediciones",
+                    "1",
+                    ""
+                  ]
+                },
+                "description": "Actualizar una edición existente"
+              },
+              "response": []
+            },
+            {
+              "name": "Eliminar Edición",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/ediciones/1/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "ediciones",
+                    "1",
+                    ""
+                  ]
+                },
+                "description": "Eliminar una edición"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Equipos Copy",
+          "item": [
+            {
+              "name": "Listar Equipos",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/equipos/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "equipos",
+                    ""
+                  ]
+                },
+                "description": "Obtener lista de todos los equipos"
+              },
+              "response": []
+            },
+            {
+              "name": "Crear Equipo",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nombre\": \"Argentina\",\n  \"codigo\": \"ARG\",\n  \"edicion_id\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{baseURL}}/mundial/equipos/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "equipos",
+                    ""
+                  ]
+                },
+                "description": "Crear un nuevo equipo"
+              },
+              "response": []
+            },
+            {
+              "name": "Obtener Equipo",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/equipos/1/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "equipos",
+                    "1",
+                    ""
+                  ]
+                },
+                "description": "Obtener detalles de un equipo específico"
+              },
+              "response": []
+            },
+            {
+              "name": "Actualizar Equipo",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nombre\": \"Argentina - Actualizado\",\n  \"codigo\": \"ARG\",\n  \"edicion_id\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{baseURL}}/mundial/equipos/1/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "equipos",
+                    "1",
+                    ""
+                  ]
+                },
+                "description": "Actualizar un equipo existente"
+              },
+              "response": []
+            },
+            {
+              "name": "Eliminar Equipo",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/equipos/1/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "equipos",
+                    "1",
+                    ""
+                  ]
+                },
+                "description": "Eliminar un equipo"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Partidos Copy",
+          "item": [
+            {
+              "name": "Listar Partidos",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/partidos/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "partidos",
+                    ""
+                  ]
+                },
+                "description": "Obtener lista de partidos con mi_prediccion"
+              },
+              "response": []
+            },
+            {
+              "name": "Crear Partido",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"equipo_local_id\": 1,\n  \"equipo_visitante_id\": 2,\n  \"fecha\": \"2026-06-21T14:00:00Z\",\n  \"edicion_id\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{baseURL}}/mundial/partidos/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "partidos",
+                    ""
+                  ]
+                },
+                "description": "Crear un nuevo partido"
+              },
+              "response": []
+            },
+            {
+              "name": "Obtener Partido",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/partidos/1/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "partidos",
+                    "1",
+                    ""
+                  ]
+                },
+                "description": "Obtener detalles de un partido específico"
+              },
+              "response": []
+            },
+            {
+              "name": "Actualizar Partido",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"equipo_local_id\": 1,\n  \"equipo_visitante_id\": 2,\n  \"fecha\": \"2026-06-21T14:00:00Z\",\n  \"edicion_id\": 1\n}"
+                },
+                "url": {
+                  "raw": "{{baseURL}}/mundial/partidos/1/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "partidos",
+                    "1",
+                    ""
+                  ]
+                },
+                "description": "Actualizar un partido"
+              },
+              "response": []
+            },
+            {
+              "name": "Eliminar Partido",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/partidos/1/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "partidos",
+                    "1",
+                    ""
+                  ]
+                },
+                "description": "Eliminar un partido"
+              },
+              "response": []
+            },
+            {
+              "name": "Obtener Resultado",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/partidos/1/resultado/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "partidos",
+                    "1",
+                    "resultado",
+                    ""
+                  ]
+                },
+                "description": "Obtener el resultado de un partido"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Partidos Admin Copy",
+          "item": [
+            {
+              "name": "Listar Partidos (Admin)",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/admin/partidos/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "admin",
+                    "partidos",
+                    ""
+                  ]
+                },
+                "description": "Obtener lista de partidos con estadísticas de control (Admin)"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Predicciones Copy",
+          "item": [
+            {
+              "name": "Listar Predicciones",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/predicciones/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "predicciones",
+                    ""
+                  ]
+                },
+                "description": "Obtener lista de predicciones de partidos"
+              },
+              "response": []
+            },
+            {
+              "name": "Crear Predicción",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"partido_id\": 1,\n  \"usuario_id\": 1,\n  \"prediccion\": \"1\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseURL}}/mundial/predicciones/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "predicciones",
+                    ""
+                  ]
+                },
+                "description": "Crear una nueva predicción"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Predicciones Especiales Copy",
+          "item": [
+            {
+              "name": "Listar Predicciones Especiales",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/predicciones-especiales/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "predicciones-especiales",
+                    ""
+                  ]
+                },
+                "description": "Obtener lista de predicciones especiales"
+              },
+              "response": []
+            },
+            {
+              "name": "Crear Predicción Especial",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"configuracion_id\": 1,\n  \"usuario_id\": 1,\n  \"prediccion\": \"equipo_id\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseURL}}/mundial/predicciones-especiales/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "predicciones-especiales",
+                    ""
+                  ]
+                },
+                "description": "Crear una nueva predicción especial"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Ranking Copy",
+          "item": [
+            {
+              "name": "Obtener Ranking",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/ranking/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "ranking",
+                    ""
+                  ]
+                },
+                "description": "Obtener el ranking de usuarios"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Configuración Copy",
+          "item": [
+            {
+              "name": "Obtener Configuración del Torneo",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/configuracion/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "configuracion",
+                    ""
+                  ]
+                },
+                "description": "Obtener configuración del torneo"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Configuración Especiales Copy",
+          "item": [
+            {
+              "name": "Listar Configuración Especiales",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/configuracion-especiales/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "configuracion-especiales",
+                    ""
+                  ]
+                },
+                "description": "Obtener lista de configuraciones de predicciones especiales"
+              },
+              "response": []
+            },
+            {
+              "name": "Crear Configuración Especial",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nombre\": \"Goleador del torneo\",\n  \"descripcion\": \"Predicción de quién será el goleador\",\n  \"edicion_id\": 1,\n  \"tipo\": \"equipo\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseURL}}/mundial/configuracion-especiales/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "configuracion-especiales",
+                    ""
+                  ]
+                },
+                "description": "Crear una nueva configuración especial"
+              },
+              "response": []
+            },
+            {
+              "name": "Obtener Configuración Especial",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/configuracion-especiales/1/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "configuracion-especiales",
+                    "1",
+                    ""
+                  ]
+                },
+                "description": "Obtener detalles de una configuración especial"
+              },
+              "response": []
+            },
+            {
+              "name": "Actualizar Configuración Especial",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"nombre\": \"Goleador del torneo - Actualizado\",\n  \"descripcion\": \"Predicción de quién será el goleador\",\n  \"edicion_id\": 1,\n  \"tipo\": \"equipo\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseURL}}/mundial/configuracion-especiales/1/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "configuracion-especiales",
+                    "1",
+                    ""
+                  ]
+                },
+                "description": "Actualizar una configuración especial"
+              },
+              "response": []
+            },
+            {
+              "name": "Eliminar Configuración Especial",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/configuracion-especiales/1/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "configuracion-especiales",
+                    "1",
+                    ""
+                  ]
+                },
+                "description": "Eliminar una configuración especial"
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Estadísticas Copy",
+          "item": [
+            {
+              "name": "Obtener Estadísticas",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseURL}}/mundial/estadisticas/",
+                  "host": [
+                    "{{baseURL}}"
+                  ],
+                  "path": [
+                    "mundial",
+                    "estadisticas",
+                    ""
+                  ]
+                },
+                "description": "Obtener estadísticas generales"
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseURL",
+      "value": "",
+      "type": "default"
+    }
+  ]
+}
