@@ -618,8 +618,8 @@ const handleRespuestaChange = async (
     setColaboradores((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
-    e.preventDefault();
+  const handleSubmit = async (e?: { preventDefault?: () => void }): Promise<void> => {
+    e?.preventDefault?.();
     try {
       setLoading(true);
       setError(null);
@@ -926,7 +926,7 @@ const handleRespuestaChange = async (
             <button className={styles.btnLimpiar} onClick={handleLimpiarDatos} type="button" title="Limpiar datos guardados">
               🗑 Limpiar
             </button>
-            <button className={styles.btnGuardar} onClick={handleSubmit} disabled={loading}>
+            <button className={styles.btnGuardar} onClick={() => handleSubmit()} disabled={loading}>
               {loading ? "Guardando..." : "Guardar Capacitación"}
             </button>
           </div>
@@ -1400,7 +1400,6 @@ const handleRespuestaChange = async (
                                         {q.tipo_pregunta === "pregunta_abierta" ? (
                                           <div className={styles.formGroup}>
                                             <textarea
-                                              type="textarea"
                                               className={styles.textarea}
                                               placeholder="Escriba su respuesta"
                                               value={q.respuestas[0]?.valor || ""}
