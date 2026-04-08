@@ -58,10 +58,34 @@ interface Colaborador {
   apellido_colaborador?: string;
 }
 
-export default function CrearCapacitacion() {
-  const { id } = useParams();
+interface FormDataType {
+  titulo: string;
+  descripcion: string;
+  imagen: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  tipo: string;
+  imagenFile: File | null;
+  imagenPreview: string | null;
+}
+
+interface ExpandedState {
+  [key: number]: boolean;
+}
+
+interface ExpandedLeccionesState {
+  [key: string]: boolean;
+}
+
+interface FileUploadErrorType {
+  message: string;
+  type: 'error' | 'success' | 'warning';
+}
+
+export default function CrearCapacitacion(): React.ReactElement {
+  const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormDataType>({
     titulo: "",
     descripcion: "",
     imagen: "",
@@ -156,17 +180,17 @@ export default function CrearCapacitacion() {
     }
   }, [modulos]);
 
-  const [expandedModulos, setExpandedModulos] = useState<{ [key: number]: boolean }>({});
-  const [expandedLecciones, setExpandedLecciones] = useState<{[key: string]: boolean;}>({});
+  const [expandedModulos, setExpandedModulos] = useState<ExpandedState>({});
+  const [expandedLecciones, setExpandedLecciones] = useState<ExpandedLeccionesState>({});
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [colaboradoresFiltrados, setColaboradoresFiltrados] = useState<Colaborador[]>([]);
-  const [searchColaborador, setSearchColaborador] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [searchColaborador, setSearchColaborador] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [fileUploadError, setFileUploadError] = useState<{ message: string; type: 'error' | 'success' | 'warning' } | null>(null);
+  const [fileUploadError, setFileUploadError] = useState<FileUploadErrorType | null>(null);
   const today = new Date().toISOString().split("T")[0];
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
     const { name, value } = e.target;
     setFormData({
       ...formData,
@@ -174,7 +198,7 @@ export default function CrearCapacitacion() {
     });
   };
 
-const handleImagenPrincipal = async (file: File | null) => {
+const handleImagenPrincipal = async (file: File | null): Promise<void> => {
   if (!file) {
     // Limpiar imagen seleccionada
     setFormData({ ...formData, imagen: "", imagenFile: null as any, imagenPreview: "" as any });
@@ -227,7 +251,7 @@ const handleImagenPrincipal = async (file: File | null) => {
   }, [searchColaborador, colaboradores]);
 
   // Crear una nueva lección vacía
-const agregarLeccionDirecta = (moduloIndex: number) => {
+const agregarLeccionDirecta = (moduloIndex: number): void => {
   const nuevos = [...modulos];
 
   const nuevaLeccionIndex = nuevos[moduloIndex].lecciones.length;
@@ -254,7 +278,7 @@ const agregarLeccionDirecta = (moduloIndex: number) => {
 };
 
 
-const toggleLeccion = (moduloIndex: number, leccionIndex: number) => {
+const toggleLeccion = (moduloIndex: number, leccionIndex: number): void => {
   const key = `${moduloIndex}-${leccionIndex}`;
   setExpandedLecciones((prev) => ({
     ...prev,
@@ -263,7 +287,7 @@ const toggleLeccion = (moduloIndex: number, leccionIndex: number) => {
 };
 
 // Eliminar una lección
-const eliminarLeccion = (moduloIndex: number, leccionIndex: number) => {
+const eliminarLeccion = (moduloIndex: number, leccionIndex: number): void => {
   const nuevos = [...modulos];
 
   nuevos[moduloIndex].lecciones.splice(leccionIndex, 1);
@@ -271,7 +295,7 @@ const eliminarLeccion = (moduloIndex: number, leccionIndex: number) => {
   setModulos(nuevos);
 };
 
-  const toggleModulo = (index: number) => {
+  const toggleModulo = (index: number): void => {
     setExpandedModulos((prev) => ({
       ...prev,
       [index]: !prev[index],
@@ -279,7 +303,7 @@ const eliminarLeccion = (moduloIndex: number, leccionIndex: number) => {
   };
 
 
-  const agregarModulo = () => {
+  const agregarModulo = (): void => {
     const nuevoModulo: Modulo = {
       nombre_modulo: modulos.length + 1 + ". Módulo",
       lecciones: [],
@@ -288,7 +312,7 @@ const eliminarLeccion = (moduloIndex: number, leccionIndex: number) => {
   };
 
   // Eliminar un módulo completo
-  const eliminarModulo = (index: number) => {
+  const eliminarModulo = (index: number): void => {
     if (!confirm('¿Eliminar módulo? Esta acción no se puede deshacer.')) return;
     const nuevos = [...modulos];
     nuevos.splice(index, 1);
@@ -315,7 +339,7 @@ const handleLeccionChange = async (
   leccionIndex: number,
   field: string,
   value: string | File | null
-) => {
+): Promise<void> => {
   const nuevos = [...modulos];
   const leccion = nuevos[moduloIndex].lecciones[leccionIndex];
 
@@ -353,7 +377,7 @@ const handleLeccionChange = async (
 };
 
     /* ---------- Formulario handlers (questions & answers) ---------- */
-    const agregarPregunta = (moduloIndex: number, leccionIndex: number) => {
+    const agregarPregunta = (moduloIndex: number, leccionIndex: number): void => {
       const nuevos = [...modulos];
       const leccion = nuevos[moduloIndex].lecciones[leccionIndex];
       if (!leccion.preguntas) leccion.preguntas = [];
@@ -369,7 +393,7 @@ const handleLeccionChange = async (
       setModulos(nuevos);
     };
 
-    const eliminarPregunta = (moduloIndex: number, leccionIndex: number, preguntaIndex: number) => {
+    const eliminarPregunta = (moduloIndex: number, leccionIndex: number, preguntaIndex: number): void => {
       const nuevos = [...modulos];
       const arr = nuevos[moduloIndex].lecciones[leccionIndex].preguntas || [];
       const p = arr[preguntaIndex];
@@ -391,14 +415,14 @@ const handleLeccionChange = async (
       setModulos(nuevos);
     };
 
-    const agregarRespuesta = (moduloIndex: number, leccionIndex: number, preguntaIndex: number) => {
+    const agregarRespuesta = (moduloIndex: number, leccionIndex: number, preguntaIndex: number): void => {
       const nuevos = [...modulos];
       const q = nuevos[moduloIndex].lecciones[leccionIndex].preguntas![preguntaIndex];
       q.respuestas.push({ valor: "", es_correcto: 0 });
       setModulos(nuevos);
     };
 
-    const eliminarRespuesta = (moduloIndex: number, leccionIndex: number, preguntaIndex: number, respIndex: number) => {
+    const eliminarRespuesta = (moduloIndex: number, leccionIndex: number, preguntaIndex: number, respIndex: number): void => {
       const nuevos = [...modulos];
       const q = nuevos[moduloIndex].lecciones[leccionIndex].preguntas![preguntaIndex];
       const r = q.respuestas[respIndex];
@@ -415,7 +439,7 @@ const handleLeccionChange = async (
         preguntaIndex: number,
         field: string,
         value: File | string | null
-        ) => {
+        ): Promise<void> => {
         const nuevos = structuredClone(modulos);
         const pregunta = nuevos[moduloIndex].lecciones[leccionIndex].preguntas![preguntaIndex];
 
@@ -448,7 +472,7 @@ const handleLeccionChange = async (
             setModulos(nuevos);
         }
 
-        // If the question type changes to single-option, ensure only one correct exists
+        // If the question type changes, handle special cases
         if (field === "tipo_pregunta" && (pregunta as any).respuestas) {
           if (value === "opcion_unica") {
             let seen = false;
@@ -459,6 +483,9 @@ const handleLeccionChange = async (
                 r.es_correcto = 0;
               }
             });
+          } else if (value === "pregunta_abierta") {
+            // Pregunta abierta: una sola respuesta, siempre correcta
+            (pregunta as any).respuestas = [{ valor: "", es_correcto: 1 }];
           }
         }
     };
@@ -472,7 +499,7 @@ const handleRespuestaChange = async (
   respIndex: number,
   field: string,
   value: string | number | File | null
-) => {
+): Promise<void> => {
   const nuevos = structuredClone(modulos);
   const respuesta =
     nuevos[moduloIndex].lecciones[leccionIndex].preguntas![preguntaIndex].respuestas[respIndex];
@@ -519,7 +546,7 @@ const handleRespuestaChange = async (
       leccionIndex: number,
       preguntaIndex: number,
       respIndex: number
-    ) => {
+    ): void => {
       const nuevos = [...modulos];
       const q = nuevos[moduloIndex].lecciones[leccionIndex].preguntas![preguntaIndex];
       const r = q.respuestas[respIndex];
@@ -542,7 +569,7 @@ const handleRespuestaChange = async (
 
     // NOTE: preguntaTieneMultiples removed — rendering now uses pregunta.tipo_pregunta to decide single vs multiple behavior
 
-  const handleCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -587,11 +614,11 @@ const handleRespuestaChange = async (
   };
 
   // Función para remover un colaborador de la previsualización
-  const handleRemoveColaborador = (index: number) => {
+  const handleRemoveColaborador = (index: number): void => {
     setColaboradores((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
     try {
       setLoading(true);
@@ -681,18 +708,20 @@ const handleRespuestaChange = async (
               return;
             }
 
-            const correctas = pregunta.respuestas.filter(r => r.es_correcto === 1);
-            if (correctas.length === 0) {
-              setError(`La pregunta ${p + 1} del módulo ${m + 1}, lección ${l + 1} debe tener una respuesta correcta`);
-              setLoading(false);
-              return;
-            }
-
-            for (let r = 0; r < pregunta.respuestas.length; r++) {
-              if (!pregunta.respuestas[r].valor.trim()) {
-                setError(`Hay respuestas vacías en la pregunta ${p + 1} del módulo ${m + 1}, lección ${l + 1}`);
+            if (pregunta.tipo_pregunta !== "pregunta_abierta") {
+              const correctas = pregunta.respuestas.filter(r => r.es_correcto === 1);
+              if (correctas.length === 0) {
+                setError(`La pregunta ${p + 1} del módulo ${m + 1}, lección ${l + 1} debe tener una respuesta correcta`);
                 setLoading(false);
                 return;
+              }
+
+              for (let r = 0; r < pregunta.respuestas.length; r++) {
+                if (!pregunta.respuestas[r].valor.trim()) {
+                  setError(`Hay respuestas vacías en la pregunta ${p + 1} del módulo ${m + 1}, lección ${l + 1}`);
+                  setLoading(false);
+                  return;
+                }
               }
             }
             // Solo validar colaboradores si es creación, no edición
@@ -861,11 +890,11 @@ const handleRespuestaChange = async (
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = (): void => {
     navigate("/capacitaciones/list");
   };
 
-  const handleLimpiarDatos = () => {
+  const handleLimpiarDatos = (): void => {
     if (!confirm("¿Estás seguro de que quieres limpiar todos los datos?")) return;
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(STORAGE_KEY_MODULOS);
@@ -1297,15 +1326,18 @@ const handleRespuestaChange = async (
                                         >
                                           <option value="opcion_multiple">Opción múltiple</option>
                                           <option value="opcion_unica">Opción única</option>
+                                          <option value="pregunta_abierta">Pregunta abierta</option>
                                         </select>
 
-                                        <button
-                                          type="button"
-                                          className={styles.btnSmall}
-                                          onClick={() => agregarRespuesta(moduloIndex, leccionIndex, preguntaIndex)}
-                                        >
-                                          + Agregar respuesta
-                                        </button>
+                                        {q.tipo_pregunta !== "pregunta_abierta" && (
+                                          <button
+                                            type="button"
+                                            className={styles.btnSmall}
+                                            onClick={() => agregarRespuesta(moduloIndex, leccionIndex, preguntaIndex)}
+                                          >
+                                            + Agregar respuesta
+                                          </button>
+                                        )}
                                         {!id || !(q as any).id ? (
                                           <button
                                             type="button"
@@ -1365,7 +1397,19 @@ const handleRespuestaChange = async (
                                     </div>
 
                                     <div className={styles.answersList}>
-                                        {q.respuestas.map((r, respIndex) => {
+                                        {q.tipo_pregunta === "pregunta_abierta" ? (
+                                          <div className={styles.formGroup}>
+                                            <textarea
+                                              type="textarea"
+                                              className={styles.textarea}
+                                              placeholder="Escriba su respuesta"
+                                              value={q.respuestas[0]?.valor || ""}
+                                              onChange={(e) =>
+                                                handleRespuestaChange(moduloIndex, leccionIndex, preguntaIndex, 0, "valor", e.target.value)
+                                              }
+                                            />
+                                          </div>
+                                        ) : q.respuestas.map((r, respIndex) => {
                                           const multiple = (q as any).tipo_pregunta !== "opcion_unica";
 
                                             return (

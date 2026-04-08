@@ -776,8 +776,10 @@ class ResponderCuestionarioView(APIView):
             
             colaborador = request.user.idcolaboradoru
             respuestas_ids = request.data.get('respuestas', [])
-            
-            if not respuestas_ids:
+            # Dict { str(pregunta_id): texto } para preguntas abiertas
+            textos_abiertos = request.data.get('respuestas_abiertas', {})
+
+            if not respuestas_ids and not textos_abiertos:
                 return Response(
                     {'error': 'Se requiere al menos una respuesta'},
                     status=status.HTTP_400_BAD_REQUEST
@@ -835,25 +837,45 @@ class ResponderCuestionarioView(APIView):
                 idpregunta_id__in=preguntas_ids
             ).delete()
             
-            # Obtener respuestas válidas y crear en bulk
+            # Obtener respuestas válidas (preguntas cerradas) y crear en bulk
             respuestas_validas = Respuestas.objects.filter(
                 id__in=respuestas_ids
             ).select_related('idpregunta')
-            
+
             nuevas_respuestas = [
                 RespuestasColaboradores(
                     idcolaborador=colaborador,
                     idpregunta=respuesta.idpregunta,
-                    idrespuesta=respuesta
+                    idrespuesta=respuesta,
                 )
                 for respuesta in respuestas_validas
             ]
+
+            # Procesar preguntas abiertas: { pregunta_id: texto }
+            for pregunta_id_str, texto in textos_abiertos.items():
+                try:
+                    pregunta_id = int(pregunta_id_str)
+                    resp_abierta = Respuestas.objects.filter(
+                        idpregunta_id=pregunta_id, escorrecto=1
+                    ).first()
+                    if resp_abierta:
+                        nuevas_respuestas.append(RespuestasColaboradores(
+                            idcolaborador=colaborador,
+                            idpregunta_id=pregunta_id,
+                            idrespuesta=resp_abierta,
+                            texto_respuesta=texto,
+                        ))
+                except (ValueError, TypeError):
+                    pass
+
             RespuestasColaboradores.objects.bulk_create(nuevas_respuestas)
             
             # Calcular respuestas correctas del usuario
+            # Las preguntas abiertas con texto siempre cuentan como correctas (escorrecto=1 por defecto)
             respuestas_correctas_usuario = set(respuestas_ids) & respuestas_correctas_ids
-            total_correctas = len(respuestas_correctas_usuario)
-            
+            total_abiertas_respondidas = len(textos_abiertos)
+            total_correctas = len(respuestas_correctas_usuario) + total_abiertas_respondidas
+
             # Calcular porcentaje de acierto
             porcentaje_acierto = (total_correctas / total_preguntas) * 100
             
@@ -2419,8 +2441,11 @@ class ReporteCapacitacionesView(APIView):
                 lecciones = Lecciones.objects.filter(idmodulo__in=modulos)
                 preguntas = PreguntasLecciones.objects.filter(id_leccion__in=lecciones).order_by('id')
                 
+                preguntas_abiertas_ids = set()
                 for pregunta in preguntas:
                     preguntas_dict[pregunta.id] = pregunta.pregunta
+                    if pregunta.tipopregunta == 'pregunta_abierta':
+                        preguntas_abiertas_ids.add(pregunta.id)
                 
                 # Agregar columnas de preguntas y respuestas
                 for pregunta_id, pregunta_texto in preguntas_dict.items():
@@ -2484,7 +2509,13 @@ class ReporteCapacitacionesView(APIView):
                     ).select_related('idpregunta', 'idrespuesta')
                     
                     # Crear diccionario de respuestas por pregunta_id
-                    respuestas_map = {r.idpregunta_id: r.idrespuesta.valor for r in respuestas_colaborador}
+                    # Preguntas abiertas muestran el texto escrito; cerradas muestran la opción elegida
+                    respuestas_map = {
+                        r.idpregunta_id: (
+                            r.texto_respuesta if r.idpregunta_id in preguntas_abiertas_ids else r.idrespuesta.valor
+                        )
+                        for r in respuestas_colaborador
+                    }
                     
                     for pregunta_id, pregunta_texto in preguntas_dict.items():
                         # Columna de pregunta

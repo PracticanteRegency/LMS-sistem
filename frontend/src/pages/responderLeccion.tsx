@@ -49,6 +49,11 @@ export default function ResponderLeccion() {
     [key: number]: number | number[];
   }>({});
 
+  // Respuestas abiertas: { preguntaId: texto } para preguntas de tipo abierta
+  const [respuestasAbiertas, setRespuestasAbiertas] = useState<{
+    [key: number]: string;
+  }>({});
+
   useEffect(() => {
     loadCapacitacion();
   }, [capacitacionId, moduloIndex, leccionIndex]);
@@ -152,6 +157,18 @@ export default function ResponderLeccion() {
     });
   };
 
+  const isAbiertaTipo = (tipo: string) => {
+    if (!tipo) return false;
+    const normalizado = tipo
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, "")
+      .replace(/\s+/g, "_")
+      .trim();
+    return /abierta|open|libre|texto/.test(normalizado);
+  };
+
   const enviarRespuestas = async () => {
     try {
       setSubmitting(true);
@@ -162,7 +179,7 @@ export default function ResponderLeccion() {
         return;
       }
 
-      // Construir array de IDs de respuestas
+      // Construir array de IDs de respuestas (cerradas)
       const respuestas: number[] = [];
       Object.values(respuestasSeleccionadas).forEach((val) => {
         if (Array.isArray(val)) {
@@ -172,14 +189,31 @@ export default function ResponderLeccion() {
         }
       });
 
-      if (respuestas.length === 0) {
+      // Agregar respuestas abiertas: mapear { pregunta_id: texto }
+      // El backend busca internamente la respuesta correcta para esa pregunta
+      const textosAbiertos: { [key: string]: string } = {};
+      for (const pregunta of leccion.preguntas || []) {
+        if (!isAbiertaTipo(pregunta.tipo_pregunta)) continue;
+        const pId = Number(pregunta.id);
+        const texto = (respuestasAbiertas[pId] || "").trim();
+        if (!texto) {
+          setError(`Por favor escribe una respuesta para la pregunta "${pregunta.pregunta.slice(0, 40)}..."`);
+          return;
+        }
+        textosAbiertos[String(pId)] = texto;
+      }
+
+      const hayAbiertas = Object.keys(textosAbiertos).length > 0;
+
+      if (respuestas.length === 0 && !hayAbiertas) {
         setError("Por favor selecciona al menos una respuesta");
         return;
       }
 
       // Llamar servicio para enviar respuestas
       const payload = {
-        respuestas: respuestas,
+        respuestas,
+        respuestas_abiertas: textosAbiertos,
       };
 
       await (CapListService as any).enviarRespuestasFormulario(
@@ -272,6 +306,11 @@ export default function ResponderLeccion() {
     return respuestasCorrectas > 1;
   });
 
+  const preguntasAbiertas = leccion.preguntas.map((p: Pregunta) => {
+    const tipo = normalizeType((p.tipo_pregunta || "").toString());
+    return /abierta|open|libre|texto/.test(tipo);
+  });
+
   // Calcular la altura mínima de respuesta para cada pregunta basada en el texto más largo
   const calculateMinHeightPerQuestion = (preguntas: Pregunta[]) => {
     const minHeights: { [key: number]: number } = {};
@@ -316,6 +355,7 @@ export default function ResponderLeccion() {
         >
           {leccion.preguntas.map((pregunta, preguntaIdx) => {
             const esMultiple = preguntasMultiples[preguntaIdx];
+            const esAbierta = preguntasAbiertas[preguntaIdx];
             const pIdNum = Number(pregunta.id);
             const respuestasSeleccionadasPregunta =
               respuestasSeleccionadas[pIdNum];
@@ -326,7 +366,12 @@ export default function ResponderLeccion() {
                   <div className={styles.questionLabel}>
                     pregunta {preguntaIdx + 1}.
                   </div>
-                  {esMultiple && (
+                  {esAbierta && (
+                    <span className={styles.badge}>
+                      Respuesta abierta
+                    </span>
+                  )}
+                  {!esAbierta && esMultiple && (
                     <span className={styles.badge}>
                       Selecciona múltiples
                     </span>
@@ -356,99 +401,115 @@ export default function ResponderLeccion() {
                   {pregunta.pregunta}
                 </div>
 
-                <div
-                  className={styles.answersList}
-                  style={{
-                    minHeight: `${
-                      minHeightsPorPregunta[pregunta.id]
-                    }px`,
-                  }}
-                >
-                  {pregunta.respuestas.map(
-                    (respuesta, respIdx) => {
-                      const rIdNum = Number(respuesta.id);
-                      let isSelected = false;
-                      if (
-                        Array.isArray(
-                          respuestasSeleccionadasPregunta
-                        )
-                      ) {
-                        isSelected = (
-                          respuestasSeleccionadasPregunta as number[]
-                        ).includes(rIdNum);
-                      } else {
-                        isSelected =
-                          respuestasSeleccionadasPregunta === rIdNum;
-                      }
+                {esAbierta ? (
+                  <textarea
+                    className={styles.textareaAbierta}
+                    placeholder="Escribe tu respuesta aquí..."
+                    value={respuestasAbiertas[pIdNum] || ""}
+                    onChange={(e) =>
+                      setRespuestasAbiertas((prev) => ({
+                        ...prev,
+                        [pIdNum]: e.target.value,
+                      }))
+                    }
+                    rows={5}
+                    required
+                  />
+                ) : (
+                  <div
+                    className={styles.answersList}
+                    style={{
+                      minHeight: `${
+                        minHeightsPorPregunta[pregunta.id]
+                      }px`,
+                    }}
+                  >
+                    {pregunta.respuestas.map(
+                      (respuesta, respIdx) => {
+                        const rIdNum = Number(respuesta.id);
+                        let isSelected = false;
+                        if (
+                          Array.isArray(
+                            respuestasSeleccionadasPregunta
+                          )
+                        ) {
+                          isSelected = (
+                            respuestasSeleccionadasPregunta as number[]
+                          ).includes(rIdNum);
+                        } else {
+                          isSelected =
+                            respuestasSeleccionadasPregunta === rIdNum;
+                        }
 
-                      return (
-                        <div
-                          key={respuesta.id}
-                          className={styles.respuestaItem}
-                        >
-                          <div className={styles.respuestaCard}>
-                            {normalizeImageSrc(
-                              respuesta.url_archivo
-                            ) && (
-                              <div
-                                className={
-                                  styles.respuestaMediaTop
-                                }
-                              >
-                                <img
-                                  src={
-                                    normalizeImageSrc(
-                                      respuesta.url_archivo
-                                    ) as string
-                                  }
-                                  alt={`Respuesta ${
-                                    respIdx + 1
-                                  }`}
+                        return (
+                          <div
+                            key={respuesta.id}
+                            className={styles.respuestaItem}
+                          >
+                            <div className={styles.respuestaCard}>
+                              {normalizeImageSrc(
+                                respuesta.url_archivo
+                              ) && (
+                                <div
                                   className={
-                                    styles.respuestaImage
+                                    styles.respuestaMediaTop
                                   }
-                                  onError={(e) => {
-                                    (
-                                      e.currentTarget as HTMLImageElement
-                                    ).style.display = "none";
-                                  }}
+                                >
+                                  <img
+                                    src={
+                                      normalizeImageSrc(
+                                        respuesta.url_archivo
+                                      ) as string
+                                    }
+                                    alt={`Respuesta ${
+                                      respIdx + 1
+                                    }`}
+                                    className={
+                                      styles.respuestaImage
+                                    }
+                                    onError={(e) => {
+                                      (
+                                        e.currentTarget as HTMLImageElement
+                                      ).style.display = "none";
+                                    }}
+                                  />
+                                </div>
+                              )}
+                              <div className={styles.answerRow}>
+                                <button
+                                  type="button"
+                                  className={
+                                    styles.selector +
+                                    " " +
+                                    (esMultiple
+                                      ? styles.square
+                                      : styles.circle) +
+                                    (isSelected
+                                      ? " " + styles.selected
+                                      : "")
+                                  }
+                                  onClick={() =>
+                                    handleRespuestaChange(
+                                      pIdNum,
+                                      rIdNum,
+                                      esMultiple
+                                    )
+                                  }
+                                  aria-pressed={isSelected}
                                 />
-                              </div>
-                            )}
-                            <div className={styles.answerRow}>
-                              <button
-                                type="button"
-                                className={
-                                  styles.selector +
-                                  " " +
-                                  (esMultiple
-                                    ? styles.square
-                                    : styles.circle) +
-                                  (isSelected
-                                    ? " " + styles.selected
-                                    : "")
-                                }
-                                onClick={() =>
-                                  handleRespuestaChange(
-                                    pIdNum,
-                                    rIdNum,
-                                    esMultiple
-                                  )
-                                }
-                                aria-pressed={isSelected}
-                              />
-                              <div
-                                className={styles.answerField}
-                              >
-                                {respuesta.valor}
+                                <div
+                                  className={styles.answerField}
+                                >
+                                  {respuesta.valor}
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    }
-                  )}
-                </div>
+                        );
+                      }
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}

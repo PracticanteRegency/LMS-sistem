@@ -105,4 +105,4 @@ volumes:
 
 networks:
   shared_net:
-    external: false
+    external: true

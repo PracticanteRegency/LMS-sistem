@@ -104,6 +104,7 @@ class RespuestasColaboradores(models.Model):
     idcolaborador = models.ForeignKey('usuarios.Colaboradores', models.DO_NOTHING, db_column='idColaborador')
     idpregunta = models.ForeignKey(PreguntasLecciones, models.DO_NOTHING, db_column='idPregunta')
     idrespuesta = models.ForeignKey(Respuestas, models.DO_NOTHING, db_column='idRespuesta')
+    texto_respuesta = models.TextField(null=True, blank=True)
 
     class Meta:
         managed = False
