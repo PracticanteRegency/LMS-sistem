@@ -17,6 +17,8 @@ services:
     expose:
       - "8000"
     restart: always
+    volumes:
+      - media_data:/app/media
     networks:
       - shared_net
 
@@ -92,6 +94,7 @@ services:
 
 volumes:
   redis_data:
+  media_data:
 
 networks:
   shared_net:
