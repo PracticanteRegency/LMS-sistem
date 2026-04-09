@@ -169,6 +169,7 @@ export default function CrearCapacitacion(): React.ReactElement {
     "SOCIAL",
     "LEGAL",
     "INDUCCIÓN CORPORATIVA",
+    "ENCUESTA",
   ];
 
   const [modulos, setModulos] = useState<Modulo[]>([]);

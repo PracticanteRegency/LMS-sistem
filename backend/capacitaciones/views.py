@@ -792,6 +792,7 @@ class ResponderCuestionarioView(APIView):
             
             modulo = leccion.idmodulo
             capacitacion = modulo.idcapacitacion
+            tipo_capacitacion = capacitacion.tipo
             
             # Verificar inscripción (query optimizada)
             inscrito = progresoCapacitaciones.objects.filter(
@@ -881,6 +882,13 @@ class ResponderCuestionarioView(APIView):
             
             # Determinar si pasó la lección (>60%)
             aprobada = porcentaje_acierto >= 60
+
+
+            if tipo_capacitacion == 'ENCUESTA':
+                # Para encuestas, el porcentage es 100
+                porcentaje_acierto = 100
+                aprobada = True
+                total_correctas = total_preguntas  # Contar todas como correctas para encuestas
             
             # Actualizar progreso usando la función de utils
             progreso = 100 if aprobada else 0
