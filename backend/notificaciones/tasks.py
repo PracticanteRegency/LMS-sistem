@@ -256,7 +256,7 @@ def desactivar_capacitaciones():
     hoy = timezone.now().date()
 
     capacitaciones_a_desactivar = Capacitaciones.objects.filter(
-        fecha_fin__date=hoy,
+        fecha_fin__date__lte=hoy,
         estado=1
     )
 

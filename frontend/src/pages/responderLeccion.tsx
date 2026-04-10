@@ -53,6 +53,7 @@ export default function ResponderLeccion() {
   const [respuestasAbiertas, setRespuestasAbiertas] = useState<{
     [key: number]: string;
   }>({});
+  const [preguntasInvalidas, setPreguntasInvalidas] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     loadCapacitacion();
@@ -179,6 +180,29 @@ export default function ResponderLeccion() {
         return;
       }
 
+      // Validar que todas las preguntas tengan respuesta
+      const invalidas = new Set<number>();
+      for (const pregunta of leccion.preguntas || []) {
+        const pId = Number(pregunta.id);
+        if (isAbiertaTipo(pregunta.tipo_pregunta)) {
+          if (!(respuestasAbiertas[pId] || "").trim()) invalidas.add(pId);
+        } else {
+          const sel = respuestasSeleccionadas[pId];
+          if (!sel || (Array.isArray(sel) && sel.length === 0)) invalidas.add(pId);
+        }
+      }
+      if (invalidas.size > 0) {
+        setPreguntasInvalidas(invalidas);
+        setError("Por favor responde todas las preguntas marcadas en rojo.");
+        // Scroll a la primera pregunta inválida
+        const primerInvalido = leccion.preguntas.find(p => invalidas.has(Number(p.id)));
+        if (primerInvalido) {
+          document.getElementById(`pregunta-${primerInvalido.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        return;
+      }
+      setPreguntasInvalidas(new Set());
+
       // Construir array de IDs de respuestas (cerradas)
       const respuestas: number[] = [];
       Object.values(respuestasSeleccionadas).forEach((val) => {
@@ -189,25 +213,12 @@ export default function ResponderLeccion() {
         }
       });
 
-      // Agregar respuestas abiertas: mapear { pregunta_id: texto }
-      // El backend busca internamente la respuesta correcta para esa pregunta
+      // Construir textos de respuestas abiertas
       const textosAbiertos: { [key: string]: string } = {};
       for (const pregunta of leccion.preguntas || []) {
         if (!isAbiertaTipo(pregunta.tipo_pregunta)) continue;
         const pId = Number(pregunta.id);
-        const texto = (respuestasAbiertas[pId] || "").trim();
-        if (!texto) {
-          setError(`Por favor escribe una respuesta para la pregunta "${pregunta.pregunta.slice(0, 40)}..."`);
-          return;
-        }
-        textosAbiertos[String(pId)] = texto;
-      }
-
-      const hayAbiertas = Object.keys(textosAbiertos).length > 0;
-
-      if (respuestas.length === 0 && !hayAbiertas) {
-        setError("Por favor selecciona al menos una respuesta");
-        return;
+        textosAbiertos[String(pId)] = (respuestasAbiertas[pId] || "").trim();
       }
 
       // Llamar servicio para enviar respuestas
@@ -241,21 +252,7 @@ export default function ResponderLeccion() {
     );
   }
 
-  if (error) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.errorBox}>
-          <p className={styles.error}>Error: {error}</p>
-          <button
-            className={styles.btnBack}
-            onClick={() => navigate(`/capacitaciones/${capacitacionId}`)}
-          >
-            ← Volver a la capacitación
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // El error de validación se muestra dentro del formulario, no como pantalla completa
 
   if (
     !leccion ||
@@ -360,8 +357,15 @@ export default function ResponderLeccion() {
             const respuestasSeleccionadasPregunta =
               respuestasSeleccionadas[pIdNum];
 
+            const esInvalida = preguntasInvalidas.has(pIdNum);
+
             return (
-              <div key={pregunta.id} className={styles.preguntaCard}>
+              <div
+                key={pregunta.id}
+                id={`pregunta-${pregunta.id}`}
+                className={styles.preguntaCard}
+                style={esInvalida ? { border: "2px solid #C0281B", borderRadius: 8 } : undefined}
+              >
                 <div className={styles.preguntaHeader}>
                   <div className={styles.questionLabel}>
                     pregunta {preguntaIdx + 1}.
@@ -402,20 +406,23 @@ export default function ResponderLeccion() {
                 </div>
 
                 {esAbierta ? (
-                  <textarea
-                    className={styles.textareaAbierta}
-                    placeholder="Escribe tu respuesta aquí..."
-                    value={respuestasAbiertas[pIdNum] || ""}
-                    onChange={(e) =>
-                      setRespuestasAbiertas((prev) => ({
-                        ...prev,
-                        [pIdNum]: e.target.value,
-                      }))
-                    }
-                    rows={5}
-                    required
-                  />
+                  <>
+                    <textarea
+                      className={styles.textareaAbierta}
+                      placeholder="Escribe tu respuesta aquí..."
+                      value={respuestasAbiertas[pIdNum] || ""}
+                      onChange={(e) => {
+                        setRespuestasAbiertas((prev) => ({ ...prev, [pIdNum]: e.target.value }));
+                        if (e.target.value.trim()) setPreguntasInvalidas(prev => { const s = new Set(prev); s.delete(pIdNum); return s; });
+                      }}
+                      rows={5}
+                      required
+                    />
+                    {esInvalida && <span style={{ color: "#C0281B", fontSize: 13, marginTop: 4, display: "block" }}>Este campo es obligatorio.</span>}
+                  </>
                 ) : (
+                  <>
+                  {esInvalida && <span style={{ color: "#C0281B", fontSize: 13, marginBottom: 6, display: "block" }}>Debes seleccionar al menos una opción.</span>}
                   <div
                     className={styles.answersList}
                     style={{
@@ -488,13 +495,10 @@ export default function ResponderLeccion() {
                                       ? " " + styles.selected
                                       : "")
                                   }
-                                  onClick={() =>
-                                    handleRespuestaChange(
-                                      pIdNum,
-                                      rIdNum,
-                                      esMultiple
-                                    )
-                                  }
+                                  onClick={() => {
+                                    handleRespuestaChange(pIdNum, rIdNum, esMultiple);
+                                    setPreguntasInvalidas(prev => { const s = new Set(prev); s.delete(pIdNum); return s; });
+                                  }}
                                   aria-pressed={isSelected}
                                 />
                                 <div
@@ -509,11 +513,17 @@ export default function ResponderLeccion() {
                       }
                     )}
                   </div>
+                  </>
                 )}
               </div>
             );
           })}
 
+          {error && (
+            <div style={{ background: "#fee", border: "1px solid #C0281B", borderRadius: 6, padding: "10px 16px", marginBottom: 16, color: "#C0281B", fontWeight: 500 }}>
+              {error}
+            </div>
+          )}
           <div className={styles.formActions}>
             <button
               type="button"
