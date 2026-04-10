@@ -119,7 +119,7 @@ export default function ResponderLeccion() {
     // Asegurar que los IDs sean números para comparaciones estrictas
     const pId = Number(preguntaId);
     const rId = Number(respuestaId);
-    setRespuestasSeleccionadas((prev) => {
+    setRespuestasSeleccionadas((prev: { [key: number]: number | number[] }) => {
       // crear copia superficial del objeto de estado
       const nuevas: { [key: number]: number | number[] } = { ...prev };
 
@@ -195,7 +195,7 @@ export default function ResponderLeccion() {
         setPreguntasInvalidas(invalidas);
         setError("Por favor responde todas las preguntas marcadas en rojo.");
         // Scroll a la primera pregunta inválida
-        const primerInvalido = leccion.preguntas.find(p => invalidas.has(Number(p.id)));
+        const primerInvalido = (leccion.preguntas || []).find((p: any) => invalidas.has(Number(p.id)));
         if (primerInvalido) {
           document.getElementById(`pregunta-${primerInvalido.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
         }
@@ -205,7 +205,7 @@ export default function ResponderLeccion() {
 
       // Construir array de IDs de respuestas (cerradas)
       const respuestas: number[] = [];
-      Object.values(respuestasSeleccionadas).forEach((val) => {
+      Object.values(respuestasSeleccionadas).forEach((val: any) => {
         if (Array.isArray(val)) {
           respuestas.push(...val);
         } else {
