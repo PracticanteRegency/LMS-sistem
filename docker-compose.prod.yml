@@ -95,6 +95,8 @@ services:
 volumes:
   redis_data:
   media_data:
+    external: true
+    name: lms_media_data
 
 networks:
   shared_net:

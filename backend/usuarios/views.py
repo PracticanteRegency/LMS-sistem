@@ -401,17 +401,22 @@ class RegisterTemporal(APIView):
         if Colaboradores.objects.filter(cccolaborador=cc_colaborador).exists():
             return JsonResponse({'error': f'La cédula {cc_colaborador} ya existe en la base de datos'}, status=400)
 
+        # Mapeo fijo empresa → centroop
+        EMPRESA_CENTROOP_MAP = {6: 1, 7: 307, 8: 308, 9: 309, 10: 310, 11: 311, 12: 312}
+        empresa_id = payload.get('empresa_id')
+        centroop_id = EMPRESA_CENTROOP_MAP.get(int(empresa_id), 1) if empresa_id else 1
+
         try:
             colaborador = Colaboradores.objects.create(
                 cccolaborador=colab_data['cc_colaborador'],
                 nombrecolaborador=colab_data['nombre_colaborador'],
                 apellidocolaborador=colab_data['apellido_colaborador'],
-                cargocolaborador_id= 118,
+                cargocolaborador_id=118,
                 correocolaborador=colab_data.get('correo_colaborador', ''),
                 telefocolaborador=colab_data.get('telefo_colaborador', ''),
                 nivelcolaborador_id=5,
                 regionalcolab_id=1,
-                centroop_id=1,
+                centroop_id=centroop_id,
             )
 
             user = Usuarios(
@@ -423,24 +428,29 @@ class RegisterTemporal(APIView):
             user.set_password(payload['password'])
             user.save()
 
-            # Si viene capacitacion_id, registrar el colaborador a esa capacitación
-            capacitacion_id = payload.get('capacitacion_id')
-            if capacitacion_id:
-                try:
-                    from capacitaciones.models import Capacitaciones, progresoCapacitaciones
-                    capacitacion = Capacitaciones.objects.get(id=capacitacion_id)
-                    progresoCapacitaciones.objects.get_or_create(
-                        capacitacion_id=capacitacion_id,
-                        colaborador_id=colaborador.idcolaborador,
-                        defaults={'completada': 0, 'progreso': 0}
-                    )
-                except Capacitaciones.DoesNotExist:
-                    return JsonResponse({'error': f'Capacitación {capacitacion_id} no encontrada'}, status=404)
-                except Exception as e:
-                    return JsonResponse({'error': f'Error registrando a capacitación: {str(e)}'}, status=500)
+            # Soporta capacitacion_ids (lista) o capacitacion_id (simple, legado)
+            capacitacion_ids = payload.get('capacitacion_ids') or []
+            if not capacitacion_ids and payload.get('capacitacion_id'):
+                capacitacion_ids = [payload.get('capacitacion_id')]
+
+            if capacitacion_ids:
+                from capacitaciones.models import progresoCapacitaciones
+                from capacitaciones.utils import enviar_correo_nuevos_colaboradores
+                from django.db import transaction as db_transaction
+                for cap_id in capacitacion_ids:
+                    try:
+                        progresoCapacitaciones.objects.get_or_create(
+                            capacitacion_id=cap_id,
+                            colaborador_id=colaborador.idcolaborador,
+                            defaults={'completada': 0, 'progreso': 0}
+                        )
+                        # Notificar al colaborador (mismo mecanismo que al agregar a capacitación existente)
+                        db_transaction.on_commit(lambda c=cap_id, col=colaborador.idcolaborador: enviar_correo_nuevos_colaboradores(c, [col]))
+                    except Exception:
+                        pass
 
             return JsonResponse({
-                'mensaje': 'Usuario temporal creado' + (' y registrado a capacitación' if capacitacion_id else ''),
+                'mensaje': 'Usuario temporal creado' + (f' y matriculado en {len(capacitacion_ids)} inducción(es)' if capacitacion_ids else ''),
                 'usuario_id': user.id,
                 'colaborador_id': colaborador.idcolaborador,
             }, status=201)

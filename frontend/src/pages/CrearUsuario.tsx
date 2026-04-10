@@ -16,10 +16,12 @@ export default function CrearUsuario() {
   const [cargosData, setCargosData] = useState<any>(null);
 
   // temporal form
-  const [tempForm, setTempForm] = useState({ cc: "", nombre: "", apellido: "", correo: "", telefono: "", induccion_id: undefined as number | undefined });
+  const [tempForm, setTempForm] = useState({ cc: "", nombre: "", apellido: "", correo: "", telefono: "", empresa_id: undefined as number | undefined });
   const [tempError, setTempError] = useState<string>("");
   const [tempLoading, setTempLoading] = useState(false);
   const [inducciones, setInducciones] = useState<any[]>([]);
+  const [induccionSeleccionada, setInduccionSeleccionada] = useState<number | "">("");
+  const [induccionesAgregadas, setInduccionesAgregadas] = useState<{id: number, titulo: string}[]>([]);
 
   // completo form
   const [fullForm, setFullForm] = useState({ usuario: "", is_staff: "0", idcolaborador: { cc_colaborador: "", nombre_colaborador: "", apellido_colaborador: "", cargo_colaborador: undefined as number | undefined, correo_colaborador: "", telefo_colaborador: "", nivel_colaborador: undefined as number | undefined, regional_colab: undefined as number | undefined, centroOP: undefined as number | undefined } });
@@ -146,13 +148,59 @@ export default function CrearUsuario() {
             <input className={styles.input} placeholder="apellido" value={tempForm.apellido} onChange={(e) => { setTempForm({...tempForm, apellido: e.target.value}); setTempError(""); }} />
             <input className={styles.input} placeholder="correo" value={tempForm.correo} onChange={(e) => { setTempForm({...tempForm, correo: e.target.value}); setTempError(""); }} />
             <input className={styles.input} placeholder="telefono" value={tempForm.telefono} onChange={(e) => { setTempForm({...tempForm, telefono: e.target.value}); setTempError(""); }} />
-            <select className={styles.select} value={tempForm.induccion_id || ''} onChange={(e) => { setTempForm({...tempForm, induccion_id: e.target.value ? Number(e.target.value) : undefined}); setTempError(""); }}>
-              <option value="">Seleccionar inducción</option>
-              {inducciones.map((ind: any) => (
-                <option key={ind.id} value={ind.id}>{ind.titulo}</option>
+            <select className={styles.select} value={tempForm.empresa_id || ''} onChange={(e) => { setTempForm({...tempForm, empresa_id: e.target.value ? Number(e.target.value) : undefined}); setTempError(""); }}>
+              <option value="">Seleccionar empresa</option>
+              {empresas.map((emp: any) => (
+                <option key={emp.idempresa} value={emp.idempresa}>{emp.nombre_empresa}</option>
               ))}
             </select>
-            <button className={styles.btnPrimary} disabled={tempLoading || !tempForm.induccion_id} onClick={async () => {
+          </div>
+
+          {/* Sección de inducciones múltiples */}
+          <div style={{ marginTop: 12 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <select className={styles.select} value={induccionSeleccionada} onChange={(e) => setInduccionSeleccionada(e.target.value ? Number(e.target.value) : "")}>
+                <option value="">Seleccionar inducción</option>
+                {inducciones.filter((ind: any) => !induccionesAgregadas.find(a => a.id === ind.id)).map((ind: any) => (
+                  <option key={ind.id} value={ind.id}>{ind.titulo}</option>
+                ))}
+              </select>
+              <button type="button" style={{ border: '1px solid #C0281B', background: '#C0281B', color: '#f3f2f2', borderRadius: 4, padding: '8px 14px', cursor: 'pointer' }}
+                onClick={() => {
+                  if (!induccionSeleccionada) return;
+                  const ind = inducciones.find((i: any) => i.id === induccionSeleccionada);
+                  if (ind && !induccionesAgregadas.find(a => a.id === ind.id)) {
+                    setInduccionesAgregadas([...induccionesAgregadas, { id: ind.id, titulo: ind.titulo }]);
+                    setInduccionSeleccionada("");
+                  }
+                }}>Agregar</button>
+            </div>
+
+            {induccionesAgregadas.length > 0 && (
+              <table style={{ marginTop: 10, width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+                <thead>
+                  <tr style={{ background: '#C0281B', color: 'white' }}>
+                    <th style={{ textAlign: 'left', padding: '6px 10px', border: '1px solid #ddd' }}>Inducción</th>
+                    <th style={{ padding: '6px 10px', border: '1px solid #ddd', width: 80 }}>Quitar</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {induccionesAgregadas.map((ind) => (
+                    <tr key={ind.id}>
+                      <td style={{ padding: '6px 10px', border: '1px solid #ddd' }}>{ind.titulo}</td>
+                      <td style={{ textAlign: 'center', padding: '6px 10px', border: '1px solid #ddd' }}>
+                        <button type="button" style={{ background: 'none', border: 'none', color: '#C0281B', cursor: 'pointer', fontWeight: 'bold' }}
+                          onClick={() => setInduccionesAgregadas(induccionesAgregadas.filter(a => a.id !== ind.id))}>✕</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div style={{ marginTop: 12 }}>
+            <button className={styles.btnPrimary} disabled={tempLoading || induccionesAgregadas.length === 0} onClick={async () => {
               setTempLoading(true);
               setTempError("");
               const payload = {
@@ -165,14 +213,15 @@ export default function CrearUsuario() {
                   correo_colaborador: tempForm.correo,
                   telefo_colaborador: tempForm.telefono,
                 },
-                capacitacion_id: tempForm.induccion_id
+                empresa_id: tempForm.empresa_id,
+                capacitacion_ids: induccionesAgregadas.map(i => i.id),
               };
               try {
-                // Crear usuario temporal y registrarlo a capacitación en una sola llamada
                 await (PerfilService as any).registerTemporalUser(payload);
-                
-                setTempForm({ cc: "", nombre: "", apellido: "", correo: "", telefono: "", induccion_id: undefined });
-                alert("Usuario temporal creado y registrado a capacitación exitosamente");
+                setTempForm({ cc: "", nombre: "", apellido: "", correo: "", telefono: "", empresa_id: undefined });
+                setInduccionesAgregadas([]);
+                setInduccionSeleccionada("");
+                alert("Usuario temporal creado y matriculado en " + induccionesAgregadas.length + " inducción(es) exitosamente");
               } catch (err: any) {
                 const errorMsg = err.response?.data?.error || err.message || "Error al crear usuario";
                 setTempError(errorMsg);
