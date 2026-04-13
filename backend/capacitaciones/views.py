@@ -2457,7 +2457,7 @@ class ReporteCapacitacionesView(APIView):
                 
                 # Agregar columnas de preguntas y respuestas
                 for pregunta_id, pregunta_texto in preguntas_dict.items():
-                    headers.append(f"Pregunta: {pregunta_texto[:50]}...")  # Truncar texto largo
+                    headers.append(f"Pregunta: {pregunta_texto}")  # Truncar texto largo
             
             for col, header in enumerate(headers, 1):
                 cell = ws.cell(row=6, column=col)
