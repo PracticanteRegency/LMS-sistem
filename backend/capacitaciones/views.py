@@ -2458,7 +2458,6 @@ class ReporteCapacitacionesView(APIView):
                 # Agregar columnas de preguntas y respuestas
                 for pregunta_id, pregunta_texto in preguntas_dict.items():
                     headers.append(f"Pregunta: {pregunta_texto[:50]}...")  # Truncar texto largo
-                    headers.append(f"Respuesta: {pregunta_texto[:50]}...")
             
             for col, header in enumerate(headers, 1):
                 cell = ws.cell(row=6, column=col)
@@ -2527,11 +2526,11 @@ class ReporteCapacitacionesView(APIView):
                     
                     for pregunta_id, pregunta_texto in preguntas_dict.items():
                         # Columna de pregunta
-                        ws.cell(row=row, column=col_offset + 1).value = pregunta_texto
+                        #ws.cell(row=row, column=col_offset + 1).value = pregunta_texto
                         # Columna de respuesta
                         respuesta = respuestas_map.get(pregunta_id, '')
-                        ws.cell(row=row, column=col_offset + 2).value = respuesta
-                        col_offset += 2
+                        ws.cell(row=row, column=col_offset + 1).value = respuesta
+                        col_offset += 1
                 
                 # Formato
                 num_cols = len(headers)
@@ -2565,10 +2564,10 @@ class ReporteCapacitacionesView(APIView):
             ws.column_dimensions['N'].width = 14  # Estado Avance
             
             # Ajustar ancho para columnas de preguntas y respuestas
-            if include_questions:
-                for col_idx in range(14, len(headers) + 1):
-                    col_letter = chr(64 + col_idx) if col_idx <= 26 else chr(64 + col_idx // 26) + chr(64 + col_idx % 26)
-                    ws.column_dimensions[col_letter].width = 30
+            #if include_questions:
+                #for col_idx in range(14, len(headers) + 1):
+                    #col_letter = chr(64 + col_idx) if col_idx <= 26 else chr(64 + col_idx // 26) + chr(64 + col_idx % 26)
+                    #ws.column_dimensions[col_letter].width = 30
             
             # Habilitar filtros (facilita filtrado en Excel)
             try:

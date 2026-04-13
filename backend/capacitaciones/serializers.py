@@ -142,7 +142,8 @@ class CapacitacionDetalleSerializer(serializers.ModelSerializer):
             'fecha_inicio',
             'fecha_fin',
             'modulos',
-            'colaboradores'
+            'colaboradores',
+            'tipo'
         ]
 
     def get_colaboradores(self, obj):

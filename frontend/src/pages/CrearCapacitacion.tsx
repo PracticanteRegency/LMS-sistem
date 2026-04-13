@@ -103,6 +103,7 @@ export default function CrearCapacitacion(): React.ReactElement {
       try {
         setLoading(true);
         const data: any = await (CapListService as any).getCapacitacionDetalle(id);
+      
         if (!data) return;
 
         setFormData((prev) => ({
@@ -912,6 +913,9 @@ const handleRespuestaChange = async (
     setModulos([]);
     alert("Datos limpios exitosamente");
   };
+
+
+
 
   return (
     <div className={styles.container}>

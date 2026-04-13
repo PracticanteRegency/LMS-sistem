@@ -380,13 +380,7 @@ class RegisterTemporal(APIView):
                 pass
             return JsonResponse({'error': 'Faltan campos requeridos'}, status=400)
 
-        # VALIDACIÓN TEMPRANA: Verificar usuario antes de cualquier otra validación
-        usuario_nombre = payload.get('usuario', '').strip()
-        if not usuario_nombre:
-            return JsonResponse({'error': 'El usuario no puede estar vacío'}, status=400)
-        if Usuarios.objects.filter(usuario=usuario_nombre).exists():
-            return JsonResponse({'error': f'El usuario {usuario_nombre} ya existe en la base de datos'}, status=400)
-
+    
         colab_data = payload.get('idcolaborador') or {}
         required_colab_min = [
             'cc_colaborador', 'nombre_colaborador', 'apellido_colaborador'
@@ -398,8 +392,42 @@ class RegisterTemporal(APIView):
         cc_colaborador = colab_data.get('cc_colaborador', '').strip()
         if not cc_colaborador:
             return JsonResponse({'error': 'La cédula del colaborador no puede estar vacía'}, status=400)
-        if Colaboradores.objects.filter(cccolaborador=cc_colaborador).exists():
-            return JsonResponse({'error': f'La cédula {cc_colaborador} ya existe en la base de datos'}, status=400)
+        colaborador = Colaboradores.objects.filter(cccolaborador=cc_colaborador).first()
+        if colaborador:
+            colaborador_id = colaborador.idcolaborador
+             # Soporta capacitacion_ids (lista) o capacitacion_id (simple, legado)
+            capacitacion_ids = payload.get('capacitacion_ids') or []
+            if not capacitacion_ids and payload.get('capacitacion_id'):
+                capacitacion_ids = [payload.get('capacitacion_id')]
+
+            if capacitacion_ids:
+                from capacitaciones.models import progresoCapacitaciones
+                from capacitaciones.utils import enviar_correo_nuevos_colaboradores
+                from django.db import transaction as db_transaction
+                for cap_id in capacitacion_ids:
+                    try:
+                        progresoCapacitaciones.objects.get_or_create(
+                            capacitacion_id=cap_id,
+                            colaborador_id=colaborador_id,
+                            defaults={'completada': 0, 'progreso': 0}
+                        )
+                        # Notificar al colaborador (mismo mecanismo que al agregar a capacitación existente)
+                        db_transaction.on_commit(lambda c=cap_id, col=colaborador_id: enviar_correo_nuevos_colaboradores(c, [col]))
+                    except Exception:
+                        pass
+
+            return JsonResponse({
+                'mensaje': 'Usuario ya registrado ' + (f'  matriculado en {len(capacitacion_ids)} inducción(es)' if capacitacion_ids else ''),
+                'colaborador_id': colaborador_id,
+            }, status=201)
+            
+
+        # VALIDACIÓN TEMPRANA: Verificar usuario antes de cualquier otra validación
+        usuario_nombre = payload.get('usuario', '').strip()
+        if not usuario_nombre:
+            return JsonResponse({'error': 'El usuario no puede estar vacío'}, status=400)
+        if Usuarios.objects.filter(usuario=usuario_nombre).exists():
+            return JsonResponse({'error': f'El usuario {usuario_nombre} ya existe en la base de datos'}, status=400)
 
         # Mapeo fijo empresa → centroop
         EMPRESA_CENTROOP_MAP = {6: 1, 7: 307, 8: 308, 9: 309, 10: 310, 11: 311, 12: 312}
