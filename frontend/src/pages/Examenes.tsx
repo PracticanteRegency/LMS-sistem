@@ -630,7 +630,17 @@ export default function Examenes() {
             <button
               type="submit"
               className={styles.submitButton}
-              disabled={sending || !selectedCargo || !selectedTipoExamen || examenesSeleccionados.length === 0}
+              disabled={
+                sending ||
+                !selectedEmpresa ||
+                !selectedCargo ||
+                !selectedTipoExamen ||
+                !selectedCentro ||
+                !formData.nombre_trabajador.trim() ||
+                !formData.documento_trabajador.trim() ||
+                !formData.ciudad.trim() ||
+                examenesSeleccionados.length === 0
+              }
             >
               {sending ? "Enviando..." : "Enviar Exámenes por Correo"}
             </button>
