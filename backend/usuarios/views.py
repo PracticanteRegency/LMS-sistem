@@ -1706,14 +1706,15 @@ class RegistrarMasivoView(APIView):
             ]
             
             for esperada, patrones in busquedas_prioritarias:
+                columnas_ya_asignadas = set(v for v in mapeo_columnas.values() if v is not None)
                 for col_original, col_norm in columnas_normalizadas.items():
                     if mapeo_columnas[esperada] is None:
                         # Buscar por coincidencia exacta primero
                         if col_norm in patrones or any(patron == col_norm for patron in patrones):
                             mapeo_columnas[esperada] = col_original
                             break
-                        # Si no hay exacta, buscar por substring (pero solo si no fue ya asignada otra columna a este campo)
-                        if any(patron in col_norm for patron in patrones):
+                        # Substring: solo si la columna no fue ya asignada a otro campo
+                        if col_original not in columnas_ya_asignadas and any(patron in col_norm for patron in patrones):
                             mapeo_columnas[esperada] = col_original
                             break
 
@@ -2035,12 +2036,13 @@ class RegistrarMasivoView(APIView):
             ]
 
             for esperada, patrones in busquedas_prioritarias:
+                columnas_ya_asignadas = set(v for v in mapeo_columnas.values() if v is not None)
                 for col_original, col_norm in columnas_normalizadas.items():
                     if mapeo_columnas[esperada] is None:
                         if col_norm in patrones or any(patron == col_norm for patron in patrones):
                             mapeo_columnas[esperada] = col_original
                             break
-                        if any(patron in col_norm for patron in patrones):
+                        if col_original not in columnas_ya_asignadas and any(patron in col_norm for patron in patrones):
                             mapeo_columnas[esperada] = col_original
                             break
 

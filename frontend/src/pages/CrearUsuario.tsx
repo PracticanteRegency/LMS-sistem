@@ -24,7 +24,7 @@ export default function CrearUsuario() {
   const [induccionesAgregadas, setInduccionesAgregadas] = useState<{id: number, titulo: string}[]>([]);
 
   // completo form
-  const [fullForm, setFullForm] = useState({ usuario: "", is_staff: "0", idcolaborador: { cc_colaborador: "", nombre_colaborador: "", apellido_colaborador: "", cargo_colaborador: undefined as number | undefined, correo_colaborador: "", telefo_colaborador: "", nivel_colaborador: undefined as number | undefined, regional_colab: undefined as number | undefined, centroOP: undefined as number | undefined } });
+  const [fullForm, setFullForm] = useState({ usuario: "", is_staff: "", idcolaborador: { cc_colaborador: "", nombre_colaborador: "", apellido_colaborador: "", cargo_colaborador: undefined as number | undefined, correo_colaborador: "", telefo_colaborador: "", nivel_colaborador: undefined as number | undefined, regional_colab: undefined as number | undefined, centroOP: undefined as number | undefined } });
   const [fullError, setFullError] = useState<string>("");
   const [fullLoading, setFullLoading] = useState(false);
 
@@ -252,29 +252,28 @@ export default function CrearUsuario() {
                     ...f.idcolaborador,
                     cc_colaborador: cc
                   },
-                  is_staff: "0"
                 }));
                 setFullError("");
               }} />
             </div>
             <div className={styles.completoRow}>
-              <input className={styles.input} placeholder="nombre" value={fullForm.idcolaborador.nombre_colaborador} onChange={(e) => { setFullForm({...fullForm, idcolaborador: {...fullForm.idcolaborador, nombre_colaborador: e.target.value}, is_staff: "0"}); setFullError(""); }} />
-              <input className={styles.input} placeholder="apellido" value={fullForm.idcolaborador.apellido_colaborador} onChange={(e) => { setFullForm({...fullForm, idcolaborador: {...fullForm.idcolaborador, apellido_colaborador: e.target.value}, is_staff: "0"}); setFullError(""); }} />
+              <input className={styles.input} placeholder="nombre" value={fullForm.idcolaborador.nombre_colaborador} onChange={(e) => { setFullForm({...fullForm, idcolaborador: {...fullForm.idcolaborador, nombre_colaborador: e.target.value}}); setFullError(""); }} />
+              <input className={styles.input} placeholder="apellido" value={fullForm.idcolaborador.apellido_colaborador} onChange={(e) => { setFullForm({...fullForm, idcolaborador: {...fullForm.idcolaborador, apellido_colaborador: e.target.value}}); setFullError(""); }} />
             </div>
             <div className={styles.completoRow}>
-              <select className={styles.select} value={fullForm.idcolaborador.cargo_colaborador || ''} onChange={(e) => { setFullForm({...fullForm, idcolaborador: {...fullForm.idcolaborador, cargo_colaborador: e.target.value ? Number(e.target.value) : undefined}, is_staff: "0"}); setFullError(""); }}>
+              <select className={styles.select} value={fullForm.idcolaborador.cargo_colaborador || ''} onChange={(e) => { setFullForm({...fullForm, idcolaborador: {...fullForm.idcolaborador, cargo_colaborador: e.target.value ? Number(e.target.value) : undefined}}); setFullError(""); }}>
                 <option value="">Seleccionar cargo</option>
                 {(cargosData?.cargos || []).map((c: any) => (
                   <option key={c.idcargo} value={c.idcargo}>{c.nombrecargo}</option>
                 ))}
               </select>
-              <select className={styles.select} value={fullForm.idcolaborador.nivel_colaborador || ''} onChange={(e) => { setFullForm({...fullForm, idcolaborador: {...fullForm.idcolaborador, nivel_colaborador: e.target.value ? Number(e.target.value) : undefined}, is_staff: "0"}); setFullError(""); }}>
+              <select className={styles.select} value={fullForm.idcolaborador.nivel_colaborador || ''} onChange={(e) => { setFullForm({...fullForm, idcolaborador: {...fullForm.idcolaborador, nivel_colaborador: e.target.value ? Number(e.target.value) : undefined}}); setFullError(""); }}>
                 <option value="">Seleccionar nivel</option>
                 {(cargosData?.niveles || []).map((n: any) => (
                   <option key={n.idnivel} value={n.idnivel}>{n.nombrenivel}</option>
                 ))}
               </select>
-              <select className={styles.select} value={fullForm.idcolaborador.regional_colab || ''} onChange={(e) => { setFullForm({...fullForm, idcolaborador: {...fullForm.idcolaborador, regional_colab: e.target.value ? Number(e.target.value) : undefined}, is_staff: "0"}); setFullError(""); }}>
+              <select className={styles.select} value={fullForm.idcolaborador.regional_colab || ''} onChange={(e) => { setFullForm({...fullForm, idcolaborador: {...fullForm.idcolaborador, regional_colab: e.target.value ? Number(e.target.value) : undefined}}); setFullError(""); }}>
                 <option value="">Seleccionar regional</option>
                 {(cargosData?.regionales || []).map((r: any) => (
                   <option key={r.idregional} value={r.idregional}>{r.nombreregional}</option>
@@ -282,43 +281,54 @@ export default function CrearUsuario() {
               </select>
             </div>
             <div className={styles.completoRow}>
-              <select className={styles.select} value={selectedEmpresa ?? ''} onChange={(e) => { setSelectedEmpresa(e.target.value ? Number(e.target.value) : null); setSelectedUnidad(null); setSelectedProyecto(null); setFullForm(f => ({...f, is_staff: "0"})); setFullError(""); }}>
+              <select className={styles.select} value={selectedEmpresa ?? ''} onChange={(e) => { setSelectedEmpresa(e.target.value ? Number(e.target.value) : null); setSelectedUnidad(null); setSelectedProyecto(null); setFullError(""); }}>
                 <option value="">Seleccionar empresa</option>
                 {empresas.map((emp: any) => (
                   <option key={emp.idempresa} value={emp.idempresa}>{emp.nombre_empresa}</option>
                 ))}
               </select>
-              <select className={styles.select} value={selectedUnidad ?? ''} onChange={(e) => { setSelectedUnidad(e.target.value ? Number(e.target.value) : null); setSelectedProyecto(null); setFullForm(f => ({...f, is_staff: "0"})); setFullError(""); }}>
+              <select className={styles.select} value={selectedUnidad ?? ''} onChange={(e) => { setSelectedUnidad(e.target.value ? Number(e.target.value) : null); setSelectedProyecto(null); setFullError(""); }}>
                 <option value="">Seleccionar unidad</option>
                 {empresas.find((em) => em.idempresa === selectedEmpresa)?.unidades?.map((u: any) => (
                   <option key={u.idunidad} value={u.idunidad}>{u.nombreunidad}{u.descripcionunidad ? ` (${u.descripcionunidad})` : ''}</option>
                 ))}
               </select>
-              <select className={styles.select} value={selectedProyecto ?? ''} onChange={(e) => { setSelectedProyecto(e.target.value ? Number(e.target.value) : null); setFullForm(f => ({...f, is_staff: "0"})); setFullError(""); }}>
+              <select className={styles.select} value={selectedProyecto ?? ''} onChange={(e) => { setSelectedProyecto(e.target.value ? Number(e.target.value) : null); setFullError(""); }}>
                 <option value="">Seleccionar proyecto</option>
                 {empresas.find((em) => em.idempresa === selectedEmpresa)?.unidades?.find((uu: any) => uu.idunidad === selectedUnidad)?.proyectos?.map((p: any) => (
                   <option key={p.idproyecto} value={p.idproyecto}>{p.nombreproyecto || p.nombre}</option>
                 ))}
               </select>
-              <select className={styles.select} value={fullForm.idcolaborador.centroOP || ''} onChange={(e) => { setFullForm({...fullForm, idcolaborador: {...fullForm.idcolaborador, centroOP: e.target.value ? Number(e.target.value) : undefined}, is_staff: "0"}); setFullError(""); }}>
+              <select className={styles.select} value={fullForm.idcolaborador.centroOP || ''} onChange={(e) => { setFullForm({...fullForm, idcolaborador: {...fullForm.idcolaborador, centroOP: e.target.value ? Number(e.target.value) : undefined}}); setFullError(""); }}>
                 <option value="">Seleccionar centro</option>
                 {empresas.find((em) => em.idempresa === selectedEmpresa)?.unidades?.find((uu: any) => uu.idunidad === selectedUnidad)?.proyectos?.find((pp: any) => pp.idproyecto === selectedProyecto)?.centros?.map((c: any) => (
                   <option key={c.idcentrop} value={c.idcentrop}>{c.nombrecentrop}</option>
                 ))}
               </select>
+              <select className={styles.select}   value={fullForm.is_staff}
+  onChange={(e) => {
+    setFullForm({ ...fullForm, is_staff: e.target.value });
+    setFullError("");
+  }}>
+                <option value="">Seleccionar Perfil</option>
+                <option value="0">USUARIO</option>
+                <option value="1">ADMIN CAPACITACIONES</option>
+                <option value="3">ADMIN EXAMENES</option>
+              </select>
             </div>
             <div className={styles.completoRow}>
-              <input className={styles.input} placeholder="correo colaborador" value={fullForm.idcolaborador.correo_colaborador} onChange={(e) => { setFullForm({...fullForm, idcolaborador: {...fullForm.idcolaborador, correo_colaborador: e.target.value}, is_staff: "0"}); setFullError(""); }} />
-              <input className={styles.input} placeholder="telefono" value={fullForm.idcolaborador.telefo_colaborador} onChange={(e) => { setFullForm({...fullForm, idcolaborador: {...fullForm.idcolaborador, telefo_colaborador: e.target.value}, is_staff: "0"}); setFullError(""); }} />
+              <input className={styles.input} placeholder="correo colaborador" value={fullForm.idcolaborador.correo_colaborador} onChange={(e) => { setFullForm({...fullForm, idcolaborador: {...fullForm.idcolaborador, correo_colaborador: e.target.value}}); setFullError(""); }} />
+              <input className={styles.input} placeholder="telefono" value={fullForm.idcolaborador.telefo_colaborador} onChange={(e) => { setFullForm({...fullForm, idcolaborador: {...fullForm.idcolaborador, telefo_colaborador: e.target.value}}); setFullError(""); }} />
             </div>
             <div style={{ marginTop: 16 }}>
               <button className={styles.btnPrimary} type="button" disabled={fullLoading} onClick={async () => {
                 setFullLoading(true);
                 setFullError("");
                 try {
-                  const payload = { ...fullForm, usuario: fullForm.idcolaborador.cc_colaborador, password: fullForm.idcolaborador.cc_colaborador, is_staff: "0" };
+                  
+                  const payload = { ...fullForm, usuario: fullForm.idcolaborador.cc_colaborador, password: fullForm.idcolaborador.cc_colaborador };
                   const resp = await api.post('user/register/', payload);
-                  setFullForm({ usuario: "", is_staff: "0", idcolaborador: { cc_colaborador: "", nombre_colaborador: "", apellido_colaborador: "", cargo_colaborador: undefined, correo_colaborador: "", telefo_colaborador: "", nivel_colaborador: undefined, regional_colab: undefined, centroOP: undefined } });
+                  setFullForm({ usuario: "", is_staff: "", idcolaborador: { cc_colaborador: "", nombre_colaborador: "", apellido_colaborador: "", cargo_colaborador: undefined, correo_colaborador: "", telefo_colaborador: "", nivel_colaborador: undefined, regional_colab: undefined, centroOP: undefined } });
                   setSelectedEmpresa(null);
                   setSelectedUnidad(null);
                   setSelectedProyecto(null);
