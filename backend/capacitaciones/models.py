@@ -31,6 +31,7 @@ class Lecciones(models.Model):
     tituloleccion = models.CharField(db_column='tituloLeccion', max_length=150)
     tipoleccion = models.CharField(db_column='tipoLeccion', max_length=150)
     url = models.TextField(db_column='URL')
+    duracion = models.CharField(max_length=20, blank=True, null=True)
     idmodulo = models.ForeignKey(Modulos, models.DO_NOTHING, db_column='idModulo')
 
     class Meta:

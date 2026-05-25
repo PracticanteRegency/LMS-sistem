@@ -14,6 +14,8 @@ export default function EditarColaboradores() {
   const [colaboradores, setColaboradores] = useState<any[]>([]);
   const [colaboradoresIds, setColaboradoresIds] = useState<number[]>([]);
   const [csvWarnings, setCsvWarnings] = useState<string | null>(null);
+  const [csvAdicionarInfo, setCsvAdicionarInfo] = useState<string | null>(null);
+  const [csvAdicionarWarnings, setCsvAdicionarWarnings] = useState<string | null>(null);
   // const [csvPreview, setCsvPreview] = useState<any[] | null>(null);
   // Guardar la lista original de IDs para detectar cambios
   const [originalColaboradoresIds, setOriginalColaboradoresIds] = useState<number[]>([]);
@@ -94,6 +96,49 @@ export default function EditarColaboradores() {
     }
   };
 
+  // Agregar colaboradores desde CSV de forma aditiva (sin reemplazar los existentes)
+  const handleCsvAdicionar = async (e: { target: HTMLInputElement }) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+      setCsvAdicionarInfo(null);
+      setCsvAdicionarWarnings(null);
+
+      const response: any = await CapListService.cargarColaboradores(file);
+      const encontrados = response.colaboradores_encontrados || response.colaboradores || (Array.isArray(response) ? response : []);
+      const no_encontrados = response.colaboradores_no_encontrados || [];
+
+      // Separar los que ya están en la lista para no duplicar
+      const currentIds = new Set(colaboradoresIds);
+      const nuevos = (encontrados || []).filter((c: any) => !currentIds.has(c.id));
+      const yaExistentes = (encontrados || []).filter((c: any) => currentIds.has(c.id));
+
+      const partes: string[] = [];
+      if (nuevos.length > 0) partes.push(`${nuevos.length} colaborador(es) agregado(s) exitosamente`);
+      if (yaExistentes.length > 0) partes.push(`${yaExistentes.length} ya estaba(n) en la lista y fueron omitido(s)`);
+      if (partes.length === 0) partes.push('No se encontraron colaboradores nuevos para agregar');
+      setCsvAdicionarInfo(partes.join(' · '));
+
+      if (no_encontrados.length > 0) {
+        setCsvAdicionarWarnings(`${no_encontrados.length} cédula(s) no encontrada(s) en el sistema: ${no_encontrados.join(', ')}`);
+      }
+
+      if (nuevos.length > 0) {
+        setColaboradores((prev: any[]) => [...prev, ...nuevos]);
+        setColaboradoresIds((prev: number[]) => [...prev, ...nuevos.map((c: any) => c.id as number)]);
+      }
+    } catch (err: any) {
+      const message = err.response?.data?.error || err.response?.data?.message || err.message || 'Error desconocido';
+      setError(message);
+    } finally {
+      setLoading(false);
+      try { (e.target as HTMLInputElement).value = ''; } catch {}
+    }
+  };
+
   // (Función agregar eliminada: solo se edita localmente y se guarda con el botón Guardar cambios)
 
   // Guardar cambios de colaboradores (PUT)
@@ -156,6 +201,32 @@ export default function EditarColaboradores() {
             />
           </label>
         </div>
+
+        <div className={styles.csvSection} style={{ marginTop: "16px", borderTop: "1px solid #e0e0e0", paddingTop: "16px" }}>
+          <span style={{ fontWeight: 500, color: "#555", fontSize: "0.95em" }}>
+            Agregar colaboradores adicionales (sin quitar los existentes):
+          </span>
+          <label className={styles.btnSubirCsv} style={{ marginLeft: "10px" }}>
+            Agregar desde CSV
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleCsvAdicionar}
+              style={{ display: "none" }}
+            />
+          </label>
+        </div>
+
+        {csvAdicionarInfo && (
+          <p style={{ color: "#2e7d32", marginTop: "8px", fontSize: "0.9em", fontWeight: 500 }}>
+            {csvAdicionarInfo}
+          </p>
+        )}
+        {csvAdicionarWarnings && (
+          <p className={styles.error} style={{ marginTop: "4px", fontSize: "0.9em" }}>
+            {csvAdicionarWarnings}
+          </p>
+        )}
 
         {loading && <p className={styles.loading}>Cargando...</p>}
         {error && <p className={styles.error}>{error}</p>}

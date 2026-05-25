@@ -273,6 +273,18 @@ const descargarReporteUsuarios = async () => {
   });
 };
 
+const cambiarContrasenaUsuario = async (idcolaborador, nueva_contrasena) => {
+  try {
+    const response = await api.patch(`user/cambiar-contrasena/${idcolaborador}/`, { nueva_contrasena }, {
+      headers: getAuthHeader(),
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error cambiando contraseña:', error);
+    throw error;
+  }
+};
+
 const Perfil = {
   getPerfil,
   getListUsers,
@@ -292,6 +304,7 @@ const Perfil = {
   actualizarUsuariosMasivo,
   GetReporteUsuarios,
   descargarReporteUsuarios,
+  cambiarContrasenaUsuario,
 };
 
 export default Perfil;

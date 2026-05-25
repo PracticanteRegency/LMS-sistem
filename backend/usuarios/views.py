@@ -14,7 +14,7 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.parsers import MultiPartParser, FormParser
-from usuarios.permissions import IsSuperAdmin, IsAdminUser, IsUsuarioEspecial, IsSuperUserOrAdmin
+from usuarios.permissions import IsSuperAdmin, IsAdminUser, IsUsuarioEspecial, IsSuperUserOrAdmin, IsGestionEmpresarial
 from usuarios.models import Colaboradores, Usuarios, Cargo, Niveles, Regional
 from analitica.models import Centroop, Proyecto, Unidadnegocio, Epresa
 from capacitaciones.models import Capacitaciones, progresoCapacitaciones, Modulos, Lecciones, progresolecciones
@@ -272,7 +272,7 @@ class Register(APIView):
                 idcolaboradoru=colaborador,
                 estadousuario=1,
             )
-            user.set_password(payload['password'])
+            user.set_password(payload['password'].strip())
             user.save()
 
             return JsonResponse({
@@ -453,7 +453,7 @@ class RegisterTemporal(APIView):
                 idcolaboradoru=colaborador,
                 estadousuario=1,
             )
-            user.set_password(payload['password'])
+            user.set_password(payload['password'].strip())
             user.save()
 
             # Soporta capacitacion_ids (lista) o capacitacion_id (simple, legado)
@@ -486,7 +486,7 @@ class RegisterTemporal(APIView):
             return JsonResponse({'error': str(e)}, status=500)
 
 class ListaUsuarios(APIView):
-    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsGestionEmpresarial]
 
     def get(self, request, *args, **kwargs):
         try:
@@ -614,7 +614,7 @@ class FiltrarUsuariosView(APIView):
     """
     Vista para filtrar usuarios por nombre o CC.
     """
-    permission_classes = [IsAuthenticated, IsSuperAdmin, IsAdminUser]
+    permission_classes = [IsAuthenticated, IsGestionEmpresarial]
 
     def get(self, request):
         query = request.GET.get('q', '').strip()
@@ -982,6 +982,40 @@ class ActualizarRolUsuarioView(APIView):
                 {"error": f"Error al actualizar rol: {str(e)}"},
                 status=500
             )
+
+
+class CambiarContrasenaAdminView(APIView):
+    """
+    Permite a un admin (rol 1) o superadmin (rol 4) cambiar la contraseña de cualquier usuario.
+    PATCH /usuarios/cambiar-contrasena/<colaborador_id>/
+    Body: { "nueva_contrasena": "..." }
+    """
+    permission_classes = [IsAuthenticated, IsAdminUser]
+
+    def patch(self, request, colaborador_id):
+        try:
+            nueva_contrasena = request.data.get('nueva_contrasena', '').strip()
+
+            if not nueva_contrasena:
+                return Response({"error": "La nueva contraseña es requerida"}, status=400)
+
+            if len(nueva_contrasena) < 6:
+                return Response({"error": "La contraseña debe tener al menos 6 caracteres"}, status=400)
+
+            usuario = Usuarios.objects.filter(
+                idcolaboradoru__idcolaborador=colaborador_id
+            ).first()
+
+            if not usuario:
+                return Response({"error": "Usuario no encontrado"}, status=404)
+
+            usuario.set_password(nueva_contrasena)
+            usuario.save()
+
+            return Response({"mensaje": "Contraseña actualizada correctamente"}, status=200)
+
+        except Exception as e:
+            return Response({"error": f"Error al cambiar contraseña: {str(e)}"}, status=500)
 
 
 class DatosCargoView(APIView):
@@ -1913,7 +1947,7 @@ class RegistrarMasivoView(APIView):
                                 idcolaboradoru=colaborador,
                                 estadousuario=1,
                             )
-                            usuario.set_password(fila_data['cedula'])
+                            usuario.set_password(str(fila_data['cedula']).strip())
                             usuario.save()
 
                             resultados.append({
@@ -2267,7 +2301,7 @@ class RegistrarMasivoView(APIView):
                                 idcolaboradoru=colaborador,
                                 estadousuario=1,
                             )
-                            usuario.set_password(fila_data['cedula'])
+                            usuario.set_password(str(fila_data['cedula']).strip())
                             usuario.save()
 
                             resultados.append({

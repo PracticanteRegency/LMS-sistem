@@ -92,10 +92,11 @@ class LeccionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lecciones
-        fields = ['id', 
-                  'titulo_leccion', 
-                  'tipo_leccion', 
-                  'url', 
+        fields = ['id',
+                  'titulo_leccion',
+                  'tipo_leccion',
+                  'url',
+                  'duracion',
                   'preguntas']
 
 
@@ -237,7 +238,8 @@ class CrearCapacitacionSerializer(serializers.ModelSerializer):
                         idmodulo=modulo,
                         tituloleccion=leccion_data.get('titulo_leccion'),
                         tipoleccion=leccion_data.get('tipo_leccion'),
-                        url=leccion_url
+                        url=leccion_url,
+                        duracion=leccion_data.get('duracion') or None,
                     )
 
                     # Si la lección es de tipo formulario, crear preguntas y respuestas
@@ -301,7 +303,8 @@ class CrearCapacitacionSerializer(serializers.ModelSerializer):
                             idmodulo=modulo,
                             tituloleccion=leccion_data.get('titulo_leccion'),
                             tipoleccion=leccion_data.get('tipo_leccion'),
-                            url=leccion_url
+                            url=leccion_url,
+                            duracion=leccion_data.get('duracion') or None,
                         )
                         if str(leccion.tipoleccion).lower() == 'formulario':
                             for pregunta_data in preguntas_data:

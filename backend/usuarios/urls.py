@@ -20,4 +20,5 @@ urlpatterns = [
     path("Nivel/", views.DatosNivelView.as_view(), name="datos-nivel"),
     path("Region/", views.DatosRegionView.as_view(), name="datos-region"),
     path("reporte-usuarios/", views.ReporteUsuariosView.as_view(), name="reporte-usuarios"),
+    path("cambiar-contrasena/<int:colaborador_id>/", views.CambiarContrasenaAdminView.as_view(), name="cambiar-contrasena-admin"),
 ]

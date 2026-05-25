@@ -44,6 +44,8 @@ export const isAdmin = () => {
   return role === 1 || role === 4;
 };
 
+export const isAdminExamenes = () => getUserRole() === 3;
+
 export const getUserId = (): number | null => {
   const user = getUser();
   if (!user) return null;

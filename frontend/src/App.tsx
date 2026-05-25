@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { AdminRoute } from "./AdminRoute.tsx";
+import { AdminOrExamenesRoute } from "./AdminOrExamenesRoute.tsx";
 import { AuthContext } from "./context/AuthContext";
 import { getUser, isAuthenticated } from "./services/auth.ts";
 
@@ -72,7 +73,7 @@ export default function App() {
               <AdminRoute><Dashboard /></AdminRoute>
             }/>
             <Route path="/capacitaciones/list" element={
-              <AdminRoute><Capacitaciones /></AdminRoute>
+              <AdminOrExamenesRoute><Capacitaciones /></AdminOrExamenesRoute>
               } />
 
 
@@ -82,7 +83,7 @@ export default function App() {
             } />
 
             <Route path="/capacitaciones/:id/colaboradores" element={
-              <AdminRoute><EditarColaboradores /></AdminRoute>
+              <AdminOrExamenesRoute><EditarColaboradores /></AdminOrExamenesRoute>
             } />
 
             <Route path="/desactivar-usuarios" element={
@@ -94,7 +95,7 @@ export default function App() {
           } />
 
             <Route path="/usuarios" element={
-              <AdminRoute><Usuarios /></AdminRoute>
+              <AdminOrExamenesRoute><Usuarios /></AdminOrExamenesRoute>
             }/>
             <Route path="/usuarios/crear" element={
               <ProtectedRoute><CrearUsuario /></ProtectedRoute>
