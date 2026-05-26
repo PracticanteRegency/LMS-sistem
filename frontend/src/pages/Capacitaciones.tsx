@@ -189,6 +189,10 @@ export default function Capacitaciones() {
       }
       return;
     }
+    if (action === "Replicar") {
+      navigate("/CrearCapacitacion", { state: { replicarId: cap.id } });
+      return;
+    }
     if (action === "Eliminar") {
       if (!window.confirm("¿Está seguro que desea eliminar la capacitación? Esta acción no se puede deshacer.")) {
         return;
@@ -382,6 +386,12 @@ export default function Capacitaciones() {
                                   Editar
                                 </button>
                               )}
+                              <button
+                                className={`${styles.btn} ${styles.btn}`}
+                                onClick={() => handleAction("Replicar", cap)}
+                              >
+                                Replicar
+                              </button>
                               <button
                                 className={`${styles.btn} ${styles.btn}`}
                                 onClick={() => handleAction("EditarColaboradores", cap)}

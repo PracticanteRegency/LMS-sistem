@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import styles from "./Styles/CrearCapacitacion.module.css";
 import { useNavigate } from "react-router-dom";
 import CapListService from "../services/Capacitaciones";
@@ -85,6 +85,8 @@ interface FileUploadErrorType {
 export default function CrearCapacitacion(): React.ReactElement {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const replicarId: number | undefined = (location.state as any)?.replicarId;
   const [formData, setFormData] = useState<FormDataType>({
     titulo: "",
     descripcion: "",
@@ -95,6 +97,30 @@ export default function CrearCapacitacion(): React.ReactElement {
     imagenFile: null as File | null,
     imagenPreview: "" as string | null,
   });
+  const normalizeModulos = (modulos: any[]): Modulo[] =>
+    (modulos || []).map((mod: Modulo) => ({
+      ...mod,
+      lecciones: (mod.lecciones || []).map((lec: Leccion) => ({
+        ...lec,
+        file: null,
+        url: normalizeDataUrl(lec.url),
+        preview: lec.preview ? normalizeDataUrl(lec.preview) : undefined,
+        preguntas: (lec.preguntas || []).map((preg: Pregunta) => ({
+          ...preg,
+          file: null,
+          url_multimedia: normalizeDataUrl(preg.url_multimedia),
+          preview: preg.preview ? normalizeDataUrl(preg.preview) : undefined,
+          respuestas: (preg.respuestas || []).map((resp: any) => ({
+            valor: resp.valor || "",
+            file: null,
+            url_imagen: normalizeDataUrl(resp.url_imagen),
+            preview: resp.preview ? normalizeDataUrl(resp.preview) : undefined,
+            es_correcto: typeof resp.escorrecto !== 'undefined' ? (resp.escorrecto === 1 ? 1 : 0) : (typeof resp.es_correcto !== 'undefined' ? (resp.es_correcto === 1 ? 1 : 0) : 0),
+          })),
+        })),
+      })),
+    }));
+
   // Cargar datos guardados al montar
   useEffect(() => {
     // Si venimos con un id, cargamos la capacitación para editar
@@ -103,7 +129,7 @@ export default function CrearCapacitacion(): React.ReactElement {
       try {
         setLoading(true);
         const data: any = await (CapListService as any).getCapacitacionDetalle(id);
-      
+
         if (!data) return;
 
         setFormData((prev) => ({
@@ -118,30 +144,7 @@ export default function CrearCapacitacion(): React.ReactElement {
           imagenPreview: normalizeDataUrl(data.imagen) || "",
         }));
 
-        // Normalizar URLs de imágenes en módulos, lecciones y respuestas, y mapear escorrecto a es_correcto
-        const modulosNorm = (data.modulos || []).map((mod: Modulo) => ({
-          ...mod,
-          lecciones: (mod.lecciones || []).map((lec: Leccion) => ({
-            ...lec,
-            file: null,  // ← Inicializar file para que no se envíe vacío en edición
-            url: normalizeDataUrl(lec.url),
-            preview: lec.preview ? normalizeDataUrl(lec.preview) : undefined,
-            preguntas: (lec.preguntas || []).map((preg: Pregunta) => ({
-              ...preg,
-              file: null,  // ← Inicializar file para preguntas
-              url_multimedia: normalizeDataUrl(preg.url_multimedia),
-              preview: preg.preview ? normalizeDataUrl(preg.preview) : undefined,
-              respuestas: (preg.respuestas || []).map((resp: any) => ({
-                valor: resp.valor || "",
-                file: null,  // ← Inicializar file para respuestas
-                url_imagen: normalizeDataUrl(resp.url_imagen),
-                preview: resp.preview ? normalizeDataUrl(resp.preview) : undefined,
-                es_correcto: typeof resp.escorrecto !== 'undefined' ? (resp.escorrecto === 1 ? 1 : 0) : (typeof resp.es_correcto !== 'undefined' ? (resp.es_correcto === 1 ? 1 : 0) : 0),
-              })),
-            })),
-          })),
-        }));
-        setModulos(modulosNorm);
+        setModulos(normalizeModulos(data.modulos));
         const cols = data.colaboradores || [];
         setColaboradores(cols);
         setColaboradoresFiltrados(cols);
@@ -152,7 +155,39 @@ export default function CrearCapacitacion(): React.ReactElement {
       }
     };
 
-    loadIfEdit();
+    const loadIfReplicate = async () => {
+      if (!replicarId) return;
+      try {
+        setLoading(true);
+        const data: any = await (CapListService as any).getCapacitacionDetalle(replicarId);
+        if (!data) return;
+
+        setFormData((prev) => ({
+          ...prev,
+          titulo: data.titulo || prev.titulo,
+          descripcion: data.descripcion || prev.descripcion,
+          imagen: normalizeDataUrl(data.imagen) || "",
+          fecha_inicio: data.fecha_inicio ? (data.fecha_inicio.split("T")[0]) : prev.fecha_inicio,
+          fecha_fin: data.fecha_fin ? (data.fecha_fin.split("T")[0]) : prev.fecha_fin,
+          tipo: data.tipo || prev.tipo,
+          imagenFile: null,
+          imagenPreview: normalizeDataUrl(data.imagen) || "",
+        }));
+
+        setModulos(normalizeModulos(data.modulos));
+        // No cargar colaboradores — el usuario los debe cargar manualmente
+      } catch (e) {
+        console.error('Error cargando capacitación para replicar', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      loadIfEdit();
+    } else if (replicarId) {
+      loadIfReplicate();
+    }
     // Eliminar carga de datos guardados en localStorage para que siempre inicie vacío
   }, []);
 
