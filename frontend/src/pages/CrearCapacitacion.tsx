@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import styles from "./Styles/CrearCapacitacion.module.css";
 import { useNavigate } from "react-router-dom";
 import CapListService from "../services/Capacitaciones";
 import { normalizeDataUrl } from "../utils/media";
+import FileUploadError from "../components/FileUploadError";
 
 const STORAGE_KEY = "crearCapacitacion_formData";
 const STORAGE_KEY_MODULOS = "crearCapacitacion_modulos";
@@ -57,10 +58,36 @@ interface Colaborador {
   apellido_colaborador?: string;
 }
 
-export default function CrearCapacitacion() {
-  const { id } = useParams();
+interface FormDataType {
+  titulo: string;
+  descripcion: string;
+  imagen: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  tipo: string;
+  imagenFile: File | null;
+  imagenPreview: string | null;
+}
+
+interface ExpandedState {
+  [key: number]: boolean;
+}
+
+interface ExpandedLeccionesState {
+  [key: string]: boolean;
+}
+
+interface FileUploadErrorType {
+  message: string;
+  type: 'error' | 'success' | 'warning';
+}
+
+export default function CrearCapacitacion(): React.ReactElement {
+  const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
+  const location = useLocation();
+  const replicarId: number | undefined = (location.state as any)?.replicarId;
+  const [formData, setFormData] = useState<FormDataType>({
     titulo: "",
     descripcion: "",
     imagen: "",
@@ -70,6 +97,30 @@ export default function CrearCapacitacion() {
     imagenFile: null as File | null,
     imagenPreview: "" as string | null,
   });
+  const normalizeModulos = (modulos: any[]): Modulo[] =>
+    (modulos || []).map((mod: Modulo) => ({
+      ...mod,
+      lecciones: (mod.lecciones || []).map((lec: Leccion) => ({
+        ...lec,
+        file: null,
+        url: normalizeDataUrl(lec.url),
+        preview: lec.preview ? normalizeDataUrl(lec.preview) : undefined,
+        preguntas: (lec.preguntas || []).map((preg: Pregunta) => ({
+          ...preg,
+          file: null,
+          url_multimedia: normalizeDataUrl(preg.url_multimedia),
+          preview: preg.preview ? normalizeDataUrl(preg.preview) : undefined,
+          respuestas: (preg.respuestas || []).map((resp: any) => ({
+            valor: resp.valor || "",
+            file: null,
+            url_imagen: normalizeDataUrl(resp.url_imagen),
+            preview: resp.preview ? normalizeDataUrl(resp.preview) : undefined,
+            es_correcto: typeof resp.escorrecto !== 'undefined' ? (resp.escorrecto === 1 ? 1 : 0) : (typeof resp.es_correcto !== 'undefined' ? (resp.es_correcto === 1 ? 1 : 0) : 0),
+          })),
+        })),
+      })),
+    }));
+
   // Cargar datos guardados al montar
   useEffect(() => {
     // Si venimos con un id, cargamos la capacitación para editar
@@ -78,6 +129,7 @@ export default function CrearCapacitacion() {
       try {
         setLoading(true);
         const data: any = await (CapListService as any).getCapacitacionDetalle(id);
+
         if (!data) return;
 
         setFormData((prev) => ({
@@ -92,27 +144,7 @@ export default function CrearCapacitacion() {
           imagenPreview: normalizeDataUrl(data.imagen) || "",
         }));
 
-        // Normalizar URLs de imágenes en módulos, lecciones y respuestas, y mapear escorrecto a es_correcto
-        const modulosNorm = (data.modulos || []).map((mod: Modulo) => ({
-          ...mod,
-          lecciones: (mod.lecciones || []).map((lec: Leccion) => ({
-            ...lec,
-            url: normalizeDataUrl(lec.url),
-            preview: lec.preview ? normalizeDataUrl(lec.preview) : undefined,
-            preguntas: (lec.preguntas || []).map((preg: Pregunta) => ({
-              ...preg,
-              url_multimedia: normalizeDataUrl(preg.url_multimedia),
-              preview: preg.preview ? normalizeDataUrl(preg.preview) : undefined,
-              respuestas: (preg.respuestas || []).map((resp: any) => ({
-                valor: resp.valor || "",
-                url_imagen: normalizeDataUrl(resp.url_imagen),
-                preview: resp.preview ? normalizeDataUrl(resp.preview) : undefined,
-                es_correcto: typeof resp.escorrecto !== 'undefined' ? (resp.escorrecto === 1 ? 1 : 0) : (typeof resp.es_correcto !== 'undefined' ? (resp.es_correcto === 1 ? 1 : 0) : 0),
-              })),
-            })),
-          })),
-        }));
-        setModulos(modulosNorm);
+        setModulos(normalizeModulos(data.modulos));
         const cols = data.colaboradores || [];
         setColaboradores(cols);
         setColaboradoresFiltrados(cols);
@@ -123,7 +155,39 @@ export default function CrearCapacitacion() {
       }
     };
 
-    loadIfEdit();
+    const loadIfReplicate = async () => {
+      if (!replicarId) return;
+      try {
+        setLoading(true);
+        const data: any = await (CapListService as any).getCapacitacionDetalle(replicarId);
+        if (!data) return;
+
+        setFormData((prev) => ({
+          ...prev,
+          titulo: data.titulo || prev.titulo,
+          descripcion: data.descripcion || prev.descripcion,
+          imagen: normalizeDataUrl(data.imagen) || "",
+          fecha_inicio: data.fecha_inicio ? (data.fecha_inicio.split("T")[0]) : prev.fecha_inicio,
+          fecha_fin: data.fecha_fin ? (data.fecha_fin.split("T")[0]) : prev.fecha_fin,
+          tipo: data.tipo || prev.tipo,
+          imagenFile: null,
+          imagenPreview: normalizeDataUrl(data.imagen) || "",
+        }));
+
+        setModulos(normalizeModulos(data.modulos));
+        // No cargar colaboradores — el usuario los debe cargar manualmente
+      } catch (e) {
+        console.error('Error cargando capacitación para replicar', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (id) {
+      loadIfEdit();
+    } else if (replicarId) {
+      loadIfReplicate();
+    }
     // Eliminar carga de datos guardados en localStorage para que siempre inicie vacío
   }, []);
 
@@ -140,6 +204,8 @@ export default function CrearCapacitacion() {
     "HABILIDADES TECNICAS",
     "SOCIAL",
     "LEGAL",
+    "INDUCCIÓN CORPORATIVA",
+    "ENCUESTA",
   ];
 
   const [modulos, setModulos] = useState<Modulo[]>([]);
@@ -151,16 +217,17 @@ export default function CrearCapacitacion() {
     }
   }, [modulos]);
 
-  const [expandedModulos, setExpandedModulos] = useState<{ [key: number]: boolean }>({});
-  const [expandedLecciones, setExpandedLecciones] = useState<{[key: string]: boolean;}>({});
+  const [expandedModulos, setExpandedModulos] = useState<ExpandedState>({});
+  const [expandedLecciones, setExpandedLecciones] = useState<ExpandedLeccionesState>({});
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [colaboradoresFiltrados, setColaboradoresFiltrados] = useState<Colaborador[]>([]);
-  const [searchColaborador, setSearchColaborador] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [searchColaborador, setSearchColaborador] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [fileUploadError, setFileUploadError] = useState<FileUploadErrorType | null>(null);
   const today = new Date().toISOString().split("T")[0];
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): void => {
     const { name, value } = e.target;
     setFormData({
       ...formData,
@@ -168,7 +235,7 @@ export default function CrearCapacitacion() {
     });
   };
 
-const handleImagenPrincipal = async (file: File | null) => {
+const handleImagenPrincipal = async (file: File | null): Promise<void> => {
   if (!file) {
     // Limpiar imagen seleccionada
     setFormData({ ...formData, imagen: "", imagenFile: null as any, imagenPreview: "" as any });
@@ -221,7 +288,7 @@ const handleImagenPrincipal = async (file: File | null) => {
   }, [searchColaborador, colaboradores]);
 
   // Crear una nueva lección vacía
-const agregarLeccionDirecta = (moduloIndex: number) => {
+const agregarLeccionDirecta = (moduloIndex: number): void => {
   const nuevos = [...modulos];
 
   const nuevaLeccionIndex = nuevos[moduloIndex].lecciones.length;
@@ -248,7 +315,7 @@ const agregarLeccionDirecta = (moduloIndex: number) => {
 };
 
 
-const toggleLeccion = (moduloIndex: number, leccionIndex: number) => {
+const toggleLeccion = (moduloIndex: number, leccionIndex: number): void => {
   const key = `${moduloIndex}-${leccionIndex}`;
   setExpandedLecciones((prev) => ({
     ...prev,
@@ -257,7 +324,7 @@ const toggleLeccion = (moduloIndex: number, leccionIndex: number) => {
 };
 
 // Eliminar una lección
-const eliminarLeccion = (moduloIndex: number, leccionIndex: number) => {
+const eliminarLeccion = (moduloIndex: number, leccionIndex: number): void => {
   const nuevos = [...modulos];
 
   nuevos[moduloIndex].lecciones.splice(leccionIndex, 1);
@@ -265,7 +332,7 @@ const eliminarLeccion = (moduloIndex: number, leccionIndex: number) => {
   setModulos(nuevos);
 };
 
-  const toggleModulo = (index: number) => {
+  const toggleModulo = (index: number): void => {
     setExpandedModulos((prev) => ({
       ...prev,
       [index]: !prev[index],
@@ -273,7 +340,7 @@ const eliminarLeccion = (moduloIndex: number, leccionIndex: number) => {
   };
 
 
-  const agregarModulo = () => {
+  const agregarModulo = (): void => {
     const nuevoModulo: Modulo = {
       nombre_modulo: modulos.length + 1 + ". Módulo",
       lecciones: [],
@@ -282,7 +349,7 @@ const eliminarLeccion = (moduloIndex: number, leccionIndex: number) => {
   };
 
   // Eliminar un módulo completo
-  const eliminarModulo = (index: number) => {
+  const eliminarModulo = (index: number): void => {
     if (!confirm('¿Eliminar módulo? Esta acción no se puede deshacer.')) return;
     const nuevos = [...modulos];
     nuevos.splice(index, 1);
@@ -309,7 +376,7 @@ const handleLeccionChange = async (
   leccionIndex: number,
   field: string,
   value: string | File | null
-) => {
+): Promise<void> => {
   const nuevos = [...modulos];
   const leccion = nuevos[moduloIndex].lecciones[leccionIndex];
 
@@ -347,7 +414,7 @@ const handleLeccionChange = async (
 };
 
     /* ---------- Formulario handlers (questions & answers) ---------- */
-    const agregarPregunta = (moduloIndex: number, leccionIndex: number) => {
+    const agregarPregunta = (moduloIndex: number, leccionIndex: number): void => {
       const nuevos = [...modulos];
       const leccion = nuevos[moduloIndex].lecciones[leccionIndex];
       if (!leccion.preguntas) leccion.preguntas = [];
@@ -363,7 +430,7 @@ const handleLeccionChange = async (
       setModulos(nuevos);
     };
 
-    const eliminarPregunta = (moduloIndex: number, leccionIndex: number, preguntaIndex: number) => {
+    const eliminarPregunta = (moduloIndex: number, leccionIndex: number, preguntaIndex: number): void => {
       const nuevos = [...modulos];
       const arr = nuevos[moduloIndex].lecciones[leccionIndex].preguntas || [];
       const p = arr[preguntaIndex];
@@ -385,14 +452,14 @@ const handleLeccionChange = async (
       setModulos(nuevos);
     };
 
-    const agregarRespuesta = (moduloIndex: number, leccionIndex: number, preguntaIndex: number) => {
+    const agregarRespuesta = (moduloIndex: number, leccionIndex: number, preguntaIndex: number): void => {
       const nuevos = [...modulos];
       const q = nuevos[moduloIndex].lecciones[leccionIndex].preguntas![preguntaIndex];
       q.respuestas.push({ valor: "", es_correcto: 0 });
       setModulos(nuevos);
     };
 
-    const eliminarRespuesta = (moduloIndex: number, leccionIndex: number, preguntaIndex: number, respIndex: number) => {
+    const eliminarRespuesta = (moduloIndex: number, leccionIndex: number, preguntaIndex: number, respIndex: number): void => {
       const nuevos = [...modulos];
       const q = nuevos[moduloIndex].lecciones[leccionIndex].preguntas![preguntaIndex];
       const r = q.respuestas[respIndex];
@@ -409,7 +476,7 @@ const handleLeccionChange = async (
         preguntaIndex: number,
         field: string,
         value: File | string | null
-        ) => {
+        ): Promise<void> => {
         const nuevos = structuredClone(modulos);
         const pregunta = nuevos[moduloIndex].lecciones[leccionIndex].preguntas![preguntaIndex];
 
@@ -442,7 +509,7 @@ const handleLeccionChange = async (
             setModulos(nuevos);
         }
 
-        // If the question type changes to single-option, ensure only one correct exists
+        // If the question type changes, handle special cases
         if (field === "tipo_pregunta" && (pregunta as any).respuestas) {
           if (value === "opcion_unica") {
             let seen = false;
@@ -453,6 +520,9 @@ const handleLeccionChange = async (
                 r.es_correcto = 0;
               }
             });
+          } else if (value === "pregunta_abierta") {
+            // Pregunta abierta: una sola respuesta, siempre correcta
+            (pregunta as any).respuestas = [{ valor: "", es_correcto: 1 }];
           }
         }
     };
@@ -466,7 +536,7 @@ const handleRespuestaChange = async (
   respIndex: number,
   field: string,
   value: string | number | File | null
-) => {
+): Promise<void> => {
   const nuevos = structuredClone(modulos);
   const respuesta =
     nuevos[moduloIndex].lecciones[leccionIndex].preguntas![preguntaIndex].respuestas[respIndex];
@@ -513,7 +583,7 @@ const handleRespuestaChange = async (
       leccionIndex: number,
       preguntaIndex: number,
       respIndex: number
-    ) => {
+    ): void => {
       const nuevos = [...modulos];
       const q = nuevos[moduloIndex].lecciones[leccionIndex].preguntas![preguntaIndex];
       const r = q.respuestas[respIndex];
@@ -536,14 +606,15 @@ const handleRespuestaChange = async (
 
     // NOTE: preguntaTieneMultiples removed — rendering now uses pregunta.tipo_pregunta to decide single vs multiple behavior
 
-  const handleCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
       setLoading(true);
       setError(null);
-      setColaboradores([]); // Limpiar colaboradores previos
+      setFileUploadError(null);
+      setColaboradores([]);
       
       console.log("Cargando archivo de colaboradores:", file.name);
       
@@ -552,42 +623,40 @@ const handleRespuestaChange = async (
       
       console.log("Respuesta del servidor:", response);
       
-      // Procesar respuesta - estructura: { colaboradores_encontrados: [...], colaboradores_no_encontrados: [...] }
+      // Procesar respuesta
       if (response.colaboradores_encontrados && Array.isArray(response.colaboradores_encontrados)) {
         setColaboradores(response.colaboradores_encontrados);
         console.log(`✓ ${response.colaboradores_encontrados.length} colaboradores cargados exitosamente`);
       } else if (response.colaboradores && Array.isArray(response.colaboradores)) {
-        // Fallback para estructura alternativa
         setColaboradores(response.colaboradores);
         console.log(`✓ ${response.colaboradores.length} colaboradores cargados exitosamente`);
       } else if (response && Array.isArray(response)) {
-        // Si retorna directamente un array
         setColaboradores(response);
         console.log(`✓ ${response.length} colaboradores cargados exitosamente`);
       }
       
-      // Mostrar advertencia si hay colaboradores no encontrados
-      if (response.colaboradores_no_encontrados && response.colaboradores_no_encontrados.length > 0) {
-        console.warn("Colaboradores no encontrados:", response.colaboradores_no_encontrados);
-        setError(`Advertencia: ${response.colaboradores_no_encontrados.length} colaboradores no fueron encontrados en el sistema: ${response.colaboradores_no_encontrados.join(", ")}`);
-      }
     } catch (err: any) {
       console.error("Error al procesar CSV:", err);
-      setError("Error al procesar el archivo CSV: " + (err.message || "Error desconocido"));
+      
+      // Mostrar solo lo que el backend responde
+      const message = err.response?.data?.error || err.response?.data?.message || err.message || 'Error desconocido';
+      setFileUploadError({
+        message,
+        type: 'error'
+      });
     } finally {
       setLoading(false);
-      // Limpiar el input file para permitir subir el mismo archivo nuevamente
       e.target.value = "";
     }
   };
 
   // Función para remover un colaborador de la previsualización
-  const handleRemoveColaborador = (index: number) => {
+  const handleRemoveColaborador = (index: number): void => {
     setColaboradores((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: { preventDefault?: () => void }): Promise<void> => {
+    e?.preventDefault?.();
     try {
       setLoading(true);
       setError(null);
@@ -676,18 +745,20 @@ const handleRespuestaChange = async (
               return;
             }
 
-            const correctas = pregunta.respuestas.filter(r => r.es_correcto === 1);
-            if (correctas.length === 0) {
-              setError(`La pregunta ${p + 1} del módulo ${m + 1}, lección ${l + 1} debe tener una respuesta correcta`);
-              setLoading(false);
-              return;
-            }
-
-            for (let r = 0; r < pregunta.respuestas.length; r++) {
-              if (!pregunta.respuestas[r].valor.trim()) {
-                setError(`Hay respuestas vacías en la pregunta ${p + 1} del módulo ${m + 1}, lección ${l + 1}`);
+            if (pregunta.tipo_pregunta !== "pregunta_abierta") {
+              const correctas = pregunta.respuestas.filter(r => r.es_correcto === 1);
+              if (correctas.length === 0) {
+                setError(`La pregunta ${p + 1} del módulo ${m + 1}, lección ${l + 1} debe tener una respuesta correcta`);
                 setLoading(false);
                 return;
+              }
+
+              for (let r = 0; r < pregunta.respuestas.length; r++) {
+                if (!pregunta.respuestas[r].valor.trim()) {
+                  setError(`Hay respuestas vacías en la pregunta ${p + 1} del módulo ${m + 1}, lección ${l + 1}`);
+                  setLoading(false);
+                  return;
+                }
               }
             }
             // Solo validar colaboradores si es creación, no edición
@@ -701,125 +772,166 @@ const handleRespuestaChange = async (
       }
     }
 
-      // SUBIR ARCHIVOS PENDIENTES Y CONSTRUIR PAYLOAD CON URLS
-      try {
-        // Imagen principal
-        let imagenFinalUrl = formData.imagen || "";
-        const imagenFile = (formData as any).imagenFile as File | undefined;
-        if (imagenFile) {
-          const resp: any = await CapListService.uploadImagenCapacitacion(imagenFile);
-          imagenFinalUrl = resp?.url || resp?.file_url || resp?.download_url || resp?.location || imagenFinalUrl;
-          if (!imagenFinalUrl) throw new Error('No se obtuvo URL para imagen principal');
-        }
-
-        // Clonar modulos para mutar urls después de subir
-        const nuevos = structuredClone(modulos);
-        for (let mm = 0; mm < nuevos.length; mm++) {
-          for (let ll = 0; ll < nuevos[mm].lecciones.length; ll++) {
-            const lec = nuevos[mm].lecciones[ll];
-            if (lec.tipo_leccion === 'imagen' && lec.file && !lec.url) {
-              const r: any = await CapListService.uploadImagenLeccion(lec.file);
-              const u = r?.url || r?.file_url || r?.download_url || r?.location;
-              if (!u) throw new Error(`No se obtuvo URL para la imagen de la lección ${ll + 1}`);
-              lec.url = u;
-            }
-            if (lec.tipo_leccion === 'pdf' && lec.file && !lec.url) {
-              const r: any = await CapListService.uploadPdfLeccion(lec.file);
-              const u = r?.url || r?.file_url || r?.download_url || r?.location;
-              if (!u) throw new Error(`No se obtuvo URL para el PDF de la lección ${ll + 1}`);
-              lec.url = u;
-            }
-            if (lec.tipo_leccion === 'formulario' && lec.preguntas) {
-              for (let pp = 0; pp < lec.preguntas.length; pp++) {
-                const pq = lec.preguntas[pp];
-                if (pq.file && !pq.url_multimedia) {
-                  const r: any = await CapListService.uploadImagenPregunta(pq.file);
-                  const u = r?.url || r?.file_url || r?.download_url || r?.location;
-                  if (!u) throw new Error(`No se obtuvo URL para la imagen de la pregunta ${pp + 1}`);
-                  pq.url_multimedia = u;
-                }
-                for (let rdx = 0; rdx < (pq.respuestas || []).length; rdx++) {
-                  const resp = (pq.respuestas as any)[rdx];
-                  if (resp.file && !resp.url_imagen) {
-                    const rr: any = await CapListService.uploadImagenRespuesta(resp.file);
-                    const u = rr?.url || rr?.file_url || rr?.download_url || rr?.location;
-                    if (!u) throw new Error(`No se obtuvo URL para la imagen de la respuesta ${rdx + 1}`);
-                    resp.url_imagen = u;
-                  }
-                }
-              }
-            }
-          }
-        }
-
-        // Construir el payload
-        const normalizedModulos = (nuevos).map((m) => ({
-          ...m,
-          lecciones: (m.lecciones || []).map((l: any) => ({
-            ...l,
-            url: l.url || "",
-            preguntas: (l.preguntas || []).map((p: any) => ({
-              ...p,
-              url_multimedia: p.url_multimedia || p.url_media || "",
-              respuestas: (p.respuestas || []).map((r: any) => ({
-                ...r,
-                url_imagen: r.url_imagen || r.url_archivo || r.url || "",
-                url_archivo: r.url_archivo || r.url_imagen || r.url || "",
-              })),
+      // ============ NUEVO: ENVIAR TODO EN UN SOLO POST CON FormData ============
+      // Construir el payload con estructura normalizada (sin archivos)
+      const modulosParaEnviar = structuredClone(modulos).map((m) => ({
+        nombre_modulo: m.nombre_modulo,
+        lecciones: (m.lecciones || []).map((l: any) => ({
+          titulo_leccion: l.titulo_leccion,
+          descripcion: l.descripcion,
+          duracion: l.duracion,
+          tipo_leccion: l.tipo_leccion,
+          url: l.url || "", // Mantener cadena vacía si no hay URL (BD requiere valor)
+          preguntas: (l.preguntas || []).map((p: any) => ({
+            pregunta: p.pregunta,
+            tipo_pregunta: p.tipo_pregunta,
+            url_multimedia: p.url_multimedia || "", // Mantener cadena vacía
+            respuestas: (p.respuestas || []).map((r: any) => ({
+              valor: r.valor,
+              es_correcto: r.es_correcto,
+              url_imagen: r.url_imagen || "", // Mantener cadena vacía
             })),
           })),
-        }));
+        })),
+      }));
 
-        const payload = {
-          titulo: formData.titulo,
-          descripcion: formData.descripcion,
-          tipo: formData.tipo,
-          imagen: imagenFinalUrl || "",
-          fecha_inicio: formData.fecha_inicio + "T08:00:00Z",
-          fecha_fin: formData.fecha_fin + "T18:00:00Z",
-          modulos: normalizedModulos,
-        } as any;
+      const payloadBasico = {
+        titulo: formData.titulo,
+        descripcion: formData.descripcion,
+        tipo: formData.tipo,
+        fecha_inicio: formData.fecha_inicio + "T08:00:00Z",
+        fecha_fin: formData.fecha_fin + "T18:00:00Z",
+        modulos: modulosParaEnviar,
+        colaboradores: !id ? colaboradores.map((c) => c.id_colaborador || c.id) : [],
+        imagenFile: (formData as any).imagenFile, // Archivo de imagen principal
+      };
 
-        // Solo incluir colaboradores si es creación (no edición)
-        if (!id) {
-          payload.colaboradores = colaboradores.map((c) => c.id_colaborador || c.id);
-        }
+      // Construir FormData con todos los archivos incrustados (mismo flujo para crear y editar)
+      const formDataMultipart = new FormData();
+      
+      // Campos simples
+      formDataMultipart.append('titulo', payloadBasico.titulo);
+      formDataMultipart.append('descripcion', payloadBasico.descripcion);
+      formDataMultipart.append('tipo', payloadBasico.tipo);
+      formDataMultipart.append('fecha_inicio', payloadBasico.fecha_inicio);
+      formDataMultipart.append('fecha_fin', payloadBasico.fecha_fin);
 
-        console.log("Enviando capacitación:", payload);
-        if (id) {
-          // Editar existente - solo enviar datos de la capacitación, sin colaboradores
-          const response = await (CapListService as any).patchCapacitacion(id, payload);
-          console.log("Capacitación actualizada exitosamente:", response);
-        } else {
-          // Crear nueva
-          const response = await CapListService.crearCapacitacionCompleta(payload);
-          console.log("Capacitación creada exitosamente:", response);
-        }
-      } catch (uploadErr: any) {
-        console.error(uploadErr);
-        setError(uploadErr.message || 'Error subiendo archivos');
-        setLoading(false);
-        return;
+      // Imagen principal como archivo si hay una nueva seleccionada
+      if (payloadBasico.imagenFile) {
+        formDataMultipart.append('imagen', payloadBasico.imagenFile);
+      }
+
+      // Agregar archivos de lecciones, preguntas y respuestas directamente al FormData
+      // El backend (POST y PATCH) procesa estos archivos con procesar_archivo_multimedia
+      modulos.forEach((modulo, moduloIdx) => {
+        modulo.lecciones.forEach((leccion, leccionIdx) => {
+          if (leccion.file) {
+            formDataMultipart.append(
+              `leccion_${moduloIdx}_${leccionIdx}`,
+              leccion.file
+            );
+          }
+
+          if (leccion.preguntas) {
+            leccion.preguntas.forEach((pregunta, preguntaIdx) => {
+              if (pregunta.file) {
+                formDataMultipart.append(
+                  `pregunta_${moduloIdx}_${leccionIdx}_${preguntaIdx}`,
+                  pregunta.file
+                );
+              }
+
+              if (pregunta.respuestas) {
+                pregunta.respuestas.forEach((respuesta, respuestaIdx) => {
+                  if (respuesta.file) {
+                    formDataMultipart.append(
+                      `respuesta_${moduloIdx}_${leccionIdx}_${preguntaIdx}_${respuestaIdx}`,
+                      respuesta.file
+                    );
+                  }
+                });
+              }
+            });
+          }
+        });
+      });
+
+      // Módulos y colaboradores como JSON strings
+      formDataMultipart.append('modulos', JSON.stringify(payloadBasico.modulos));
+      formDataMultipart.append('colaboradores', JSON.stringify(payloadBasico.colaboradores));
+
+      console.log("Enviando capacitación con FormData multipart...");
+      
+      if (id) {
+        // Editar existente
+        const response = await (CapListService as any).patchCapacitacion(id, formDataMultipart);
+        console.log("Capacitación actualizada exitosamente:", response);
+      } else {
+        // Crear nueva - usa crearCapacitacionCompleta que detecta FormData automáticamente
+        const response = await CapListService.crearCapacitacionCompleta(formDataMultipart);
+        console.log("Capacitación creada exitosamente:", response);
       }
       
       // Mostrar mensaje de éxito
       alert("¡Capacitación creada exitosamente!");
       
+      // Limpiar localStorage
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(STORAGE_KEY_MODULOS);
+      
       // Redirigir a la página de capacitaciones
       navigate("/capacitaciones/list");
     } catch (err: any) {
       console.error("Error al crear capacitación:", err);
-      setError(err.message || "Error al crear la capacitación");
+      
+      // Extraer mensaje de error del backend
+      let errorMessage = "Error al crear la capacitación";
+      
+      // Intentar obtener detalles del error desde diferentes fuentes
+      if (err.response?.data) {
+        const data = err.response.data;
+        
+        // Si hay un mensaje de error directo
+        if (typeof data === 'string') {
+          errorMessage = data;
+        } else if (data.error) {
+          errorMessage = data.error;
+        } else if (data.message) {
+          errorMessage = data.message;
+        } else if (data.detail) {
+          errorMessage = data.detail;
+        } else if (typeof data === 'object') {
+          // Buscar errores en los campos
+          const errors = Object.entries(data)
+            .map(([field, messages]: any) => {
+              if (Array.isArray(messages)) {
+                return `${field}: ${messages.join(", ")}`;
+              } else if (typeof messages === 'object') {
+                return `${field}: ${JSON.stringify(messages)}`;
+              }
+              return `${field}: ${messages}`;
+            })
+            .filter(msg => msg);
+          
+          if (errors.length > 0) {
+            errorMessage = errors.join(" | ");
+          }
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCancel = () => {
+  const handleCancel = (): void => {
     navigate("/capacitaciones/list");
   };
 
-  const handleLimpiarDatos = () => {
+  const handleLimpiarDatos = (): void => {
     if (!confirm("¿Estás seguro de que quieres limpiar todos los datos?")) return;
     localStorage.removeItem(STORAGE_KEY);
     localStorage.removeItem(STORAGE_KEY_MODULOS);
@@ -837,6 +949,9 @@ const handleRespuestaChange = async (
     alert("Datos limpios exitosamente");
   };
 
+
+
+
   return (
     <div className={styles.container}>
       {/* Header */}
@@ -851,7 +966,7 @@ const handleRespuestaChange = async (
             <button className={styles.btnLimpiar} onClick={handleLimpiarDatos} type="button" title="Limpiar datos guardados">
               🗑 Limpiar
             </button>
-            <button className={styles.btnGuardar} onClick={handleSubmit} disabled={loading}>
+            <button className={styles.btnGuardar} onClick={() => handleSubmit()} disabled={loading}>
               {loading ? "Guardando..." : "Guardar Capacitación"}
             </button>
           </div>
@@ -1251,15 +1366,18 @@ const handleRespuestaChange = async (
                                         >
                                           <option value="opcion_multiple">Opción múltiple</option>
                                           <option value="opcion_unica">Opción única</option>
+                                          <option value="pregunta_abierta">Pregunta abierta</option>
                                         </select>
 
-                                        <button
-                                          type="button"
-                                          className={styles.btnSmall}
-                                          onClick={() => agregarRespuesta(moduloIndex, leccionIndex, preguntaIndex)}
-                                        >
-                                          + Agregar respuesta
-                                        </button>
+                                        {q.tipo_pregunta !== "pregunta_abierta" && (
+                                          <button
+                                            type="button"
+                                            className={styles.btnSmall}
+                                            onClick={() => agregarRespuesta(moduloIndex, leccionIndex, preguntaIndex)}
+                                          >
+                                            + Agregar respuesta
+                                          </button>
+                                        )}
                                         {!id || !(q as any).id ? (
                                           <button
                                             type="button"
@@ -1319,7 +1437,18 @@ const handleRespuestaChange = async (
                                     </div>
 
                                     <div className={styles.answersList}>
-                                        {q.respuestas.map((r, respIndex) => {
+                                        {q.tipo_pregunta === "pregunta_abierta" ? (
+                                          <div className={styles.formGroup}>
+                                            <textarea
+                                              className={styles.textarea}
+                                              placeholder="Escriba su respuesta"
+                                              value={q.respuestas[0]?.valor || ""}
+                                              onChange={(e) =>
+                                                handleRespuestaChange(moduloIndex, leccionIndex, preguntaIndex, 0, "valor", e.target.value)
+                                              }
+                                            />
+                                          </div>
+                                        ) : q.respuestas.map((r, respIndex) => {
                                           const multiple = (q as any).tipo_pregunta !== "opcion_unica";
 
                                             return (
@@ -1473,11 +1602,21 @@ const handleRespuestaChange = async (
               Subir CSV
               <input
                 type="file"
+                accept=".csv"
                 onChange={handleCsvUpload}
                 style={{ display: "none" }}
               />
             </label>
           </div>
+
+          {/* Componente mejorado para mostrar errores/advertencias de carga de archivos */}
+          {fileUploadError && (
+            <FileUploadError
+              error={fileUploadError.type === 'error' ? fileUploadError.message : null}
+              type={fileUploadError.type}
+              onClose={() => setFileUploadError(null)}
+            />
+          )}
 
           {colaboradores.length > 0 && (
             <div className={styles.colaboradoresTable}>
@@ -1536,7 +1675,51 @@ const handleRespuestaChange = async (
           )}
         </div>
         )}
-        {error && <p className={styles.error}>{error}</p>}
+        {error && (
+          <div className={styles.errorContainer} style={{
+            backgroundColor: "#fee2e2",
+            border: "1px solid #fca5a5",
+            borderRadius: "6px",
+            padding: "16px",
+            marginTop: "16px",
+            marginBottom: "16px"
+          }}>
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+              <div style={{ fontSize: "20px", color: "#dc2626", flexShrink: 0 }}>⚠️</div>
+              <div style={{ flex: 1 }}>
+                <p style={{ margin: "0 0 8px 0", fontWeight: "600", color: "#991b1b" }}>
+                  Error al guardar la capacitación
+                </p>
+                <p style={{ 
+                  margin: "0", 
+                  color: "#7f1d1d", 
+                  fontSize: "14px", 
+                  lineHeight: "1.5",
+                  whiteSpace: "pre-wrap",
+                  wordBreak: "break-word"
+                }}>
+                  {error}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setError(null)}
+                  style={{
+                    marginTop: "8px",
+                    padding: "4px 8px",
+                    fontSize: "12px",
+                    backgroundColor: "#dc2626",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: "pointer"
+                  }}
+                >
+                  Descartar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         </form>
       </div>
   );

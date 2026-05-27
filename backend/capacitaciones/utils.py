@@ -1,6 +1,8 @@
 from django.core.files.storage import default_storage
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
+from django.utils import timezone
+
 import os
 import io
 import tempfile
@@ -22,21 +24,29 @@ except ImportError:
 
 
 """
-MÓDULO DE BATCHING PARA ENVÍO DE CORREOS
-==========================================
+MÓDULO DE BATCHING PARA ENVÍO DE CORREOS (Rate-Limited)
+=========================================================
 
 Proporciona funciones para enviar correos masivos a más de 500 colaboradores
-dividiendo en lotes de máximo 500 correos por email.
+dividiendo en lotes de máximo 80 correos por email y respetando el límite
+de GoDaddy de 500 emails/hora (se usa 450 como margen de seguridad).
+
+IMPORTANTE: GoDaddy cuenta cada destinatario BCC como 1 email hacia el límite.
+
+Para 1500 colaboradores:
+  - 19 lotes de 80 destinatarios
+  - Delay de ~640s (~10 min) entre lotes  
+  - Tiempo total estimado: ~3.2 horas
 
 Uso:
-    from capacitaciones.batch_email import enviar_correo_batch
+    from capacitaciones.utils import enviar_correo_batch
     
     enviar_correo_batch(
         correos=['email1@test.com', 'email2@test.com', ...],  # 1500+
         subject='Asunto',
         text_message='Texto plano',
-        html_message='<html>...</html>',
-        delay_entre_lotes=2  # segundos
+        html_message='<html>...</html>'
+        # delay_entre_lotes=None → calculado automáticamente
     )
 """
 
@@ -48,35 +58,54 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# Constantes
-BATCH_SIZE = 500  # Máximo de correos por email (límite SMTP estándar)
-DEFAULT_DELAY = 2  # Segundos de pausa entre lotes
+# ── Constantes de rate-limiting ──────────────────────────────────────────
+# GoDaddy límite real: 500 emails/hora (cada BCC cuenta como 1 email)
+EMAILS_PER_HOUR = 450   # Margen de 50 para emails de exámenes u otros módulos
+BATCH_SIZE = 80          # Destinatarios BCC por email (era 500, reducido para seguridad)
+DEFAULT_DELAY = 2        # Delay mínimo entre lotes (se ajusta automáticamente)
+
+
+def _calcular_delay_entre_lotes(tamanio_lote: int, max_por_hora: int = EMAILS_PER_HOUR) -> float:
+    """
+    Calcula el delay necesario entre lotes para no exceder el límite por hora.
+
+    GoDaddy cuenta cada destinatario BCC como 1 email → con lotes de 80,
+    podemos enviar máximo 450/80 ≈ 5.6 lotes por hora.
+    Delay = 3600 / 5.6 ≈ 640 segundos (~10.7 minutos) entre lotes.
+
+    Args:
+        tamanio_lote: Cantidad de destinatarios por lote
+        max_por_hora: Límite de emails por hora del proveedor
+
+    Returns:
+        float: Segundos de pausa entre lotes
+    """
+    if tamanio_lote <= 0 or max_por_hora <= 0:
+        return DEFAULT_DELAY
+    lotes_por_hora = max_por_hora / tamanio_lote
+    delay = 3600.0 / lotes_por_hora
+    return max(delay, DEFAULT_DELAY)
 
 
 def dividir_en_lotes(correos: List[str], tamanio_lote: int = BATCH_SIZE) -> List[List[str]]:
     """
     Divide una lista de correos en lotes de tamaño máximo.
-    
+
     Args:
         correos: Lista de direcciones de email
-        tamanio_lote: Máximo de correos por lote (default: 500)
-    
+        tamanio_lote: Máximo de correos por lote (default: 80)
+
     Returns:
-        Lista de lotes: [[email1, email2, ...], [email500+1, ...], ...]
-    
-    Ejemplo:
-        correos = ['a@t.com', 'b@t.com', ..., 'zzz@t.com']  # 1500
-        lotes = dividir_en_lotes(correos, 500)
-        # Resultado: [[email1-500], [email501-1000], [email1001-1500]]
+        Lista de lotes
     """
     if not correos:
         return []
-    
+
     lotes = []
     for i in range(0, len(correos), tamanio_lote):
         lote = correos[i:i+tamanio_lote]
         lotes.append(lote)
-    
+
     return lotes
 
 
@@ -85,94 +114,99 @@ def enviar_correo_batch(
     subject: str,
     text_message: str,
     html_message: str,
-    delay_entre_lotes: int = DEFAULT_DELAY,
+    delay_entre_lotes: int = None,
     from_email: str = None,
-    fail_silently: bool = False
+    fail_silently: bool = False,
+    max_por_hora: int = EMAILS_PER_HOUR
 ) -> Tuple[int, int, List[str]]:
     """
-    Envía un correo masivo a múltiples colaboradores dividiéndolos en lotes.
-    
-    CARACTERÍSTICA PRINCIPAL: Soporta 1500+ colaboradores sin errores de servidor.
-    IMPORTANTE: Filtra automáticamente usuarios desactivados (estadousuario = 0)
-    
+    Envía un correo masivo a múltiples colaboradores dividiéndolos en lotes,
+    respetando el límite de 500 emails/hora de GoDaddy.
+
+    IMPORTANTE:
+    - GoDaddy cuenta CADA destinatario BCC como 1 email hacia el límite/hora.
+    - Con BATCH_SIZE=80 y max_por_hora=450, el delay entre lotes es ~640s (~10 min).
+    - Para 1500 colaboradores: 19 lotes × 10 min ≈ 3.2 horas.
+    - Filtra automáticamente usuarios desactivados (estadocolaborador != 1).
+
     Args:
         correos: Lista de direcciones de email (puede ser 1500+)
         subject: Asunto del email
         text_message: Cuerpo en texto plano
         html_message: Cuerpo en HTML
-        delay_entre_lotes: Segundos de pausa entre envíos (default: 2)
+        delay_entre_lotes: Segundos de pausa entre envíos (None = calculado automático)
         from_email: Email del remitente (default: settings.DEFAULT_FROM_EMAIL)
         fail_silently: Si True, silencia excepciones; si False, las levanta
-    
+        max_por_hora: Límite de emails/hora del proveedor (default: 450)
+
     Returns:
         Tupla: (total_enviados, total_fallidos, lista_de_errores)
-        
-        Ejemplo:
-            enviados, fallidos, errores = enviar_correo_batch(
-                correos=['a@test.com', 'b@test.com', ...],  # 1500
-                subject='Test Masivo',
-                text_message='Hola',
-                html_message='<html><body>Hola</body></html>'
-            )
-            print(f"Enviados: {enviados}, Fallidos: {fallidos}")
-    
-    Notas:
-        - Divide automáticamente en lotes de 500 máximo
-        - Agrega pausa entre lotes para evitar rate limiting
-        - Registra cada intento en logs
-        - Retorna estadísticas detalladas
-        - Filtra colaboradores desactivados antes de enviar
     """
     if not correos:
         logger.warning("enviar_correo_batch: Lista de correos vacía")
         return 0, 0, []
-    
+
     if from_email is None:
         from_email = settings.DEFAULT_FROM_EMAIL
-    
+
     # Validar emails válidos Y que el colaborador esté activo
     correos_validos = []
     usuarios_desactivados = 0
-    
-    for email in correos:
-        if not email or '@' not in email:
+
+    for email_addr in correos:
+        if not email_addr or '@' not in email_addr:
             continue
-        
-        # Verificar que el colaborador esté activo (estadocolaborador = 1)
+
         colaborador_activo = Colaboradores.objects.filter(
-            correocolaborador=email,
+            correocolaborador=email_addr,
             estadocolaborador=1
         ).exists()
-        
+
         if not colaborador_activo:
             usuarios_desactivados += 1
-            logger.debug(f"enviar_correo_batch: Email {email} omitido (colaborador desactivado o no encontrado)")
+            logger.debug(f"enviar_correo_batch: Email {email_addr} omitido (desactivado/no encontrado)")
             continue
-        
-        correos_validos.append(email)
-    
+
+        correos_validos.append(email_addr)
+
     if usuarios_desactivados > 0:
         logger.warning(f"enviar_correo_batch: {usuarios_desactivados} usuarios desactivados omitidos")
-    
+
     # Dividir en lotes
     lotes = dividir_en_lotes(correos_validos, BATCH_SIZE)
-    
+
     if not lotes:
         logger.error("enviar_correo_batch: No hay emails válidos después de validación")
         return 0, len(correos), ["No hay emails válidos o todos los usuarios están desactivados"]
-    
-    # Enviar por lotes
+
+    # Calcular delay respetando el límite por hora de GoDaddy
+    if delay_entre_lotes is None:
+        delay_real = _calcular_delay_entre_lotes(BATCH_SIZE, max_por_hora)
+    else:
+        delay_real = max(delay_entre_lotes, _calcular_delay_entre_lotes(BATCH_SIZE, max_por_hora))
+
+    tiempo_estimado = delay_real * (len(lotes) - 1) if len(lotes) > 1 else 0
+
+    logger.info(
+        f"enviar_correo_batch: {len(correos_validos)} colaboradores activos → "
+        f"{len(lotes)} lotes de {BATCH_SIZE} | "
+        f"Delay entre lotes: {delay_real:.0f}s (~{delay_real/60:.1f} min) | "
+        f"Tiempo estimado total: {tiempo_estimado/60:.1f} min | "
+        f"Límite: {max_por_hora}/hora"
+    )
+
+    # Enviar por lotes con rate-limiting
     total_enviados = 0
     total_fallidos = 0
     errores = []
-    
-    logger.info(f"enviar_correo_batch: Enviando a {len(correos_validos)} colaboradores activos en {len(lotes)} lotes")
-    
+
     for num_lote, lote in enumerate(lotes, 1):
         try:
-            logger.info(f"  Lote {num_lote}/{len(lotes)}: Enviando a {len(lote)} colaboradores...")
-            
-            # Crear email
+            logger.info(
+                f"  Lote {num_lote}/{len(lotes)}: Enviando a {len(lote)} "
+                f"colaboradores (BCC)..."
+            )
+
             email = EmailMultiAlternatives(
                 subject=subject,
                 body=text_message,
@@ -180,71 +214,64 @@ def enviar_correo_batch(
                 to=[],
                 bcc=lote
             )
-            
-            # Adjuntar HTML
             email.attach_alternative(html_message, "text/html")
-            
-            # Enviar
+
             result = email.send(fail_silently=fail_silently)
             total_enviados += result
-            
-            logger.info(f"  Lote {num_lote}/{len(lotes)}: ✅ Enviado exitosamente")
-            
+
+            logger.info(f"  Lote {num_lote}/{len(lotes)}: ✅ Enviado ({len(lote)} destinatarios)")
+
             # Pausa entre lotes (excepto en el último)
             if num_lote < len(lotes):
-                logger.debug(f"  Esperando {delay_entre_lotes}s antes del siguiente lote...")
-                time.sleep(delay_entre_lotes)
-        
+                logger.info(
+                    f"  ⏳ Esperando {delay_real:.0f}s (~{delay_real/60:.1f} min) "
+                    f"antes del lote {num_lote+1} para respetar límite GoDaddy..."
+                )
+                time.sleep(delay_real)
+
         except Exception as e:
             total_fallidos += 1
             error_msg = f"Lote {num_lote}: {str(e)}"
             errores.append(error_msg)
             logger.error(f"  Lote {num_lote}/{len(lotes)}: ❌ Error - {error_msg}")
-            
+
             if not fail_silently:
                 raise
-    
-    # Estadísticas
+
     tasa_exito = (total_enviados / len(lotes) * 100) if lotes else 0
-    logger.info(f"enviar_correo_batch: COMPLETADO - Enviados: {total_enviados}, Fallidos: {total_fallidos}, Tasa éxito: {tasa_exito:.1f}%")
-    
+    logger.info(
+        f"enviar_correo_batch: COMPLETADO - Enviados: {total_enviados}/{len(lotes)} lotes, "
+        f"Fallidos: {total_fallidos}, Tasa éxito: {tasa_exito:.1f}%"
+    )
+
     return total_enviados, total_fallidos, errores
 
 
 def obtener_estadisticas_batching(num_colaboradores: int) -> dict:
     """
     Calcula estadísticas de batching para N colaboradores.
-    
-    Args:
-        num_colaboradores: Número total de colaboradores
-    
-    Returns:
-        Diccionario con estadísticas
-        
+    Tiene en cuenta el límite de GoDaddy (450/hora efectivos).
+
     Ejemplo:
         stats = obtener_estadisticas_batching(1500)
-        print(stats)
-        # {
-        #     'num_colaboradores': 1500,
-        #     'tamanio_lote': 500,
-        #     'num_lotes': 3,
-        #     'tiempo_estimado_segundos': 15,
-        #     'tiempo_estimado_minutos': 0.25
-        # }
+        # 1500 / 80 = 19 lotes, delay ~640s → ~3.2 horas
     """
     num_lotes = (num_colaboradores + BATCH_SIZE - 1) // BATCH_SIZE
-    tiempo_por_lote = 3  # segundos (envío a SMTP)
-    tiempo_pausa = DEFAULT_DELAY  # segundos (pausa entre lotes)
-    
-    tiempo_total = (num_lotes * tiempo_por_lote) + ((num_lotes - 1) * tiempo_pausa)
-    
+    delay_entre_lotes = _calcular_delay_entre_lotes(BATCH_SIZE, EMAILS_PER_HOUR)
+    tiempo_envio_lote = 5  # segundos aprox de envío SMTP por lote
+
+    tiempo_total = (num_lotes * tiempo_envio_lote) + (max(0, num_lotes - 1) * delay_entre_lotes)
+
     return {
         'num_colaboradores': num_colaboradores,
         'tamanio_lote': BATCH_SIZE,
+        'max_por_hora': EMAILS_PER_HOUR,
         'num_lotes': num_lotes,
-        'tiempo_estimado_segundos': tiempo_total,
-        'tiempo_estimado_minutos': round(tiempo_total / 60, 2),
-        'tiempo_estimado_legible': f"{tiempo_total // 60}m {tiempo_total % 60}s"
+        'delay_entre_lotes_seg': round(delay_entre_lotes),
+        'delay_entre_lotes_min': round(delay_entre_lotes / 60, 1),
+        'tiempo_estimado_segundos': round(tiempo_total),
+        'tiempo_estimado_minutos': round(tiempo_total / 60, 1),
+        'tiempo_estimado_legible': f"{int(tiempo_total // 3600)}h {int((tiempo_total % 3600) // 60)}m"
     }
 
 
@@ -274,9 +301,6 @@ def enviar_correo_capacitacion_creada_batch(capacitacion, colaboradores_ids=None
             'tasa_exito': float
         }
     """
-    from capacitaciones.models import progresoCapacitaciones, Capacitaciones
-    from usuarios.models import Colaboradores
-    from django.utils import timezone
     
     logger_local = logging.getLogger(__name__)
     
@@ -355,13 +379,12 @@ def enviar_correo_capacitacion_creada_batch(capacitacion, colaboradores_ids=None
         </html>
         """
         
-        # Enviar usando batch
+        # Enviar usando batch (rate-limiting automático: 450 emails/hora)
         enviados, fallidos, errores = enviar_correo_batch(
             correos=correos,
             subject=subject,
             text_message=text_message,
             html_message=html_message,
-            delay_entre_lotes=2,
             fail_silently=False
         )
         
@@ -397,9 +420,6 @@ def enviar_correo_cap_activada_batch(capacitacion, colaboradores_ids=None):
     """
     Versión mejorada de enviar_correo_cap_activada que soporta 1500+ colaboradores.
     """
-    from capacitaciones.models import progresoCapacitaciones
-    from usuarios.models import Colaboradores
-    from django.utils import timezone
     
     logger_local = logging.getLogger(__name__)
     
@@ -486,13 +506,12 @@ def enviar_correo_cap_activada_batch(capacitacion, colaboradores_ids=None):
         </html>
         """
         
-        # Enviar usando batch
+        # Enviar usando batch (rate-limiting automático: 450 emails/hora)
         enviados, fallidos, errores = enviar_correo_batch(
             correos=correos,
             subject=subject,
             text_message=text_message,
             html_message=html_message,
-            delay_entre_lotes=2,
             fail_silently=False
         )
         
@@ -631,13 +650,12 @@ def enviar_correo_nuevos_colaboradores(capacitacion_id, colaboradores_ids):
     </html>
     """
 
-    # Enviar usando batch
+    # Enviar usando batch (rate-limiting automático: 450 emails/hora)
     enviados, fallidos, errores = enviar_correo_batch(
         correos=correos,
         subject=subject,
         text_message=text_message,
-        html_message=html_message,
-        delay_entre_lotes=2
+        html_message=html_message
     )
     
     total = len(correos)
@@ -722,6 +740,7 @@ def actualizar_progreso_modulo(colaborador_id, modulo):
 def actualizar_progreso_capacitacion(colaborador_id, capacitacion):
     """
     Calcula el progreso general de una capacitación basado en sus módulos.
+    Maneja duplicados en la tabla capacitaciones_colaboradores de forma segura.
     """
     modulos = Modulos.objects.filter(idcapacitacion=capacitacion)
     total_modulos = modulos.count()
@@ -746,18 +765,39 @@ def actualizar_progreso_capacitacion(colaborador_id, capacitacion):
     capacitacion_completada = completados == total_modulos
 
     from django.utils import timezone
-    obj, created = progresoCapacitaciones.objects.get_or_create(
+
+    # Usar filter().first() en lugar de get_or_create para evitar
+    # MultipleObjectsReturned cuando existen registros duplicados
+    registros = progresoCapacitaciones.objects.filter(
         colaborador_id=colaborador_id,
-        capacitacion=capacitacion,
-        defaults={
-            'progreso': promedio_capacitacion,
-            'completada': capacitacion_completada,
-            'fecha_completada': timezone.now() if capacitacion_completada else None
-        }
-    )
-    # Si ya existe, solo actualizar progreso y completada
-    update_fields = ['progreso', 'completada']
-    if not created:
+        capacitacion=capacitacion
+    ).order_by('id')
+
+    obj = registros.first()
+
+    # Limpiar duplicados si existen (mantener solo el primero)
+    if registros.count() > 1:
+        ids_duplicados = list(registros.values_list('id', flat=True)[1:])
+        progresoCapacitaciones.objects.filter(id__in=ids_duplicados).delete()
+        logger.warning(
+            f"Se eliminaron {len(ids_duplicados)} registros duplicados de "
+            f"progresoCapacitaciones para colaborador={colaborador_id}, "
+            f"capacitacion={capacitacion.id}"
+        )
+
+    if obj is None:
+        # Crear registro nuevo si no existe
+        obj = progresoCapacitaciones.objects.create(
+            colaborador_id=colaborador_id,
+            capacitacion=capacitacion,
+            progreso=promedio_capacitacion,
+            completada=capacitacion_completada,
+            fecha_registro=timezone.now(),
+            fecha_completada=timezone.now() if capacitacion_completada else None
+        )
+    else:
+        # Actualizar registro existente
+        update_fields = ['progreso', 'completada']
         obj.progreso = promedio_capacitacion
         obj.completada = capacitacion_completada
         # Si se completa y nunca se había completado antes, poner fecha
@@ -896,3 +936,181 @@ def guardar_archivo(file, carpeta, request, extensiones_permitidas=None, max_siz
         return None, f"Error al subir archivo a Cloudinary: {str(e)}"
     
     return file_url, None
+
+
+# ==================== MANEJO SEGURO DE ARCHIVOS PARA CAPACITACIONES ====================
+
+import hashlib
+import uuid
+from django.core.exceptions import ValidationError
+from django.utils.deconstruct import deconstructible
+
+ALLOWED_IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'}
+ALLOWED_PDF_EXTENSION = {'pdf'}
+ALLOWED_VIDEO_EXTENSIONS = {'mp4', 'webm', 'ogg', 'mkv'}
+MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
+
+
+def calcular_hash_archivo(file_obj) -> str:
+    """Calcula el hash SHA256 de un archivo para detectar duplicados"""
+    hash_obj = hashlib.sha256()
+    for chunk in file_obj.chunks():
+        hash_obj.update(chunk)
+    file_obj.seek(0)  # Reset file pointer
+    return hash_obj.hexdigest()
+
+
+def validar_archivo(file_obj, allowed_extensions: set, max_size: int = MAX_FILE_SIZE) -> Tuple[bool, str]:
+    """
+    Valida un archivo según extensión y tamaño
+    
+    Args:
+        file_obj: File object from request.FILES
+        allowed_extensions: Set of allowed extensions (sin punto)
+        max_size: Tamaño máximo en bytes
+    
+    Returns:
+        (is_valid, error_message)
+    """
+    if not file_obj:
+        return False, "No se proporcionó archivo"
+    
+    if file_obj.size > max_size:
+        size_mb = max_size / (1024 * 1024)
+        return False, f"Archivo demasiado grande. Máximo {size_mb}MB"
+    
+    filename = file_obj.name.lower()
+    ext = filename.rsplit('.', 1)[-1] if '.' in filename else ''
+    
+    if ext not in allowed_extensions:
+        return False, f"Tipo de archivo no permitido. Extensiones válidas: {', '.join(sorted(allowed_extensions))}"
+    
+    return True, ""
+
+
+def procesar_archivo_multimedia(file_obj, tipo_archivo: str, nombre_unico: str = None) -> Tuple[str, str]:
+    """
+    Procesa y sube un archivo multimedia de forma segura
+    
+    Args:
+        file_obj: File object
+        tipo_archivo: 'imagen', 'pdf', 'video'
+        nombre_unico: Nombre único para el archivo (si no se proporciona, se genera con UUID_nombre_original)
+    
+    Returns:
+        (url, error_message)
+    """
+    # Validar tipo
+    extensiones_permitidas = {
+        'imagen': ALLOWED_IMAGE_EXTENSIONS,
+        'pdf': ALLOWED_PDF_EXTENSION,
+        'video': ALLOWED_VIDEO_EXTENSIONS,
+    }
+    
+    if tipo_archivo not in extensiones_permitidas:
+        return "", f"Tipo de archivo desconocido: {tipo_archivo}"
+    
+    # Validar archivo
+    is_valid, error = validar_archivo(file_obj, extensiones_permitidas[tipo_archivo])
+    if not is_valid:
+        return "", error
+    
+    try:
+        # Generar nombre único si no se proporciona
+        # Formato: {uuid_hex}_{nombre_original} para mantener consistencia con CargarArchivoView
+        if not nombre_unico:
+            nombre_original = file_obj.name
+            nombre_unico = f"{uuid.uuid4().hex}_{nombre_original}"
+        
+        # Crear carpeta destino - todo en capacitaciones/ para consistencia con CargarArchivoView
+        carpeta = 'capacitaciones'
+        
+        # Configurar Cloudinary si está disponible
+        if hasattr(settings, 'CLOUDINARY_STORAGE') and settings.CLOUDINARY_STORAGE:
+            cloudinary.config(
+                cloud_name=settings.CLOUDINARY_STORAGE['CLOUD_NAME'],
+                api_key=settings.CLOUDINARY_STORAGE['API_KEY'],
+                api_secret=settings.CLOUDINARY_STORAGE['API_SECRET']
+            )
+            
+            resource_type = 'image' if tipo_archivo == 'imagen' else 'raw'
+            upload_result = cloudinary.uploader.upload(
+                file_obj,
+                folder=carpeta,
+                resource_type=resource_type,
+                public_id=nombre_unico.rsplit('.', 1)[0],  # Sin extensión
+                overwrite=True,  # Reemplazar si existe (evita duplicados)
+                chunk_size=6000000
+            )
+            
+            url = upload_result['secure_url']
+        else:
+            # Fallback a almacenamiento local
+            carpeta_local = os.path.join(settings.MEDIA_ROOT, carpeta)
+            os.makedirs(carpeta_local, exist_ok=True)
+            ruta = os.path.join(carpeta_local, nombre_unico)
+            
+            with open(ruta, 'wb+') as f:
+                for chunk in file_obj.chunks():
+                    f.write(chunk)
+            
+            url = f"{settings.MEDIA_URL}{carpeta}/{nombre_unico}"
+        
+        return url, ""
+        
+    except Exception as e:
+        return "", f"Error al procesar archivo: {str(e)}"
+
+
+def limpiar_archivo(url: str) -> bool:
+    """
+    Elimina un archivo cargado (útil para rollback en caso de error)
+    
+    Args:
+        url: URL del archivo a eliminar
+    
+    Returns:
+        True si se eliminó, False si hubo error
+    """
+    try:
+        if not url:
+            return False
+        
+        # Si es URL de Cloudinary
+        if 'cloudinary' in url or 'res.cloudinary' in url:
+            try:
+                # Extraer public_id de la URL
+                # Formato: https://res.cloudinary.com/cloud_name/image/upload/v123/path/to/file
+                parts = url.split('/upload/')
+                if len(parts) > 1:
+                    public_id = parts[1].split('?')[0].rsplit('.', 1)[0]
+                    
+                    if hasattr(settings, 'CLOUDINARY_STORAGE') and settings.CLOUDINARY_STORAGE:
+                        cloudinary.config(
+                            cloud_name=settings.CLOUDINARY_STORAGE['CLOUD_NAME'],
+                            api_key=settings.CLOUDINARY_STORAGE['API_KEY'],
+                            api_secret=settings.CLOUDINARY_STORAGE['API_SECRET']
+                        )
+                        
+                        # Determinar tipo de recurso
+                        resource_type = 'image' if any(ext in url for ext in ['jpg', 'jpeg', 'png', 'gif', 'webp']) else 'raw'
+                        cloudinary.uploader.destroy(public_id, resource_type=resource_type)
+                        return True
+            except Exception as e:
+                logger.warning(f"No se pudo eliminar archivo de Cloudinary: {str(e)}")
+                return False
+        
+        # Si es archivo local
+        elif url.startswith(settings.MEDIA_URL):
+            local_path = url.replace(settings.MEDIA_URL, '', 1)
+            full_path = os.path.join(settings.MEDIA_ROOT, local_path)
+            
+            if os.path.exists(full_path):
+                os.remove(full_path)
+                return True
+        
+        return False
+        
+    except Exception as e:
+        logger.error(f"Error al limpiar archivo {url}: {str(e)}")
+        return False

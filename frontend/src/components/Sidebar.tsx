@@ -71,6 +71,23 @@ import styles from "./Navbar.module.css";
                   )}
                 </li>
               </>
+            ) : userType === 3 ? (
+              <>
+                <li className={styles.menuSection}>
+                  <span className={styles.sectionTitle}>Capacitaciones</span>
+                  <ul className={styles.submenu}>
+                    <li><Link to="/capacitaciones/list" className={styles.submenuItem}>Capacitaciones</Link></li>
+                    <li><Link to="/" className={styles.submenuItem}>Mis Capacitaciones</Link></li>
+                  </ul>
+                </li>
+                <li className={styles.menuSection}>
+                  <span className={styles.sectionTitle}>Usuarios</span>
+                  <ul className={styles.submenu}>
+                    <li><Link to="/usuarios" className={styles.submenuItem}>Gestionar Usuarios</Link></li>
+                    <li><Link to="/usuarios/crear" className={styles.submenuItem}>Crear Usuario Temporal</Link></li>
+                  </ul>
+                </li>
+              </>
             ) : (
               <li className={styles.menuSection}>
                 <span className={styles.sectionTitle}>Capacitaciones</span>

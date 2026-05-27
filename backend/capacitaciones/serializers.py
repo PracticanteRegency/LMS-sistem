@@ -92,10 +92,11 @@ class LeccionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Lecciones
-        fields = ['id', 
-                  'titulo_leccion', 
-                  'tipo_leccion', 
-                  'url', 
+        fields = ['id',
+                  'titulo_leccion',
+                  'tipo_leccion',
+                  'url',
+                  'duracion',
                   'preguntas']
 
 
@@ -128,7 +129,7 @@ class ColaboradorSerializer(serializers.ModelSerializer):
 class CapacitacionDetalleSerializer(serializers.ModelSerializer):
     modulos = ModuloSerializer(many=True, source='modulos_set', read_only=True)
     colaboradores = serializers.SerializerMethodField()
-    imagen = serializers.CharField()
+    imagen = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = Capacitaciones
@@ -142,13 +143,25 @@ class CapacitacionDetalleSerializer(serializers.ModelSerializer):
             'fecha_inicio',
             'fecha_fin',
             'modulos',
-            'colaboradores'
+            'colaboradores',
+            'tipo'
         ]
 
     def get_colaboradores(self, obj):
         progres = progresoCapacitaciones.objects.filter(capacitacion=obj).select_related('colaborador')
         colaboradores = [p.colaborador for p in progres]
         return ColaboradorSerializer(colaboradores, many=True).data
+    
+    def to_internal_value(self, data):
+        """Normalizar los datos de entrada antes de validar"""
+        data = dict(data)  # Crear copia mutable
+        if 'imagen' in data:
+            val = data['imagen']
+            if hasattr(val, 'read') or hasattr(val, 'chunks'):
+                data.pop('imagen')
+            elif not val:
+                data.pop('imagen')
+        return super().to_internal_value(data)
     
 
 class CapacitacionColaboradorSerializer(serializers.ModelSerializer):
@@ -164,6 +177,7 @@ class CapacitacionColaboradorSerializer(serializers.ModelSerializer):
 class CrearCapacitacionSerializer(serializers.ModelSerializer):
     modulos = serializers.ListField(required=False)
     colaboradores = serializers.ListField(required=False)
+    imagen = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = Capacitaciones
@@ -176,9 +190,27 @@ class CrearCapacitacionSerializer(serializers.ModelSerializer):
                   'modulos', 
                   'colaboradores']
 
+    def to_internal_value(self, data):
+        """Normalizar los datos de entrada antes de validar"""
+        data = dict(data)  # Crear copia mutable
+        # Si imagen es un objeto archivo (InMemoryUploadedFile), eliminarlo
+        # Los archivos se procesan en la vista, no en el serializer
+        if 'imagen' in data:
+            val = data['imagen']
+            if hasattr(val, 'read') or hasattr(val, 'chunks'):
+                data.pop('imagen')
+            elif not val:  # vacío o None
+                data.pop('imagen')
+        return super().to_internal_value(data)
+
     def create(self, validated_data):
         modulos_data = validated_data.pop('modulos', [])
         colaboradores_data = validated_data.pop('colaboradores', [])
+        
+        # Asegurar que imagen tiene un valor (no NULL)
+        # Si no se proporciona, usar cadena vacía (que BD permite)
+        if 'imagen' not in validated_data or not validated_data.get('imagen'):
+            validated_data['imagen'] = ''
 
         with transaction.atomic():
             capacitacion = Capacitaciones.objects.create(
@@ -200,40 +232,40 @@ class CrearCapacitacionSerializer(serializers.ModelSerializer):
                 # crea las lecciones
                 for leccion_data in lecciones_data:
                     preguntas_data = leccion_data.pop('preguntas', [])
+                    # Mantener URL como es (puede ser cadena vacía, pero no None)
+                    leccion_url = leccion_data.get('url') or ""
                     leccion = Lecciones.objects.create(
                         idmodulo=modulo,
                         tituloleccion=leccion_data.get('titulo_leccion'),
                         tipoleccion=leccion_data.get('tipo_leccion'),
-                        url=leccion_data.get('url', None)
+                        url=leccion_url,
+                        duracion=leccion_data.get('duracion') or None,
                     )
 
                     # Si la lección es de tipo formulario, crear preguntas y respuestas
                     if leccion.tipoleccion.lower() == 'formulario':
                         for pregunta_data in preguntas_data:
                             respuestas_data = pregunta_data.pop('respuestas', [])
+                            # Mantener URL como es (puede ser cadena vacía, pero no None)
+                            pregunta_url = pregunta_data.get('url_multimedia') or ""
                             pregunta = PreguntasLecciones.objects.create(
                                 id_leccion=leccion,
                                 pregunta=pregunta_data.get('pregunta'),
                                 tipopregunta=pregunta_data.get('tipo_pregunta'),
-                                urlmultimedia=pregunta_data.get('url_multimedia', None)
+                                urlmultimedia=pregunta_url
                             )
 
                             for respuesta_data in respuestas_data:
+                                respuesta_url = respuesta_data.get('url_imagen') or ""
                                 Respuestas.objects.create(
                                     idpregunta=pregunta,
                                     valor=respuesta_data.get('valor'),
                                     escorrecto=respuesta_data.get('es_correcto', 0),
-                                    urlimagen=respuesta_data.get('url_imagen', None)
+                                    urlimagen=respuesta_url
                                 )
 
-            for colaborador_id in colaboradores_data:
-                progresoCapacitaciones.objects.create(
-                    capacitacion=capacitacion,
-                    colaborador_id=colaborador_id,
-                    fecha_registro=timezone.now(),
-                    completada=False,
-                    progreso=0
-                )
+            # NOTA: La creación de progresoCapacitaciones se maneja en la vista (CrearCapacitacionView.post)
+            # para evitar duplicados y aplicar filtros de colaboradores activos (estadocolaborador=1)
 
         return capacitacion
 
@@ -265,27 +297,34 @@ class CrearCapacitacionSerializer(serializers.ModelSerializer):
                     )
                     for leccion_data in lecciones_data:
                         preguntas_data = leccion_data.get('preguntas', [])
+                        # Mantener URL como es (puede ser cadena vacía, pero no None)
+                        leccion_url = leccion_data.get('url') or ""
                         leccion = Lecciones.objects.create(
                             idmodulo=modulo,
                             tituloleccion=leccion_data.get('titulo_leccion'),
                             tipoleccion=leccion_data.get('tipo_leccion'),
-                            url=leccion_data.get('url', None)
+                            url=leccion_url,
+                            duracion=leccion_data.get('duracion') or None,
                         )
                         if str(leccion.tipoleccion).lower() == 'formulario':
                             for pregunta_data in preguntas_data:
                                 respuestas_data = pregunta_data.get('respuestas', [])
+                                # Mantener URL como es (puede ser cadena vacía, pero no None)
+                                pregunta_url = pregunta_data.get('url_multimedia') or ""
                                 pregunta = PreguntasLecciones.objects.create(
                                     id_leccion=leccion,
                                     pregunta=pregunta_data.get('pregunta'),
                                     tipopregunta=pregunta_data.get('tipo_pregunta'),
-                                    urlmultimedia=pregunta_data.get('url_multimedia', None)
+                                    urlmultimedia=pregunta_url
                                 )
                                 for respuesta_data in respuestas_data:
+                                    # Mantener URL como es (puede ser cadena vacía, pero no None)
+                                    respuesta_url = respuesta_data.get('url_imagen') or ""
                                     Respuestas.objects.create(
                                         idpregunta=pregunta,
                                         valor=respuesta_data.get('valor'),
                                         escorrecto=respuesta_data.get('es_correcto', 0),
-                                        urlimagen=respuesta_data.get('url_imagen', None)
+                                        urlimagen=respuesta_url
                                     )
 
             # Sincronizar colaboradores si se envía la lista
@@ -303,19 +342,19 @@ class CrearCapacitacionSerializer(serializers.ModelSerializer):
                 to_add = incoming - current
                 to_remove = current - incoming
 
-                # Agregar nuevos
-                bulk_objs = []
+                # Agregar nuevos (con verificación anti-duplicado)
                 for cid in to_add:
-                    bulk_objs.append(progresoCapacitaciones(
+                    _, created = progresoCapacitaciones.objects.get_or_create(
                         capacitacion=instance,
                         colaborador_id=cid,
-                        fecha_registro=timezone.now(),
-                        completada=False,
-                        progreso=0
-                    ))
-                    added.append(cid)
-                if bulk_objs:
-                    progresoCapacitaciones.objects.bulk_create(bulk_objs)
+                        defaults={
+                            'fecha_registro': timezone.now(),
+                            'completada': False,
+                            'progreso': 0
+                        }
+                    )
+                    if created:
+                        added.append(cid)
 
                 # Eliminar removidos y limpiar progreso relacionado
                 if to_remove:
@@ -546,6 +585,8 @@ class capacitacionUpdateSerializer(serializers.ModelSerializer):
     preguntas = serializers.ListField(required=False)
     respuestas = serializers.ListField(required=False)
     colaboradores = serializers.ListField(required=False)
+    imagen = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    
     class Meta:
         model = Capacitaciones
         fields = ['titulo', 

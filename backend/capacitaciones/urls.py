@@ -12,6 +12,7 @@ urlpatterns = [
     path('cargar/', views.PrevisualizarColaboradoresView.as_view(), name='cargar-colaborador'),
     path('subir-archivoImagen/', views.CargarArchivoView.as_view(), name='cargar-archivoImagen'),
     path('certificado/<int:id_capacitacion>/', views.DescargarCertificadoView.as_view(), name='certificado'),
+    path('certificado/<int:id_capacitacion>/<int:id_colaborador>/', views.DescargarCertificadoView.as_view(), name='certificado-colaborador'),
     path('<int:capacitacion_id>/', views.MisCapacitacionesView.as_view(), name='capacitacion_individual'),
     path('mis-capacitaciones/', views.MisCapacitacionesListView.as_view(), name='mis-capacitaciones'),
     path('desactivar-capacitaciones/', views.DesactivarCapacitacionesView.as_view(), name='desactivar-capacitaciones'),
@@ -19,4 +20,5 @@ urlpatterns = [
     path('editar-colaborador-capacitacion/<int:capacitacion_id>/', views.EditarColaboradorCapacitacionView.as_view(), name='editar-colaborador-capacitacion'),
     path('obtener-colaboradores-capacitacion/<int:capacitacion_id>/', views.ObtenerColaboradoresCapacitacionView.as_view(), name='obtener-colaboradores-capacitacion'),
     path('reporte-capacitaciones/', views.ReporteCapacitacionesView.as_view(), name='reporte-capacitaciones'),
+    path('inducciones/', views.InduccionesView.as_view(), name='inducciones'),
 ]

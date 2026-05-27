@@ -19,12 +19,61 @@ const getMisCapacitaciones = async () => {
   });
 };
 
-// POST: Crear una nueva capacitación con estructura completa (módulos, lecciones, preguntas, etc.)
-// payload debe contener: { titulo, descripcion, imagen, fecha_inicio, fecha_fin, modulos, colaboradores }
+// POST: Crear una nueva capacitación con estructura completa y soporte para archivos multimedia incrustados
+// Acepta tanto JSON puro como FormData con archivos
+// payload puede contener archivos en estructura: { modulos: [...], imagen: File, archivos: {...} }
 const crearCapacitacionCompleta = async (payload) => {
   return dedupe('cap:crearCapacitacionCompleta', payload, async () => {
-    const response = await api.post("capacitaciones/crear-capacitacion/", payload);
-    return response.data;
+    // Si el payload contiene archivos, usar FormData; si no, usar JSON puro
+    if (payload instanceof FormData || (payload.imagen instanceof File) || (payload.archivos && Object.values(payload.archivos).some(v => v instanceof File))) {
+      // Convertir a FormData si no lo es ya
+      let formData;
+      if (payload instanceof FormData) {
+        formData = payload;
+      } else {
+        formData = new FormData();
+        
+        // Agregar campos simples
+        formData.append('titulo', payload.titulo || '');
+        formData.append('descripcion', payload.descripcion || '');
+        formData.append('tipo', payload.tipo || '');
+        if (payload.fecha_inicio) formData.append('fecha_inicio', payload.fecha_inicio);
+        if (payload.fecha_fin) formData.append('fecha_fin', payload.fecha_fin);
+        
+        // Agregar módulos como JSON string
+        if (payload.modulos) {
+          formData.append('modulos', JSON.stringify(payload.modulos));
+        }
+        
+        // Agregar colaboradores como JSON string
+        if (payload.colaboradores) {
+          formData.append('colaboradores', JSON.stringify(payload.colaboradores));
+        }
+        
+        // Agregar imagen principal si existe
+        if (payload.imagen instanceof File) {
+          formData.append('imagen', payload.imagen);
+        }
+        
+        // Agregar archivos multimedia incrustados
+        if (payload.archivos && typeof payload.archivos === 'object') {
+          Object.entries(payload.archivos).forEach(([key, file]) => {
+            if (file instanceof File) {
+              formData.append(key, file);
+            }
+          });
+        }
+      }
+      
+      const response = await api.post("capacitaciones/crear-capacitacion/", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return response.data;
+    } else {
+      // Sin archivos: usar JSON puro (compatibilidad hacia atrás)
+      const response = await api.post("capacitaciones/crear-capacitacion/", payload);
+      return response.data;
+    }
   });
 };
 
@@ -221,16 +270,24 @@ const cargarColaboradores = async (file) => {
 export async function getCapacitacionDetalle(capacitacionId) {
   // Llama a: GET /capacitaciones/crear-capacitacion/<id>/
   // Respuesta esperada: objeto CapacitacionDetalleSerializer con campo `colaboradores`
-  const response = await api.get(`capacitaciones/crear-capacitacion/${capacitacionId}/`);
-  return response.data; // { id, titulo, descripcion, modulos, colaboradores: [...] }
+  return dedupe('cap:getCapacitacionDetalle', capacitacionId, async () => {
+    const response = await api.get(`capacitaciones/crear-capacitacion/${capacitacionId}/`);
+    return response.data; // { id, titulo, descripcion, modulos, colaboradores: [...] }
+  });
 }
 
 // Actualizar campos de la capacitación (sincronizar si envías `colaboradores` completo)
 export async function patchCapacitacion(capacitacionId, payload) {
   // Llama a: PATCH /capacitaciones/crear-capacitacion/<id>/
-  // Payload: campos a actualizar o { colaboradores: [ids...] } para sincronizar
-  const response = await api.patch(`capacitaciones/crear-capacitacion/${capacitacionId}/`, payload);
-  return response.data;
+  // Payload: campos a actualizar, { colaboradores: [ids...] }, o FormData para multipart
+  return dedupe('cap:patchCapacitacion', { capacitacionId, payload }, async () => {
+    // Si es FormData, axios detecta automáticamente y usa multipart/form-data
+    const config = payload instanceof FormData
+      ? { headers: { "Content-Type": "multipart/form-data" } }
+      : {};
+    const response = await api.patch(`capacitaciones/crear-capacitacion/${capacitacionId}/`, payload, config);
+    return response.data;
+  });
 }
 
 // Agregar / eliminar colaboradores (operación parcial)
@@ -240,9 +297,11 @@ export async function updateColaboradores(capacitacionId, { add = [], remove = [
   // - No enviar IDs que estén en `add` y `remove` al mismo tiempo
   // - `add` debe contener IDs de colaboradores existentes
   // - Respuesta: { added: [...], removed: [...] }
-  const body = { add, remove };
-  const response = await api.post(`capacitaciones/crear-capacitacion/${capacitacionId}/`, body);
-  return response.data;
+  return dedupe('cap:updateColaboradores', { capacitacionId, add, remove }, async () => {
+    const body = { add, remove };
+    const response = await api.post(`capacitaciones/crear-capacitacion/${capacitacionId}/`, body);
+    return response.data;
+  });
 }
 
 // Ejemplo de uso rápido (con axios):
@@ -257,16 +316,19 @@ export async function updateColaboradores(capacitacionId, { add = [], remove = [
 //   para actualizar la lista mostrada en UI.
 // - Manejar errores HTTP 400/403/404 mostrando mensajes adecuados al usuario.
 
-const certificadoDescargar = async (capacitacionId) => {
-  return dedupe('cap:certificadoDescargar', { capacitacionId }, async () => {
-    const response = await api.get(
-      `capacitaciones/certificado/${capacitacionId}/`,
-      {
-        responseType: 'blob', // importante para archivos PDF
-      }
-    );
-    return response.data;
-  });
+const certificadoDescargar = async (capacitacionId, colaboradorId) => {
+  // Construir URL con el ID del colaborador para validación de seguridad
+  const url = colaboradorId 
+    ? `capacitaciones/certificado/${capacitacionId}/${colaboradorId}/`
+    : `capacitaciones/certificado/${capacitacionId}/`;
+  
+  const response = await api.get(
+    url,
+    {
+      responseType: 'blob',
+    }
+  );
+  return response.data;
 };
 
 // GET: Obtener solo los IDs de colaboradores asignados a una capacitación
@@ -293,10 +355,11 @@ const GetUsersCapacitacion = async (capacitacionId) => {
   });
 };
 
-const descargarReporteCapacitacion = async (capacitacionId) => {
-  return dedupe('cap:descargarReporteCapacitacion', capacitacionId, async () => {
+const descargarReporteCapacitacion = async (capacitacionId, includeQuestions) => {
+  const include = includeQuestions === true ? 'true' : 'false';
+  return dedupe('cap:descargarReporteCapacitacion', { capacitacionId, includeQuestions }, async () => {
     const response = await api.get(
-      `capacitaciones/reporte-capacitaciones/?capacitacion_id=${capacitacionId}`,
+      `capacitaciones/reporte-capacitaciones/?capacitacion_id=${capacitacionId}&include_questions=${include}`,
       {
         responseType: 'blob',
       }
@@ -314,6 +377,13 @@ const descargarReporteRangoFechas = async (fechaInicio, fechaFin) => {
         responseType: 'blob',
       }
     );
+    return response.data;
+  });
+};
+
+const getInducciones = async () => {
+  return dedupe('cap:getInducciones', null, async () => {
+    const response = await api.get("capacitaciones/inducciones/");
     return response.data;
   });
 };
@@ -350,6 +420,7 @@ const CapListService = {
   GetUsersCapacitacion,
   descargarReporteCapacitacion,
   descargarReporteRangoFechas,
+  getInducciones,
 };
 
 export default CapListService;

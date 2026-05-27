@@ -900,6 +900,153 @@
   color: #991b1b;
 }
 
+/* ===== COLABORADOR DROPDOWN (Solicitante Extra) ===== */
+.colaboradorWrapper {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.colaboradorInput {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: #fff;
+  color: #333;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.colaboradorInput:focus {
+  outline: none;
+  border-color: #C0281B;
+  box-shadow: 0 0 0 3px rgba(192, 40, 27, 0.1);
+}
+
+.colaboradorInput:disabled {
+  background-color: #f5f5f5;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.colaboradorDropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  max-height: 250px;
+  overflow-y: auto;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.colaboradorItem {
+  padding: 10px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.95rem;
+  color: #333;
+  transition: background-color 0.2s ease;
+}
+
+.colaboradorItem:last-child {
+  border-bottom: none;
+}
+
+.colaboradorItem:hover {
+  background-color: #f5f7fa;
+  color: #C0281B;
+}
+
+.colaboradorItem strong {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.colaboradorEmpty {
+  padding: 10px 12px;
+  color: #999;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.removeColaboradorButton {
+  display: block;
+  margin-top: 8px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  color: #C0281B;
+  background: none;
+  border: 1px solid #C0281B;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.removeColaboradorButton:hover {
+  background-color: #ffe4e0;
+  color: #8B1512;
+}
+
+.removeColaboradorButton:active {
+  background-color: #ffd6ce;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .colaboradorWrapper {
+    margin-bottom: 18px;
+  }
+
+  .colaboradorDropdown {
+    max-height: 200px;
+    font-size: 0.9rem;
+  }
+  
+  .colaboradorItem {
+    padding: 8px 10px;
+    font-size: 0.9rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .colaboradorWrapper {
+    margin-bottom: 14px;
+  }
+
+  .colaboradorDropdown {
+    max-height: 180px;
+    font-size: 0.85rem;
+  }
+  
+  .colaboradorItem {
+    padding: 6px 8px;
+    font-size: 0.85rem;
+  }
+  
+  .removeColaboradorButton {
+    width: 100%;
+    font-size: 0.8rem;
+  }
+}
+
 /* ===== DARK MODE ===== */
 @media (prefers-color-scheme: dark) {
   .container {
@@ -917,6 +1064,56 @@
     border-left-color: #e55;
     color: #f99;
   }
+  .colaboradorInput {
+    background-color: #2a2a2a;
+    border-color: #444;
+    color: #e0e0e0;
+  }
+
+  .colaboradorInput:focus {
+    border-color: #ff6b5b;
+    box-shadow: 0 0 0 3px rgba(255, 107, 91, 0.15);
+  }
+
+  .colaboradorInput:disabled {
+    background-color: #1a1a1a;
+    color: #666;
+  }
+
+  .colaboradorDropdown {
+    background: #1e1e1e;
+    border-color: #333;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  }
+
+  .colaboradorItem {
+    color: #e0e0e0;
+    border-bottom-color: #333;
+  }
+
+  .colaboradorItem:hover {
+    background-color: #2a2a2a;
+    color: #ff9a85;
+  }
+
+  .colaboradorEmpty {
+    color: #888;
+  }
+
+  .removeColaboradorButton {
+    color: #ff9a85;
+    border-color: #ff6b5b;
+  }
+
+  .removeColaboradorButton:hover {
+    background-color: #2a1515;
+    color: #ffb3a3;
+  }
+
+  .removeColaboradorButton:active {
+    background-color: #3a1515;
+  }
+
   .tabs {
     border-bottom-color: #333;
   }

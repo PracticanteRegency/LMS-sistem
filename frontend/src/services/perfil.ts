@@ -72,6 +72,7 @@ declare const Perfil: {
   registrarUsuariosMasivo(file: File): Promise<any>;
   actualizarUsuariosMasivo(file: File): Promise<any>;
   descargarReporteUsuarios(): Promise<any>;
+  cambiarContrasenaUsuario(idcolaborador: number, nueva_contrasena: string): Promise<any>;
 };
 
 export default Perfil;

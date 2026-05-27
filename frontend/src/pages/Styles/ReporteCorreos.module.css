@@ -1,9 +1,42 @@
+/* CSS Variables for Light/Dark Mode */
+:root {
+  --bg-primary: #f5f7fa;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f9f9f9;
+  --text-primary: #1a1a1a;
+  --text-secondary: #666;
+  --text-tertiary: #999;
+  --border-color: #bdbdbd;
+  --border-light: #e0e0e0;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-primary: #1a1a1a;
+    --bg-secondary: #1a1a1a;
+    --bg-tertiary: #333333;
+    --text-primary: #e0e0e0;
+    --text-secondary: #b0b0b0;
+    --text-tertiary: #888888;
+    --border-color: #444444;
+    --border-light: #555555;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 6px 12px rgba(0, 0, 0, 0.4);
+  }
+}
+
 .container {
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
-  background: #f5f7fa;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   min-height: 100vh;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .header {
@@ -19,15 +52,17 @@
 
 .header h1 {
   font-size: 2.5rem;
-  color: #1a1a1a;
+  color: var(--text-primary);
   margin: 0 0 10px 0;
   font-weight: 700;
+  transition: color 0.3s ease;
 }
 
 .subtitle {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 1rem;
   margin: 0;
+  transition: color 0.3s ease;
 }
 
 .headerButtons {
@@ -88,6 +123,15 @@
   border-radius: 4px;
   margin-bottom: 20px;
   font-size: 0.95rem;
+  transition: all 0.3s ease;
+}
+
+@media (prefers-color-scheme: dark) {
+  .error {
+    background-color: #3d2626;
+    border-left-color: #ff6b6b;
+    color: #ff9999;
+  }
 }
 
 /* Search Container */
@@ -101,19 +145,25 @@
 .searchInput {
   flex: 1;
   padding: 12px 16px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--border-light);
   border-radius: 8px;
   font-size: 1rem;
   transition: all 0.3s ease;
-  background: white;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   box-sizing: border-box;
-  color: black;
 }
 
 .searchInput:focus {
   outline: none;
   border-color: #C0281B;
   box-shadow: 0 0 0 3px rgba(192, 40, 27, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  .searchInput:focus {
+    box-shadow: 0 0 0 3px rgba(192, 40, 27, 0.3);
+  }
 }
 
 .searchButton {
@@ -166,12 +216,13 @@
 
 /* Filter Container */
 .filterContainer {
-  background: white;
+  background: var(--bg-secondary);
   border-radius: 8px;
   padding: 16px;
   margin-bottom: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e5e7eb;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light);
+  transition: all 0.3s ease;
 }
 
 .filterContent {
@@ -197,19 +248,19 @@
 
 .filterSelect {
   padding: 10px 12px;
-  border: 2px solid #e0e0e0;
+  border: 2px solid var(--border-light);
   border-radius: 6px;
   font-size: 0.95rem;
-  background: white;
-  color: #000;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .filterSelect option {
-  color: #000;
-  background: white;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
   font-weight: normal;
 }
 
@@ -217,6 +268,12 @@
   outline: none;
   border-color: #C0281B;
   box-shadow: 0 0 0 3px rgba(192, 40, 27, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  .filterSelect:focus {
+    box-shadow: 0 0 0 3px rgba(192, 40, 27, 0.3);
+  }
 }
 
 .filterButtons {
@@ -327,38 +384,44 @@
 }
 
 .loadingContainer {
-  background: white;
+  background: var(--bg-secondary);
   border-radius: 8px;
   padding: 40px;
   text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  color: #666;
+  box-shadow: var(--shadow-sm);
+  color: var(--text-secondary);
   font-size: 1rem;
+  transition: all 0.3s ease;
 }
 
 .content {
-  background: white;
+  background: var(--bg-secondary);
   border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.3s ease;
 }
 
 .emptyState {
   padding: 40px;
   text-align: center;
-  color: #999;
+  color: var(--text-tertiary);
   font-size: 1rem;
 }
 
 /* Table Styles */
 .tableContainer {
   padding: 30px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.95rem;
-  border: 1px solid #bdbdbd;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  transition: all 0.3s ease;
 }
 
 .table thead {
@@ -370,13 +433,35 @@
   text-align: center;
   font-weight: 600;
   white-space: nowrap;
-  border: 1px solid #bdbdbd;
+  border: 1px solid var(--border-color);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  transition: all 0.3s ease;
 }
 
 .table td {
   padding: 12px 16px;
-  border: 1px solid #bdbdbd;
+  border: 1px solid var(--border-color);
   text-align: center;
+  transition: all 0.3s ease;
+}
+
+.table tbody tr:hover {
+  background: var(--bg-tertiary);
+}
+
+.workerNameHeader {
+  min-width: 150px;
+  font-weight: 600;
+  border: 1px solid var(--border-color);
+}
+
+.workerNameCell {
+  text-align: left;
+  font-size: 0.9rem;
+  max-width: 250px;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 
@@ -403,23 +488,129 @@
   color: #721c24;
 }
 
+@media (prefers-color-scheme: dark) {
+  .badge.success {
+    background: #1e3a2d;
+    color: #4ade80;
+  }
+  .badge.pending {
+    background: #3a2d1e;
+    color: #fcd34d;
+  }
+  .badge.error {
+    background: #3a1f24;
+    color: #f87171;
+  }
+}
+
 .detailButton {
   background: #8B1F14;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 600;
+}
+
+.detailButton:hover:not(:disabled) {
+  background: #6b1610;
+  transform: translateY(-1px);
+}
+
+.detailButton:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+@media (prefers-color-scheme: dark) {
+  .detailButton:disabled {
+    background: #444;
+  }
+}
+
+.completarButton {
+  background: #10b981;
   color: white;
   border: none;
   padding: 6px 12px;
   border-radius: 4px;
   font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
-.detailButton:hover:not(:disabled) {
-  background: #8B1F14;
+.completarButton:hover:not(:disabled) {
+  background: #059669;
+  box-shadow: 0 2px 4px rgba(16, 185, 129, 0.3);
 }
 
-.detailButton:disabled {
-  background: #ccc;
+.completarButton:disabled {
+  background: #a1a1a1;
+  cursor: not-allowed;
+}
+
+.changeStateButton {
+  background: #f59e0b;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.changeStateButton:hover:not(:disabled) {
+  background: #d97706;
+  transform: translateY(-1px);
+}
+
+.changeStateButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.retryButton {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.retryButton:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+.retryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (prefers-color-scheme: dark) {
+  .changeStateButton {
+    background: #d97706;
+  }
+  .changeStateButton:hover:not(:disabled) {
+    background: #f59e0b;
+    box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+  }
+}
+
+.changeStateButton:disabled {
+  background: #a1a1a1;
   cursor: not-allowed;
 }
 
@@ -430,7 +621,9 @@
   align-items: center;
   gap: 15px;
   padding: 20px 30px;
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--border-light);
+  background: var(--bg-secondary);
+  border-radius: 0 0 8px 8px;
 }
 
 .pagination button {
@@ -441,18 +634,21 @@
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.3s ease;
+  font-weight: 600;
 }
 
 .pagination button:hover:not(:disabled) {
-  background: #8B1F14;
+  background: #6b1610;
+  transform: translateY(-1px);
 }
 
 .pagination button:disabled {
   cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .pagination span {
-  color: #666;
+  color: var(--text-secondary);
   font-size: 0.95rem;
   font-weight: 500;
 }
@@ -473,7 +669,7 @@
 }
 
 .modalContent {
-  background: white;
+  background: var(--bg-secondary);
   border-radius: 8px;
   max-width: 600px;
   width: 100%;
@@ -482,6 +678,7 @@
   padding: 30px;
   position: relative;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  color: var(--text-primary);
 }
 
 .closeButton {
@@ -492,17 +689,18 @@
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
-  color: #666;
-  transition: color 0.3s ease;
+  color: var(--text-secondary);
+  transition: all 0.3s ease;
 }
 
 .closeButton:hover {
-  color: #000;
+  color: var(--text-primary);
+  transform: scale(1.1);
 }
 
 .modalContent h2 {
   margin: 0 0 20px 0;
-  color: #1a1a1a;
+  color: var(--text-primary);
   font-size: 1.5rem;
 }
 
@@ -515,8 +713,9 @@
 
 .detailItem {
   padding: 12px;
-  background: #f5f7fa;
+  background: var(--bg-tertiary);
   border-radius: 4px;
+  border: 1px solid var(--border-light);
 }
 
 .detailItem strong {
@@ -528,7 +727,7 @@
 
 .detailItem p {
   margin: 0;
-  color: #333;
+  color: var(--text-primary);
   word-break: break-word;
 }
 
@@ -850,12 +1049,12 @@
     color: #ccc;
   }
   .filterSelect {
-    background: #2a2a2a;
+    background: #1a1a1a;
     border-color: #444;
     color: #e0e0e0;
   }
   .filterSelect option {
-    background: #2a2a2a;
+    background: #1a1a1a;
     color: #e0e0e0;
   }
   .loadingContainer {
@@ -1000,5 +1199,356 @@
   }
   .excelButton:hover {
     background: linear-gradient(135deg, #15803d 0%, #166534 100%);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .container {
+    padding: 15px;
+  }
+
+  .header h1 {
+    font-size: 2rem;
+  }
+
+  .headerContent {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .headerButtons {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .backButton,
+  .excelButton {
+    width: 100%;
+  }
+
+  .table {
+    font-size: 0.85rem;
+  }
+
+  .table th,
+  .table td {
+    padding: 10px 8px;
+  }
+
+  .actionsCell {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .detailButton,
+  .changeStateButton {
+    width: 100%;
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 10px;
+  }
+
+  .header h1 {
+    font-size: 1.5rem;
+  }
+
+  .searchContainer {
+    flex-direction: column;
+  }
+
+  .searchInput,
+  .searchButton,
+  .clearButton {
+    width: 100%;
+  }
+
+  .filterContainer {
+    padding: 15px;
+  }
+
+  .filterContent {
+    flex-direction: column;
+  }
+
+  .filterGroup {
+    width: 100%;
+  }
+
+  .filterSelect {
+    width: 100%;
+  }
+
+  .filterButtons {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .filterButton,
+  .clearFilterButton {
+    width: 100%;
+  }
+
+  .tableContainer {
+    padding: 15px;
+    overflow-x: auto;
+  }
+
+  .table {
+    font-size: 0.8rem;
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .table thead {
+    display: none;
+  }
+
+  .table tbody {
+    display: block;
+  }
+
+  .table tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 16px;
+    border: 1px solid #bdbdbd;
+    padding: 12px;
+    border-radius: 4px;
+    background: #f9f9f9;
+  }
+
+  .table td {
+    display: block;
+    padding: 8px;
+    border: none;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #666;
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.75rem;
+  }
+
+  .workerNameCell {
+    max-width: none;
+    text-align: left;
+  }
+
+  .actionsCell {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .detailButton,
+  .changeStateButton {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 0.75rem;
+  }
+
+  .pagination {
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px 15px;
+  }
+
+  .pagination button {
+    width: 100%;
+  }
+
+  .modal {
+    padding: 15px;
+  }
+
+  .modalContent {
+    width: 95%;
+  }
+
+  .excelForm {
+    flex-direction: column;
+  }
+
+  .formGroup {
+    width: 100%;
+  }
+
+  .dateInput,
+  .filterSelect {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 8px;
+  }
+
+  .header h1 {
+    font-size: 1.2rem;
+  }
+
+  .subtitle {
+    font-size: 0.85rem;
+  }
+
+  .searchInput {
+    font-size: 0.9rem;
+  }
+
+  .filterContainer {
+    padding: 10px;
+  }
+
+  .table {
+    font-size: 0.75rem;
+  }
+
+  .table tr {
+    grid-template-columns: 1fr;
+    padding: 10px;
+  }
+
+  .table td {
+    padding: 6px;
+    text-align: left;
+  }
+
+  .actionsCell {
+    flex-direction: column;
+  }
+
+  .detailButton,
+  .changeStateButton {
+    padding: 8px 10px;
+    font-size: 0.7rem;
+    width: 100%;
+  }
+
+  .badge {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+  }
+
+  .pagination {
+    flex-direction: column;
+    gap: 10px;
+    padding: 15px 10px;
+  }
+
+  .pagination span {
+    font-size: 0.85rem;
+  }
+}
+
+/* Additional Responsive Improvements */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .headerContent {
+    flex-direction: row;
+  }
+
+  .headerButtons {
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .searchContainer {
+    gap: 8px;
+  }
+
+  .actionsCell {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .detailButton,
+  .changeStateButton {
+    width: auto;
+    min-width: 120px;
+  }
+
+  .tableContainer {
+    padding: 20px;
+    overflow-x: auto;
+  }
+
+  .table {
+    min-width: 700px;
+  }
+}
+
+/* Extra small devices */
+@media (max-width: 340px) {
+  .container {
+    padding: 5px;
+  }
+
+  .header h1 {
+    font-size: 1rem;
+  }
+
+  .subtitle {
+    font-size: 0.75rem;
+  }
+
+  .detailButton,
+  .changeStateButton {
+    padding: 6px 8px;
+    font-size: 0.65rem;
+  }
+
+  .badge {
+    padding: 3px 6px;
+    font-size: 0.7rem;
+  }
+
+  .pagination span {
+    font-size: 0.75rem;
+  }
+}
+
+/* Tablet landscape */
+@media (max-width: 1024px) and (orientation: landscape) {
+  .header h1 {
+    font-size: 2rem;
+  }
+
+  .tableContainer {
+    padding: 15px;
+  }
+
+  .pagination {
+    padding: 15px;
+    gap: 10px;
+  }
+}
+
+/* Improve touch targets on mobile */
+@media (hover: none) and (pointer: coarse) {
+  .detailButton,
+  .changeStateButton,
+  .filterButton,
+  .clearFilterButton,
+  .pagination button,
+  .searchButton {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 10px 16px;
+  }
+
+  .table td {
+    padding: 14px 12px;
   }
 }

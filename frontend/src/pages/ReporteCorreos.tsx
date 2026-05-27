@@ -3,6 +3,12 @@ import { useNavigate } from "react-router-dom";
 import styles from "./Styles/ReporteCorreos.module.css";
 import ExamenesService from "../services/Examenes";
 
+interface TrabajadorInfo {
+  id: number;
+  nombre_trabajador: string;
+  estado_trabajador: number;
+}
+
 interface ReporteCorreoItem {
   id: number;
   uuid_correo?: string;
@@ -10,16 +16,9 @@ interface ReporteCorreoItem {
   enviado_por_nombre: string;
   fecha_envio: string;
   enviado_correctamente: boolean;
-}
-
-interface DetalleCorreo {
-  id: number;
-  uuid_correo?: string;
-  asunto?: string;
-  correo_destino?: string;
-  fecha_envio?: string;
-  total_trabajadores?: number;
-  cuerpo_correo?: string;
+  trabajadores_count?: number;
+  trabajadores_ids?: TrabajadorInfo[];
+  estado_nombre?: string;
 }
 
 interface Empresa {
@@ -39,9 +38,6 @@ export default function ReporteCorreos() {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [selectedReporte, setSelectedReporte] = useState<DetalleCorreo | null>(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const itemsPerPage = 10;
   
@@ -60,6 +56,9 @@ export default function ReporteCorreos() {
   const [loadingColaboradores, setLoadingColaboradores] = useState(false);
   const [colaboradorSeleccionado, setColaboradorSeleccionado] = useState<number | null>(null);
   const [filtroActivo, setFiltroActivo] = useState(false);
+  
+  // Estado para botón completar
+  const [completingId, setCompletingId] = useState<number | null>(null);
 
   // Load reportes on mount
   const loadReportes = useCallback(async (page: number) => {
@@ -132,31 +131,53 @@ export default function ReporteCorreos() {
   const paginatedReportes = reportes; // ya vienen paginados desde backend
   const totalPages = Math.max(1, Math.ceil(totalCount / itemsPerPage));
 
-  const loadDetalleCorreo = async (correoId: number) => {
-    try {
-      setDetailLoading(true);
-      const data = await ExamenesService.ObtenerDetalleCorreo(correoId);
-      const mapped: DetalleCorreo = {
-        id: (data as any)?.correo_id ?? correoId,
-        uuid_correo: (data as any)?.uuid_correo,
-        asunto: (data as any)?.asunto,
-        correo_destino: (data as any)?.correos_destino || (data as any)?.correo_destino,
-        fecha_envio: (data as any)?.fecha_envio,
-        total_trabajadores: (data as any)?.total_trabajadores ?? (data as any)?.count,
-        cuerpo_correo: (data as any)?.cuerpo_correo,
-      };
-      setSelectedReporte(mapped);
-      setShowDetailModal(true);
-    } catch (err: any) {
-      setError(err.message || "Error cargando detalle");
-      console.error("Error:", err);
-    } finally {
-      setDetailLoading(false);
-    }
+  const goToWorkers = (correoId: number) => {
+    navigate(`/reportes-correos/${correoId}/trabajadores`);
   };
 
-  const goToWorkersPage = (correoId: number) => {
-    navigate(`/reportes-correos/${correoId}/trabajadores`);
+  const handleCambiarEstado = async (correoId: number, reporte: ReporteCorreoItem) => {
+    const trabajadores = reporte.trabajadores_ids || [];
+    if (trabajadores.length === 0) {
+      setError("No hay trabajadores en este correo");
+      return;
+    }
+
+    try {
+      setCompletingId(correoId);
+      setError(null);
+      
+      const ids = trabajadores.map(t => t.id);
+      await ExamenesService.ActualizarEstadoTrabajadores({ trabajador_ids: ids });
+      
+      // Recargar reportes manteniendo el filtro o búsqueda activos
+      if (filtroActivo && colaboradorSeleccionado !== null) {
+        // Mantener el filtro por colaborador
+        const data = await ExamenesService.FiltrarExamenesPorColaborador(colaboradorSeleccionado, currentPage, itemsPerPage);
+        setReportes(data.results || []);
+        setTotalCount(data.count || 0);
+      } else if (searchTerm.trim() !== "") {
+        // Mantener la búsqueda por UUID o nombre
+        const data = await ExamenesService.FiltrarExamenesPorUUID(searchTerm.trim(), currentPage, itemsPerPage);
+        
+        if (data.results && Array.isArray(data.results)) {
+          setReportes(data.results || []);
+          setTotalCount(data.count || 0);
+        } else if (data.correo) {
+          setReportes([data.correo]);
+          setTotalCount(1);
+        }
+      } else {
+        // Recargar reportes normales si no hay filtro
+        await loadReportes(currentPage);
+      }
+      
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || "Error al cambiar estado de trabajadores");
+      console.error("Error:", err);
+    } finally {
+      setCompletingId(null);
+    }
   };
 
   // Cargar empresas para el filtro de Excel
@@ -269,6 +290,45 @@ export default function ReporteCorreos() {
     }
   };
 
+  // Paginar manteniendo el filtro si está activo
+  const handlePaginar = async (page: number) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      if (filtroActivo && colaboradorSeleccionado !== null) {
+        // Si hay filtro activo, mantenerlo al cambiar página
+        const data = await ExamenesService.FiltrarExamenesPorColaborador(colaboradorSeleccionado, page, itemsPerPage);
+        setReportes(data.results || []);
+        setTotalCount(data.count || 0);
+        setCurrentPage(page);
+      } else if (searchTerm.trim() !== "") {
+        // Si hay búsqueda activa, mantenerla al cambiar página
+        // Para búsquedas múltiples, usar la API con paginación
+        const data = await ExamenesService.FiltrarExamenesPorUUID(searchTerm.trim(), page, itemsPerPage);
+        
+        if (data.results && Array.isArray(data.results)) {
+          setReportes(data.results || []);
+          setTotalCount(data.count || 0);
+          setCurrentPage(page);
+        } else {
+          // Fallback si solo hay un resultado
+          setReportes([data.correo]);
+          setTotalCount(1);
+          setCurrentPage(1);
+        }
+      } else {
+        // Si no hay filtro ni búsqueda, cargar normalmente
+        await loadReportes(page);
+      }
+    } catch (err: any) {
+      setError(err.message || "Error al cambiar página");
+      console.error("Error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Limpiar filtro
   const handleLimpiarFiltro = () => {
     setColaboradorSeleccionado(null);
@@ -276,46 +336,61 @@ export default function ReporteCorreos() {
     loadReportes(1);
   };
 
-  // Buscar por UUID
+  // Buscar por UUID o nombre del trabajador
   const handleBuscarPorUUID = async (uuid: string) => {
     try {
       setLoading(true);
       setError(null);
       
-      console.log("Buscando correo por UUID:", uuid);
+      console.log("Buscando correo por UUID o nombre:", uuid);
       
-      // Llamar al servicio directamente con el UUID
-      // El servicio enviará: GET /examenes/filtrar-examenes/?uuid=<uuid>
+      // Llamar al servicio directamente con el UUID o nombre
+      // El servicio enviará: GET /examenes/filtrar-examenes/?uuid=<uuid_o_nombre>
       const data = await ExamenesService.FiltrarExamenesPorUUID(uuid);
       
       console.log("Respuesta del backend:", data);
       
+      // Manejar respuesta con formato unitario (un correo encontrado)
       if (data.found && data.correo) {
-        // Mostrar el correo encontrado
         setReportes([data.correo]);
         setTotalCount(1);
+        setCurrentPage(1);
         setError(null);
-      } else if (data.correo) {
-        // Si solo viene correo sin "found"
+        setFiltroActivo(false);
+      } 
+      // Manejar respuesta con formato paginado (múltiples correos encontrados)
+      else if (data.results && Array.isArray(data.results)) {
+        setReportes(data.results || []);
+        setTotalCount(data.count || 0);
+        setCurrentPage(1);
+        setError(null);
+        setFiltroActivo(false);
+      }
+      // Fallback: solo viene correo sin "found"
+      else if (data.correo) {
         setReportes([data.correo]);
         setTotalCount(1);
+        setCurrentPage(1);
         setError(null);
-      } else {
+        setFiltroActivo(false);
+      } 
+      else {
         setReportes([]);
         setTotalCount(0);
-        setError(`No se encontró correo con UUID: ${uuid}`);
+        setError(`No se encontró correo con UUID o nombre: ${uuid}`);
       }
     } catch (err: any) {
       setReportes([]);
       setTotalCount(0);
+      setFiltroActivo(false);
       
-      console.error("Error en búsqueda por UUID:", err);
+      console.error("Error en búsqueda:", err);
       
       // Manejar error 404 específico
       if (err?.response?.status === 404) {
-        setError(`No se encontró correo con UUID: ${uuid}`);
+        setError(`No se encontró correo con UUID o nombre: ${uuid}`);
       } else {
-        setError(`Error buscando UUID: ${err.message || "Error desconocido"}`);
+        setError(`Error buscando: ${err.message || "Error desconocido"}`);
       }
     } finally {
       setLoading(false);
@@ -356,7 +431,7 @@ export default function ReporteCorreos() {
       <div className={styles.searchContainer}>
         <input
           type="text"
-          placeholder="🔍 Buscar por correo destino o UUID..."
+          placeholder="🔍 Buscar por UUID o nombre del trabajador..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           onKeyPress={handleKeyPress}
@@ -444,33 +519,51 @@ export default function ReporteCorreos() {
                     <tr>
                       <th>Enviado por</th>
                       <th>Fecha Envío</th>
+                      <th className={styles.workerNameHeader}>Trabajador</th>
                       <th>Estado</th>
                       <th>Acciones</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {paginatedReportes.map((reporte) => (
+                    {paginatedReportes.map((reporte) => {
+                      console.log('Reporte:', reporte.id, 'enviado_correctamente:', reporte.enviado_correctamente);
+                      return (
                       <tr key={reporte.id}>
                         <td>{reporte.enviado_por_nombre}</td>
                         <td>{new Date(reporte.fecha_envio).toLocaleString("es-CO")}</td>
+                        <td className={styles.workerNameCell}>
+                          {reporte.trabajadores_ids && reporte.trabajadores_ids.length > 0
+                            ? reporte.trabajadores_ids.length === 1
+                              ? reporte.trabajadores_ids[0].nombre_trabajador
+                              : `${reporte.trabajadores_ids.length} trabajadores`
+                            : "Sin datos"}
+                        </td>
                         <td>
-                          <span className={`${styles.badge} ${reporte.enviado_correctamente ? styles.success : styles.pending}`}>
-                            {reporte.enviado_correctamente ? "Enviado" : "Pendiente"}
+                          <span className={`${styles.badge} ${reporte.estado_nombre === "Completado" ? styles.success : styles.pending}`}>
+                            {reporte.estado_nombre === "Completado" ? "Completado" : "No Completado"}
                           </span>
                         </td>
                         <td>
                           <div className={styles.actionsCell}>
                             <button
                               className={styles.detailButton}
-                              onClick={() => loadDetalleCorreo(reporte.id)}
-                              disabled={detailLoading}
+                              onClick={() => goToWorkers(reporte.id)}
                             >
-                              Ver Detalle
+                              Ver Trabajadores
+                            </button>
+                            <button
+                              className={styles.changeStateButton}
+                              onClick={() => handleCambiarEstado(reporte.id, reporte)}
+                              disabled={completingId === reporte.id || !reporte.trabajadores_ids?.length}
+                              title="Cambiar estado de trabajadores"
+                            >
+                              {completingId === reporte.id ? "Procesando..." : "⚙️ Cambiar Estado"}
                             </button>
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -479,7 +572,7 @@ export default function ReporteCorreos() {
               {totalPages > 1 && (
                 <div className={styles.pagination}>
                     <button
-                      onClick={() => loadReportes(Math.max(1, currentPage - 1))}
+                      onClick={() => handlePaginar(Math.max(1, currentPage - 1))}
                       disabled={currentPage === 1}
                     >
                       ← Anterior
@@ -488,7 +581,7 @@ export default function ReporteCorreos() {
                       Página {currentPage} de {totalPages} ({totalCount} resultados)
                     </span>
                     <button
-                      onClick={() => loadReportes(Math.min(totalPages, currentPage + 1))}
+                      onClick={() => handlePaginar(Math.min(totalPages, currentPage + 1))}
                       disabled={currentPage === totalPages}
                     >
                       Siguiente →
@@ -497,67 +590,6 @@ export default function ReporteCorreos() {
               )}
             </>
           )}
-        </div>
-      )}
-
-      {/* Modal Detalle */}
-      {showDetailModal && selectedReporte && (
-        <div className={styles.modal}>
-          <div className={styles.modalContent}>
-            <button className={styles.closeButton} onClick={() => setShowDetailModal(false)}>
-              ✕
-            </button>
-            <h2>Detalle del Correo</h2>
-
-            <div className={styles.detailActions}>
-              <button
-                className={styles.workerButton}
-                onClick={() => goToWorkersPage(selectedReporte.id)}
-              >
-                Ver trabajadores enviados
-              </button>
-            </div>
-
-            <div className={styles.detailGrid}>
-              {selectedReporte.uuid_correo && (
-                <div className={styles.detailItem}>
-                  <strong>UUID:</strong>
-                  <p className={styles.uuidText}>{selectedReporte.uuid_correo}</p>
-                </div>
-              )}
-              {selectedReporte.asunto && (
-                <div className={styles.detailItem}>
-                  <strong>Asunto:</strong>
-                  <p>{selectedReporte.asunto}</p>
-                </div>
-              )}
-              {selectedReporte.correo_destino && (
-                <div className={styles.detailItem}>
-                  <strong>Correos destino:</strong>
-                  <p>{selectedReporte.correo_destino}</p>
-                </div>
-              )}
-              {selectedReporte.fecha_envio && (
-                <div className={styles.detailItem}>
-                  <strong>Fecha de Envío:</strong>
-                  <p>{new Date(selectedReporte.fecha_envio).toLocaleString("es-CO")}</p>
-                </div>
-              )}
-              {selectedReporte.total_trabajadores !== undefined && (
-                <div className={styles.detailItem}>
-                  <strong>Total trabajadores:</strong>
-                  <p>{selectedReporte.total_trabajadores}</p>
-                </div>
-              )}
-            </div>
-
-            {selectedReporte.cuerpo_correo && (
-              <div className={styles.detailSection}>
-                <strong>Cuerpo del Correo:</strong>
-                <pre className={styles.emailBody}>{selectedReporte.cuerpo_correo}</pre>
-              </div>
-            )}
-          </div>
         </div>
       )}
 

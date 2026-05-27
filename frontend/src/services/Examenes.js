@@ -49,32 +49,65 @@ const ObtenerTrabajadoresCorreo = async (correoId, page = 1, pageSize = 10, sear
 
 // GET: Generar reporte Excel con filtros de fecha y empresas
 const GenerarReporteExcel = async (fechaInicio, fechaFin, empresas) => {
-  const response = await api.get(
-    `examenes/imprimir-reporte/?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}&empresas=${empresas}`,
-    {
-      responseType: 'blob'
-    }
-  );
-  return response.data;
+  return dedupe(`exam:GenerarReporteExcel:${fechaInicio}:${fechaFin}:${empresas}`, null, async () => {
+    const response = await api.get(
+      `examenes/imprimir-reporte/?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}&empresas=${empresas}`,
+      {
+        responseType: 'blob'
+      }
+    );
+    return response.data;
+  });
 };
 
 // POST: Enviar correos masivos por CSV
-const EnviarCorreoMasivo = async (file) => {
-  const formData = new FormData();
-  formData.append('archivo_csv', file);
-  
-  const response = await api.post('examenes/correo/enviar-masivo/', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data'
+const EnviarCorreoMasivo = async (file, solicitante_extra_id) => {
+  return dedupe('exam:EnviarCorreoMasivo', { name: file?.name }, async () => {
+    const formData = new FormData();
+    formData.append('archivo_csv', file);
+    if (solicitante_extra_id) {
+      formData.append('solicitante_extra_id', solicitante_extra_id);
     }
+    
+    const response = await api.post('examenes/correo/enviar-masivo/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+    return response.data;
+  });
+};
+
+// POST: Reintentar envío de un correo fallido
+const ReintentarCorreo = async (correoId) => {
+  const response = await api.post('examenes/correo/reintentar/', {
+    correo_id: correoId
   });
   return response.data;
 };
 
+// GET: Listar correos fallidos que pueden ser reintentados
+const ObtenerCorreosFallidos = async () => {
+  return dedupe('exam:CorreosFallidos', null, async () => {
+    const response = await api.get('examenes/correo/reintentar/');
+    return response.data;
+  });
+};
+
+// GET: Diagnóstico de la configuración de email
+const DiagnosticoEmail = async () => {
+  return dedupe('exam:DiagnosticoEmail', null, async () => {
+    const response = await api.get('examenes/correo/diagnostico/');
+    return response.data;
+  });
+};
+
 // PATCH: Actualizar estado de trabajadores
 const ActualizarEstadoTrabajadores = async (payload) => {
-  const response = await api.patch("examenes/actualizar-estado/", payload);
-  return response.data;
+  return dedupe('exam:ActualizarEstadoTrabajadores', payload, async () => {
+    const response = await api.patch("examenes/actualizar-estado/", payload);
+    return response.data;
+  });
 };
 
 // GET: Preview de exámenes según empresa y cargo seleccionados
@@ -94,6 +127,14 @@ const EmpresaCargo = async () => {
 const crearExamen = async (payload) => {
   const response = await api.post("examenes/crear-examen/", payload);
   return response.data;
+};
+
+// GET: Obtener todos los colaboradores que han enviado correos (para selector de solicitante extra)
+const ObtenerTodosColaboradores = async () => {
+  return dedupe('exam:ObtenerTodosColaboradores', null, async () => {
+    const response = await api.get('examenes/filtrar-examenes/');
+    return response.data;
+  });
 };
 
 const FiltrarExamenesPorColaborador = async (colaboradorId, page = 1, pageSize = 10) => {
@@ -153,16 +194,16 @@ const EliminarExamenesCargo = async (payload) => {
   return response.data;
 };
 
-const FiltrarExamenesPorUUID = async (uuid) => {
-  return dedupe(`examenes:FiltrarExamenesPorUUID:${uuid}`, uuid, async () => {
+const FiltrarExamenesPorUUID = async (uuid, page = 1, pageSize = 25) => {
+  return dedupe(`examenes:FiltrarExamenesPorUUID:${uuid}:page=${page}:size=${pageSize}`, uuid, async () => {
     try {
-      const url = `examenes/filtrar-examenes/?uuid=${encodeURIComponent(uuid)}`;
-      console.log('Buscando por UUID - URL:', url);
+      const url = `examenes/filtrar-examenes/?uuid=${encodeURIComponent(uuid)}&page=${page}&page_size=${pageSize}`;
+      console.log('Buscando por UUID o nombre - URL:', url);
       const response = await api.get(url);
       console.log('Respuesta del backend:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error fetching filtrar examenes por UUID:', error);
+      console.error('Error fetching filtrar examenes por UUID o nombre:', error);
       throw error;
     }
   });
@@ -185,6 +226,10 @@ const ExamenesService = {
   ObtenerExamenesCargo,
   AgregarExamenesCargo,
   EliminarExamenesCargo,
+  ObtenerTodosColaboradores,
+  ReintentarCorreo,
+  ObtenerCorreosFallidos,
+  DiagnosticoEmail,
 };
 
 export default ExamenesService;

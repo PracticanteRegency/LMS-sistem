@@ -36,6 +36,16 @@ export default function Usuarios() {
   const navigate = useNavigate();
   const userRole = Number(getUserRole());
   
+  // Estados para el modal de cambio de contraseña
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordModalUser, setPasswordModalUser] = useState<Usuario | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [showNewPass, setShowNewPass] = useState(false);
+  const [showConfirmPass, setShowConfirmPass] = useState(false);
+
   // Estados para el modal de carga masiva
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -89,7 +99,23 @@ export default function Usuarios() {
       }
       const list: Usuario[] = Array.isArray(data) ? data : data?.results ?? [];
       const count: number = Array.isArray(data) ? list.length : (data?.count ?? list.length);
-      setUsuarios(list);
+      
+      // Detectar y filtrar IDs duplicados
+      const seenIds = new Set();
+      const uniqueUsers = list.filter((u: Usuario) => {
+        if (seenIds.has(u.id_colaborador)) {
+          console.warn(`⚠️ Usuario duplicado detectado - ID: ${u.id_colaborador}, Nombre: ${u.nombre_colaborador}`);
+          return false;
+        }
+        seenIds.add(u.id_colaborador);
+        return true;
+      });
+      
+      if (list.length !== uniqueUsers.length) {
+        console.warn(`⚠️ Se encontraron ${list.length - uniqueUsers.length} usuarios duplicados y fueron removidos`);
+      }
+      
+      setUsuarios(uniqueUsers);
       setTotalCount(count);
     } catch (err) {
       setError("Error al cargar los usuarios");
@@ -185,6 +211,42 @@ export default function Usuarios() {
       handleCambiarEstado(user);
     } else if (action === "Cambiar Rol") {
       handleCambiarRol(user);
+    } else if (action === "Cambiar Contraseña") {
+      setPasswordModalUser(user);
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordError(null);
+      setShowNewPass(false);
+      setShowConfirmPass(false);
+      setShowPasswordModal(true);
+    }
+  };
+
+  const handleCambiarContrasena = async () => {
+    if (!passwordModalUser) return;
+    if (!newPassword.trim()) {
+      setPasswordError("La contraseña no puede estar vacía");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordError("La contraseña debe tener al menos 6 caracteres");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Las contraseñas no coinciden");
+      return;
+    }
+    try {
+      setPasswordLoading(true);
+      setPasswordError(null);
+      await (Perfil as any).cambiarContrasenaUsuario(passwordModalUser.id_colaborador, newPassword);
+      setShowPasswordModal(false);
+      setSuccess(`Contraseña de ${passwordModalUser.nombre_colaborador} actualizada correctamente`);
+      setTimeout(() => setSuccess(null), 4000);
+    } catch (err: any) {
+      setPasswordError(err?.response?.data?.error || "Error al cambiar la contraseña");
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -256,12 +318,11 @@ export default function Usuarios() {
         setSuccess(`Se registraron ${response.total_creados} usuarios correctamente`);
       }
       setUploadFile(null);
-      
-      // Recargar usuarios después de 2 segundos
+
+      // Recargar usuarios después de 2 segundos pero NO cerrar el modal automáticamente.
+      // El panel con la respuesta permanecerá visible hasta que el usuario pulse "Cerrar".
       setTimeout(() => {
         loadUsuarios(1);
-        setShowUploadModal(false);
-        setUploadResult(null);
       }, 2000);
     } catch (err: any) {
       const errorData = err?.response?.data;
@@ -386,8 +447,8 @@ export default function Usuarios() {
                 </tr>
               </thead>
               <tbody className={styles.tbody}>
-                {usuariosMostrados.map((u) => (
-                  <tr key={u.id_colaborador} className={styles.row}>
+                {usuariosMostrados.map((u, idx) => (
+                  <tr key={`${u.id_colaborador}-${idx}`} className={styles.row}>
                     <td>{u.cc_colaborador}</td>
                     <td>{u.nombre_colaborador}</td>
                     <td>{u.apellido_colaborador}</td>
@@ -430,13 +491,22 @@ export default function Usuarios() {
                             >
                               Editar
                             </button>
-                            {(userRole === 1 || userRole === 4) && (
+                            {(userRole === 1 || userRole === 3 || userRole === 4) && (
                               <button
                                 className={`${styles.btn} ${styles.btn}`}
                                 onClick={() => handleAction("Cambiar Estado", u)}
                                 title="Cambiar estado del usuario"
                               >
                                 Cambiar Estado
+                              </button>
+                            )}
+                            {(userRole === 1 || userRole === 4) && (
+                              <button
+                                className={`${styles.btn} ${styles.btn}`}
+                                onClick={() => handleAction("Cambiar Contraseña", u)}
+                                title="Cambiar contraseña del usuario"
+                              >
+                                Cambiar Contraseña
                               </button>
                             )}
                             {userRole === 4 && (
@@ -715,6 +785,87 @@ export default function Usuarios() {
                   {uploadLoading ? "Cargando..." : uploadMode === 'update' ? "Actualizar Usuarios" : "Cargar Usuarios"}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cambiar Contraseña */}
+      {showPasswordModal && passwordModalUser && (
+        <div className={styles.modalOverlay} onClick={() => setShowPasswordModal(false)}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Cambiar Contraseña</h2>
+              <button onClick={() => setShowPasswordModal(false)} className={styles.modalCloseBtn}>✕</button>
+            </div>
+
+            <div style={{ padding: "16px 24px" }}>
+              <p style={{ marginBottom: 16, color: "#555" }}>
+                Usuario: <strong>{passwordModalUser.nombre_colaborador} {passwordModalUser.apellido_colaborador}</strong>
+                <br />
+                <span style={{ fontSize: "0.85em", color: "#888" }}>Cédula: {passwordModalUser.cc_colaborador}</span>
+              </p>
+
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", marginBottom: 4, fontWeight: 500, fontSize: "0.9em" }}>
+                  Nueva contraseña
+                </label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type={showNewPass ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Mínimo 6 caracteres"
+                    style={{ width: "100%", padding: "8px 36px 8px 10px", borderRadius: 6, border: "1px solid #ccc", fontSize: "0.95em", boxSizing: "border-box" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPass((v) => !v)}
+                    style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#666" }}
+                  >
+                    {showNewPass ? "🙈" : "👁"}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", marginBottom: 4, fontWeight: 500, fontSize: "0.9em" }}>
+                  Confirmar contraseña
+                </label>
+                <div style={{ position: "relative" }}>
+                  <input
+                    type={showConfirmPass ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Repite la contraseña"
+                    style={{ width: "100%", padding: "8px 36px 8px 10px", borderRadius: 6, border: "1px solid #ccc", fontSize: "0.95em", boxSizing: "border-box" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPass((v) => !v)}
+                    style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#666" }}
+                  >
+                    {showConfirmPass ? "🙈" : "👁"}
+                  </button>
+                </div>
+              </div>
+
+              {passwordError && (
+                <p style={{ color: "#d32f2f", fontSize: "0.88em", marginBottom: 8 }}>{passwordError}</p>
+              )}
+            </div>
+
+            <div className={styles.modalFooter}>
+              <button onClick={() => setShowPasswordModal(false)} className={styles.modalBtnClose}>
+                Cancelar
+              </button>
+              <button
+                onClick={handleCambiarContrasena}
+                disabled={passwordLoading}
+                className={styles.modalBtnSubmit}
+              >
+                {passwordLoading ? "Guardando..." : "Guardar"}
+              </button>
             </div>
           </div>
         </div>

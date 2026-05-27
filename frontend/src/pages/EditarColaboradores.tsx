@@ -14,6 +14,8 @@ export default function EditarColaboradores() {
   const [colaboradores, setColaboradores] = useState<any[]>([]);
   const [colaboradoresIds, setColaboradoresIds] = useState<number[]>([]);
   const [csvWarnings, setCsvWarnings] = useState<string | null>(null);
+  const [csvAdicionarInfo, setCsvAdicionarInfo] = useState<string | null>(null);
+  const [csvAdicionarWarnings, setCsvAdicionarWarnings] = useState<string | null>(null);
   // const [csvPreview, setCsvPreview] = useState<any[] | null>(null);
   // Guardar la lista original de IDs para detectar cambios
   const [originalColaboradoresIds, setOriginalColaboradoresIds] = useState<number[]>([]);
@@ -68,14 +70,12 @@ export default function EditarColaboradores() {
     try {
       setLoading(true);
       setError(null);
-      // setCsvPreview(null);
       setCsvWarnings(null);
 
       const response: any = await CapListService.cargarColaboradores(file);
       const encontrados = response.colaboradores_encontrados || response.colaboradores || (Array.isArray(response) ? response : []);
       const no_encontrados = response.colaboradores_no_encontrados || [];
 
-      // setCsvPreview(encontrados || []);
       if (no_encontrados && no_encontrados.length) {
         setCsvWarnings(`Advertencia: ${no_encontrados.length} colaboradores no encontrados: ${no_encontrados.join(', ')}`);
       }
@@ -83,10 +83,56 @@ export default function EditarColaboradores() {
       // Reemplazar la lista local de colaboradores por los encontrados en el CSV
       setColaboradores(encontrados || []);
       setColaboradoresIds((encontrados || []).map((c: any) => c.id));
-      // No ejecutar PUT, solo actualizar la vista local
+      
     } catch (err: any) {
       console.error('Error al procesar CSV:', err);
-      setError(err?.message || 'Error al procesar el archivo CSV');
+      
+      // Mostrar solo lo que el backend responde
+      const message = err.response?.data?.error || err.response?.data?.message || err.message || 'Error desconocido';
+      setError(message);
+    } finally {
+      setLoading(false);
+      try { (e.target as HTMLInputElement).value = ''; } catch {}
+    }
+  };
+
+  // Agregar colaboradores desde CSV de forma aditiva (sin reemplazar los existentes)
+  const handleCsvAdicionar = async (e: { target: HTMLInputElement }) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+      setCsvAdicionarInfo(null);
+      setCsvAdicionarWarnings(null);
+
+      const response: any = await CapListService.cargarColaboradores(file);
+      const encontrados = response.colaboradores_encontrados || response.colaboradores || (Array.isArray(response) ? response : []);
+      const no_encontrados = response.colaboradores_no_encontrados || [];
+
+      // Separar los que ya están en la lista para no duplicar
+      const currentIds = new Set(colaboradoresIds);
+      const nuevos = (encontrados || []).filter((c: any) => !currentIds.has(c.id));
+      const yaExistentes = (encontrados || []).filter((c: any) => currentIds.has(c.id));
+
+      const partes: string[] = [];
+      if (nuevos.length > 0) partes.push(`${nuevos.length} colaborador(es) agregado(s) exitosamente`);
+      if (yaExistentes.length > 0) partes.push(`${yaExistentes.length} ya estaba(n) en la lista y fueron omitido(s)`);
+      if (partes.length === 0) partes.push('No se encontraron colaboradores nuevos para agregar');
+      setCsvAdicionarInfo(partes.join(' · '));
+
+      if (no_encontrados.length > 0) {
+        setCsvAdicionarWarnings(`${no_encontrados.length} cédula(s) no encontrada(s) en el sistema: ${no_encontrados.join(', ')}`);
+      }
+
+      if (nuevos.length > 0) {
+        setColaboradores((prev: any[]) => [...prev, ...nuevos]);
+        setColaboradoresIds((prev: number[]) => [...prev, ...nuevos.map((c: any) => c.id as number)]);
+      }
+    } catch (err: any) {
+      const message = err.response?.data?.error || err.response?.data?.message || err.message || 'Error desconocido';
+      setError(message);
     } finally {
       setLoading(false);
       try { (e.target as HTMLInputElement).value = ''; } catch {}
@@ -149,12 +195,38 @@ export default function EditarColaboradores() {
             Subir CSV
             <input
               type="file"
-              accept=".csv, .xlsx"
+              accept=".csv"
               onChange={handleCsvUpload}
               style={{ display: "none" }}
             />
           </label>
         </div>
+
+        <div className={styles.csvSection} style={{ marginTop: "16px", borderTop: "1px solid #e0e0e0", paddingTop: "16px" }}>
+          <span style={{ fontWeight: 500, color: "#555", fontSize: "0.95em" }}>
+            Agregar colaboradores adicionales (sin quitar los existentes):
+          </span>
+          <label className={styles.btnSubirCsv} style={{ marginLeft: "10px" }}>
+            Agregar desde CSV
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleCsvAdicionar}
+              style={{ display: "none" }}
+            />
+          </label>
+        </div>
+
+        {csvAdicionarInfo && (
+          <p style={{ color: "#2e7d32", marginTop: "8px", fontSize: "0.9em", fontWeight: 500 }}>
+            {csvAdicionarInfo}
+          </p>
+        )}
+        {csvAdicionarWarnings && (
+          <p className={styles.error} style={{ marginTop: "4px", fontSize: "0.9em" }}>
+            {csvAdicionarWarnings}
+          </p>
+        )}
 
         {loading && <p className={styles.loading}>Cargando...</p>}
         {error && <p className={styles.error}>{error}</p>}
@@ -177,7 +249,7 @@ export default function EditarColaboradores() {
               </thead>
               <tbody>
                 {colaboradores.map((colab, index) => (
-                  <tr key={colab.id}>
+                  <tr key={`${colab.id}-${index}`}>
                     <td>{index + 1}</td>
                     <td><strong>{colab.nombre || "N/A"}</strong></td>
                     <td>{colab.apellido || "N/A"}</td>

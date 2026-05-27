@@ -8,7 +8,7 @@ interface Examen {
   nombre: string;
 }
 
-type TipoExamen = "INGRESO" | "PERIODICO" | "RETIRO";
+type TipoExamen = "INGRESO" | "PERIODICO" | "RETIRO" | "ESPECIAL" | "POST_INCAPACIDAD" | "ALTURAS";
 
 type ExamenesPorTipo = Partial<Record<TipoExamen, Examen[]>>;
 
@@ -69,17 +69,36 @@ export default function Examenes() {
   const [selectedProyecto, setSelectedProyecto] = useState<number | null>(null);
   const [selectedCentro, setSelectedCentro] = useState<number | null>(null);
   
+  // Estados para solicitante extra (selector de colaborador)
+  const [colaboradores, setColaboradores] = useState<{id: number; nombre: string; correo: string}[]>([]);
+  const [solicitanteExtraId, setSolicitanteExtraId] = useState<number | null>(null);
+  const [colaboradorSearch, setColaboradorSearch] = useState("");
+  const [showColaboradorDropdown, setShowColaboradorDropdown] = useState(false);
+
   // Estados para envío masivo
   const [showMasivoModal, setShowMasivoModal] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [sendingMasivo, setSendingMasivo] = useState(false);
   const [masivoError, setMasivoError] = useState<string | null>(null);
   const [masivoResult, setMasivoResult] = useState<any>(null);
+  const [masivoSolicitanteExtraId, setMasivoSolicitanteExtraId] = useState<number | null>(null);
+  const [masivoColaboradorSearch, setMasivoColaboradorSearch] = useState("");
+  const [showMasivoColaboradorDropdown, setShowMasivoColaboradorDropdown] = useState(false);
 
   // Load initial data
   useEffect(() => {
     loadInitialData();
+    loadColaboradores();
   }, []);
+
+  const loadColaboradores = async () => {
+    try {
+      const data = await ExamenesService.ObtenerTodosColaboradores();
+      setColaboradores(data.colaboradores || []);
+    } catch (err) {
+      console.error("Error cargando colaboradores:", err);
+    }
+  };
 
   // Update exámenes cuando se selecciona empresa o cargo
   useEffect(() => {
@@ -178,6 +197,7 @@ export default function Examenes() {
         centro_id: selectedCentro,
         tipo_examen: selectedTipoExamen,
         examenes_ids: examenesSeleccionados.map((ex) => ex.id),
+        solicitante_extra_id: solicitanteExtraId || undefined,
       };
 
       await ExamenesService.EnviarCorreo(payload);
@@ -195,6 +215,8 @@ export default function Examenes() {
       setSelectedUnidad(null);
       setSelectedProyecto(null);
       setSelectedCentro(null);
+      setSolicitanteExtraId(null);
+      setColaboradorSearch("");
 
       alert("Correo enviado exitosamente");
     } catch (err: any) {
@@ -225,6 +247,8 @@ export default function Examenes() {
     setCsvFile(null);
     setMasivoError(null);
     setMasivoResult(null);
+    setMasivoSolicitanteExtraId(null);
+    setMasivoColaboradorSearch("");
     setShowMasivoModal(true);
   };
 
@@ -268,9 +292,11 @@ export default function Examenes() {
       setMasivoError(null);
       setMasivoResult(null);
 
-      const result = await ExamenesService.EnviarCorreoMasivo(csvFile);
+      const result = await ExamenesService.EnviarCorreoMasivo(csvFile, masivoSolicitanteExtraId || undefined);
       setMasivoResult(result);
       setCsvFile(null);
+      setMasivoColaboradorSearch("");
+      setMasivoSolicitanteExtraId(null);
       
       if (result.total_trabajadores > 0) {
       }
@@ -445,6 +471,7 @@ export default function Examenes() {
                 <option value="RETIRO">RETIRO</option>
                 <option value="ESPECIAL">ESPECIAL</option>
                 <option value="POST_INCAPACIDAD">POST INCAPACIDAD</option>
+                <option value="ALTURAS">ALTURAS</option>
             </select>
           </div>
 
@@ -507,7 +534,12 @@ export default function Examenes() {
                 type="text"
                 placeholder="Ej: Juan Pérez Gómez"
                 value={formData.nombre_trabajador}
-                onChange={(e) => setFormData({ ...formData, nombre_trabajador: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Solo permitir letras (incluyendo acentos) y espacios
+                  const filtered = value.replace(/[^a-záéíóúñüA-ZÁÉÍÓÚÑÜ\s]/g, "");
+                  setFormData({ ...formData, nombre_trabajador: filtered });
+                }}
                 disabled={sending}
                 required
               />
@@ -519,7 +551,12 @@ export default function Examenes() {
                 type="text"
                 placeholder="Ej: 1234567890"
                 value={formData.documento_trabajador}
-                onChange={(e) => setFormData({ ...formData, documento_trabajador: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  // Solo permitir números
+                  const filtered = value.replace(/[^0-9]/g, "");
+                  setFormData({ ...formData, documento_trabajador: filtered });
+                }}
                 disabled={sending}
                 required
               />
@@ -535,6 +572,57 @@ export default function Examenes() {
               />
             </div>
 
+            <div className={styles.colaboradorWrapper}>
+              <label>Correo Solicitante Extra (Opcional)</label>
+              <input
+                type="text"
+                className={styles.colaboradorInput}
+                placeholder="Buscar colaborador por nombre..."
+                value={colaboradorSearch}
+                onChange={(e) => {
+                  setColaboradorSearch(e.target.value);
+                  setShowColaboradorDropdown(true);
+                  if (!e.target.value) {
+                    setSolicitanteExtraId(null);
+                  }
+                }}
+                onFocus={() => setShowColaboradorDropdown(true)}
+                disabled={sending}
+              />
+              {showColaboradorDropdown && colaboradorSearch && (
+                <div className={styles.colaboradorDropdown}>
+                  {colaboradores
+                    .filter(c => c.nombre.toLowerCase().includes(colaboradorSearch.toLowerCase()))
+                    .slice(0, 15)
+                    .map(c => (
+                      <div
+                        key={c.id}
+                        className={styles.colaboradorItem}
+                        onMouseDown={() => {
+                          setSolicitanteExtraId(c.id);
+                          setColaboradorSearch(c.nombre);
+                          setShowColaboradorDropdown(false);
+                        }}
+                      >
+                        <strong>{c.nombre}</strong>
+                      </div>
+                    ))}
+                  {colaboradores.filter(c => c.nombre.toLowerCase().includes(colaboradorSearch.toLowerCase())).length === 0 && (
+                    <div className={styles.colaboradorEmpty}>No se encontraron colaboradores</div>
+                  )}
+                </div>
+              )}
+              {solicitanteExtraId && (
+                <button
+                  type="button"
+                  className={styles.removeColaboradorButton}
+                  onClick={() => { setSolicitanteExtraId(null); setColaboradorSearch(""); }}
+                >
+                  ✕ Quitar solicitante extra
+                </button>
+              )}
+            </div>
+
             {/* Correo destino oculto: el backend se encarga de los destinatarios */}
 
 
@@ -542,7 +630,17 @@ export default function Examenes() {
             <button
               type="submit"
               className={styles.submitButton}
-              disabled={sending || !selectedCargo || !selectedTipoExamen || examenesSeleccionados.length === 0}
+              disabled={
+                sending ||
+                !selectedEmpresa ||
+                !selectedCargo ||
+                !selectedTipoExamen ||
+                !selectedCentro ||
+                !formData.nombre_trabajador.trim() ||
+                !formData.documento_trabajador.trim() ||
+                !formData.ciudad.trim() ||
+                examenesSeleccionados.length === 0
+              }
             >
               {sending ? "Enviando..." : "Enviar Exámenes por Correo"}
             </button>
@@ -601,10 +699,61 @@ export default function Examenes() {
                 )}
               </div>
 
+              <div className={styles.colaboradorWrapper}>
+                <label>Correo Solicitante Extra (Opcional)</label>
+                <input
+                  type="text"
+                  className={styles.colaboradorInput}
+                  placeholder="Buscar colaborador por nombre..."
+                  value={masivoColaboradorSearch}
+                  onChange={(e) => {
+                    setMasivoColaboradorSearch(e.target.value);
+                    setShowMasivoColaboradorDropdown(true);
+                    if (!e.target.value) {
+                      setMasivoSolicitanteExtraId(null);
+                    }
+                  }}
+                  onFocus={() => setShowMasivoColaboradorDropdown(true)}
+                  disabled={sendingMasivo}
+                />
+                {showMasivoColaboradorDropdown && masivoColaboradorSearch && (
+                  <div className={styles.colaboradorDropdown}>
+                    {colaboradores
+                      .filter(c => c.nombre.toLowerCase().includes(masivoColaboradorSearch.toLowerCase()))
+                      .slice(0, 15)
+                      .map(c => (
+                        <div
+                          key={c.id}
+                          className={styles.colaboradorItem}
+                          onMouseDown={() => {
+                            setMasivoSolicitanteExtraId(c.id);
+                            setMasivoColaboradorSearch(c.nombre);
+                            setShowMasivoColaboradorDropdown(false);
+                          }}
+                        >
+                          <strong>{c.nombre}</strong>
+                        </div>
+                      ))}
+                    {colaboradores.filter(c => c.nombre.toLowerCase().includes(masivoColaboradorSearch.toLowerCase())).length === 0 && (
+                      <div className={styles.colaboradorEmpty}>No se encontraron colaboradores</div>
+                    )}
+                  </div>
+                )}
+                {masivoSolicitanteExtraId && (
+                  <button
+                    type="button"
+                    className={styles.removeColaboradorButton}
+                    onClick={() => { setMasivoSolicitanteExtraId(null); setMasivoColaboradorSearch(""); }}
+                  >
+                    ✕ Quitar solicitante extra
+                  </button>
+                )}
+              </div>
+
               <div className={styles.formInfo}>
                 <p><strong>Formato requerido del CSV:</strong></p>
                 <p>• Archivo delimitado por comas (,)</p>
-                <p>• Los tipos se examenes son: INGRESO", "PERIODICO", "RETIRO", "ESPECIAL", "POST_INCAPACIDAD"</p>
+                <p>• Los tipos de exámenes son: INGRESO, PERIODICO, RETIRO, ESPECIAL, POST_INCAPACIDAD, ALTURAS</p>
                 <p>• Debe contener las columnas necesarias según lo definido por el backend</p>
                 <p>• Codificación recomendada: UTF-8</p>
               </div>

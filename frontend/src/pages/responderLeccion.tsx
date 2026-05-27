@@ -1,4 +1,4 @@
-    import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import styles from "./Styles/responderLeccion.module.css";
 import CapListService from "../services/Capacitaciones";
@@ -48,6 +48,12 @@ export default function ResponderLeccion() {
   const [respuestasSeleccionadas, setRespuestasSeleccionadas] = useState<{
     [key: number]: number | number[];
   }>({});
+
+  // Respuestas abiertas: { preguntaId: texto } para preguntas de tipo abierta
+  const [respuestasAbiertas, setRespuestasAbiertas] = useState<{
+    [key: number]: string;
+  }>({});
+  const [preguntasInvalidas, setPreguntasInvalidas] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     loadCapacitacion();
@@ -113,7 +119,7 @@ export default function ResponderLeccion() {
     // Asegurar que los IDs sean números para comparaciones estrictas
     const pId = Number(preguntaId);
     const rId = Number(respuestaId);
-    setRespuestasSeleccionadas((prev) => {
+    setRespuestasSeleccionadas((prev: { [key: number]: number | number[] }) => {
       // crear copia superficial del objeto de estado
       const nuevas: { [key: number]: number | number[] } = { ...prev };
 
@@ -152,6 +158,18 @@ export default function ResponderLeccion() {
     });
   };
 
+  const isAbiertaTipo = (tipo: string) => {
+    if (!tipo) return false;
+    const normalizado = tipo
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, "")
+      .replace(/\s+/g, "_")
+      .trim();
+    return /abierta|open|libre|texto/.test(normalizado);
+  };
+
   const enviarRespuestas = async () => {
     try {
       setSubmitting(true);
@@ -162,9 +180,32 @@ export default function ResponderLeccion() {
         return;
       }
 
-      // Construir array de IDs de respuestas
+      // Validar que todas las preguntas tengan respuesta
+      const invalidas = new Set<number>();
+      for (const pregunta of leccion.preguntas || []) {
+        const pId = Number(pregunta.id);
+        if (isAbiertaTipo(pregunta.tipo_pregunta)) {
+          if (!(respuestasAbiertas[pId] || "").trim()) invalidas.add(pId);
+        } else {
+          const sel = respuestasSeleccionadas[pId];
+          if (!sel || (Array.isArray(sel) && sel.length === 0)) invalidas.add(pId);
+        }
+      }
+      if (invalidas.size > 0) {
+        setPreguntasInvalidas(invalidas);
+        setError("Por favor responde todas las preguntas marcadas en rojo.");
+        // Scroll a la primera pregunta inválida
+        const primerInvalido = (leccion.preguntas || []).find((p: any) => invalidas.has(Number(p.id)));
+        if (primerInvalido) {
+          document.getElementById(`pregunta-${primerInvalido.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        return;
+      }
+      setPreguntasInvalidas(new Set());
+
+      // Construir array de IDs de respuestas (cerradas)
       const respuestas: number[] = [];
-      Object.values(respuestasSeleccionadas).forEach((val) => {
+      Object.values(respuestasSeleccionadas).forEach((val: any) => {
         if (Array.isArray(val)) {
           respuestas.push(...val);
         } else {
@@ -172,14 +213,18 @@ export default function ResponderLeccion() {
         }
       });
 
-      if (respuestas.length === 0) {
-        setError("Por favor selecciona al menos una respuesta");
-        return;
+      // Construir textos de respuestas abiertas
+      const textosAbiertos: { [key: string]: string } = {};
+      for (const pregunta of leccion.preguntas || []) {
+        if (!isAbiertaTipo(pregunta.tipo_pregunta)) continue;
+        const pId = Number(pregunta.id);
+        textosAbiertos[String(pId)] = (respuestasAbiertas[pId] || "").trim();
       }
 
       // Llamar servicio para enviar respuestas
       const payload = {
-        respuestas: respuestas,
+        respuestas,
+        respuestas_abiertas: textosAbiertos,
       };
 
       await (CapListService as any).enviarRespuestasFormulario(
@@ -207,21 +252,7 @@ export default function ResponderLeccion() {
     );
   }
 
-  if (error) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.errorBox}>
-          <p className={styles.error}>Error: {error}</p>
-          <button
-            className={styles.btnBack}
-            onClick={() => navigate(`/capacitaciones/${capacitacionId}`)}
-          >
-            ← Volver a la capacitación
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // El error de validación se muestra dentro del formulario, no como pantalla completa
 
   if (
     !leccion ||
@@ -272,6 +303,11 @@ export default function ResponderLeccion() {
     return respuestasCorrectas > 1;
   });
 
+  const preguntasAbiertas = leccion.preguntas.map((p: Pregunta) => {
+    const tipo = normalizeType((p.tipo_pregunta || "").toString());
+    return /abierta|open|libre|texto/.test(tipo);
+  });
+
   // Calcular la altura mínima de respuesta para cada pregunta basada en el texto más largo
   const calculateMinHeightPerQuestion = (preguntas: Pregunta[]) => {
     const minHeights: { [key: number]: number } = {};
@@ -316,17 +352,30 @@ export default function ResponderLeccion() {
         >
           {leccion.preguntas.map((pregunta, preguntaIdx) => {
             const esMultiple = preguntasMultiples[preguntaIdx];
+            const esAbierta = preguntasAbiertas[preguntaIdx];
             const pIdNum = Number(pregunta.id);
             const respuestasSeleccionadasPregunta =
               respuestasSeleccionadas[pIdNum];
 
+            const esInvalida = preguntasInvalidas.has(pIdNum);
+
             return (
-              <div key={pregunta.id} className={styles.preguntaCard}>
+              <div
+                key={pregunta.id}
+                id={`pregunta-${pregunta.id}`}
+                className={styles.preguntaCard}
+                style={esInvalida ? { border: "2px solid #C0281B", borderRadius: 8 } : undefined}
+              >
                 <div className={styles.preguntaHeader}>
                   <div className={styles.questionLabel}>
                     pregunta {preguntaIdx + 1}.
                   </div>
-                  {esMultiple && (
+                  {esAbierta && (
+                    <span className={styles.badge}>
+                      Respuesta abierta
+                    </span>
+                  )}
+                  {!esAbierta && esMultiple && (
                     <span className={styles.badge}>
                       Selecciona múltiples
                     </span>
@@ -356,103 +405,125 @@ export default function ResponderLeccion() {
                   {pregunta.pregunta}
                 </div>
 
-                <div
-                  className={styles.answersList}
-                  style={{
-                    minHeight: `${
-                      minHeightsPorPregunta[pregunta.id]
-                    }px`,
-                  }}
-                >
-                  {pregunta.respuestas.map(
-                    (respuesta, respIdx) => {
-                      const rIdNum = Number(respuesta.id);
-                      let isSelected = false;
-                      if (
-                        Array.isArray(
-                          respuestasSeleccionadasPregunta
-                        )
-                      ) {
-                        isSelected = (
-                          respuestasSeleccionadasPregunta as number[]
-                        ).includes(rIdNum);
-                      } else {
-                        isSelected =
-                          respuestasSeleccionadasPregunta === rIdNum;
-                      }
+                {esAbierta ? (
+                  <>
+                    <textarea
+                      className={styles.textareaAbierta}
+                      placeholder="Escribe tu respuesta aquí..."
+                      value={respuestasAbiertas[pIdNum] || ""}
+                      onChange={(e) => {
+                        setRespuestasAbiertas((prev) => ({ ...prev, [pIdNum]: e.target.value }));
+                        if (e.target.value.trim()) setPreguntasInvalidas(prev => { const s = new Set(prev); s.delete(pIdNum); return s; });
+                      }}
+                      rows={5}
+                      required
+                    />
+                    {esInvalida && <span style={{ color: "#C0281B", fontSize: 13, marginTop: 4, display: "block" }}>Este campo es obligatorio.</span>}
+                  </>
+                ) : (
+                  <>
+                  {esInvalida && <span style={{ color: "#C0281B", fontSize: 13, marginBottom: 6, display: "block" }}>Debes seleccionar al menos una opción.</span>}
+                  <div
+                    className={styles.answersList}
+                    style={{
+                      minHeight: `${
+                        minHeightsPorPregunta[pregunta.id]
+                      }px`,
+                    }}
+                  >
+                    {pregunta.respuestas.map(
+                      (respuesta, respIdx) => {
+                        const rIdNum = Number(respuesta.id);
+                        let isSelected = false;
+                        if (
+                          Array.isArray(
+                            respuestasSeleccionadasPregunta
+                          )
+                        ) {
+                          isSelected = (
+                            respuestasSeleccionadasPregunta as number[]
+                          ).includes(rIdNum);
+                        } else {
+                          isSelected =
+                            respuestasSeleccionadasPregunta === rIdNum;
+                        }
 
-                      return (
-                        <div
-                          key={respuesta.id}
-                          className={styles.respuestaItem}
-                        >
-                          <div className={styles.respuestaCard}>
-                            {normalizeImageSrc(
-                              respuesta.url_archivo
-                            ) && (
-                              <div
-                                className={
-                                  styles.respuestaMediaTop
-                                }
-                              >
-                                <img
-                                  src={
-                                    normalizeImageSrc(
-                                      respuesta.url_archivo
-                                    ) as string
-                                  }
-                                  alt={`Respuesta ${
-                                    respIdx + 1
-                                  }`}
+                        return (
+                          <div
+                            key={respuesta.id}
+                            className={styles.respuestaItem}
+                          >
+                            <div className={styles.respuestaCard}>
+                              {normalizeImageSrc(
+                                respuesta.url_archivo
+                              ) && (
+                                <div
                                   className={
-                                    styles.respuestaImage
+                                    styles.respuestaMediaTop
                                   }
-                                  onError={(e) => {
-                                    (
-                                      e.currentTarget as HTMLImageElement
-                                    ).style.display = "none";
+                                >
+                                  <img
+                                    src={
+                                      normalizeImageSrc(
+                                        respuesta.url_archivo
+                                      ) as string
+                                    }
+                                    alt={`Respuesta ${
+                                      respIdx + 1
+                                    }`}
+                                    className={
+                                      styles.respuestaImage
+                                    }
+                                    onError={(e) => {
+                                      (
+                                        e.currentTarget as HTMLImageElement
+                                      ).style.display = "none";
+                                    }}
+                                  />
+                                </div>
+                              )}
+                              <div className={styles.answerRow}>
+                                <button
+                                  type="button"
+                                  className={
+                                    styles.selector +
+                                    " " +
+                                    (esMultiple
+                                      ? styles.square
+                                      : styles.circle) +
+                                    (isSelected
+                                      ? " " + styles.selected
+                                      : "")
+                                  }
+                                  onClick={() => {
+                                    handleRespuestaChange(pIdNum, rIdNum, esMultiple);
+                                    setPreguntasInvalidas(prev => { const s = new Set(prev); s.delete(pIdNum); return s; });
                                   }}
+                                  aria-pressed={isSelected}
                                 />
-                              </div>
-                            )}
-                            <div className={styles.answerRow}>
-                              <button
-                                type="button"
-                                className={
-                                  styles.selector +
-                                  " " +
-                                  (esMultiple
-                                    ? styles.square
-                                    : styles.circle) +
-                                  (isSelected
-                                    ? " " + styles.selected
-                                    : "")
-                                }
-                                onClick={() =>
-                                  handleRespuestaChange(
-                                    pIdNum,
-                                    rIdNum,
-                                    esMultiple
-                                  )
-                                }
-                                aria-pressed={isSelected}
-                              />
-                              <div
-                                className={styles.answerField}
-                              >
-                                {respuesta.valor}
+                                <div
+                                  className={styles.answerField}
+                                >
+                                  {respuesta.valor}
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    }
-                  )}
-                </div>
+                        );
+                      }
+                    )}
+                  </div>
+                  </>
+                )}
               </div>
             );
           })}
 
+          {error && (
+            <div style={{ background: "#fee", border: "1px solid #C0281B", borderRadius: 6, padding: "10px 16px", marginBottom: 16, color: "#C0281B", fontWeight: 500 }}>
+              {error}
+            </div>
+          )}
           <div className={styles.formActions}>
             <button
               type="button"

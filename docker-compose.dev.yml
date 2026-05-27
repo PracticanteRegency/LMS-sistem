@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   backend:
     build: ./backend
@@ -12,8 +10,8 @@ services:
     environment:
       - DB_ENGINE=django.db.backends.mysql
       - DB_NAME=formularios
-      - DB_USER=root
-      - DB_PASSWORD=form@cionGH2026*
+      - DB_USER=lms_user
+      - DB_PASSWORD=lms_form@cionGH2026*
       - DB_HOST=mysql
       - DB_PORT=3306
       - REDIS_HOST=redis
@@ -107,4 +105,4 @@ volumes:
 
 networks:
   shared_net:
-    external: false
+    external: true

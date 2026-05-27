@@ -31,6 +31,7 @@ class Lecciones(models.Model):
     tituloleccion = models.CharField(db_column='tituloLeccion', max_length=150)
     tipoleccion = models.CharField(db_column='tipoLeccion', max_length=150)
     url = models.TextField(db_column='URL')
+    duracion = models.CharField(max_length=20, blank=True, null=True)
     idmodulo = models.ForeignKey(Modulos, models.DO_NOTHING, db_column='idModulo')
 
     class Meta:
@@ -71,6 +72,7 @@ class progresoCapacitaciones(models.Model):
     class Meta:
         managed = False
         db_table = 'capacitaciones_colaboradores'
+        unique_together = (('capacitacion', 'colaborador'),)
 
 
 class progresolecciones(models.Model):
@@ -103,6 +105,7 @@ class RespuestasColaboradores(models.Model):
     idcolaborador = models.ForeignKey('usuarios.Colaboradores', models.DO_NOTHING, db_column='idColaborador')
     idpregunta = models.ForeignKey(PreguntasLecciones, models.DO_NOTHING, db_column='idPregunta')
     idrespuesta = models.ForeignKey(Respuestas, models.DO_NOTHING, db_column='idRespuesta')
+    texto_respuesta = models.TextField(null=True, blank=True)
 
     class Meta:
         managed = False

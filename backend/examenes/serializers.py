@@ -21,7 +21,8 @@ class CrearExamenSerializer(serializers.Serializer):
                 ("PERIODICO", "Examen Periódico"),
                 ("RETIRO", "Examen de Retiro"),
                 ("ESPECIAL", "Examen Especial"),
-                ("POST_INCAPACIDAD", "Examen Post-Incapacidad")
+                ("POST_INCAPACIDAD", "Examen Post-Incapacidad"),
+                ("ALTURAS", "Examen con énfasis en alturas")
             ]
         ),
         allow_empty=False,
@@ -79,7 +80,8 @@ class EmpresaConCargosSerializer(serializers.Serializer):
                 'PERIODICO': [],
                 'RETIRO': [],
                 'ESPECIAL': [],
-                'POST_INCAPACIDAD': []
+                'POST_INCAPACIDAD': [],
+                'ALTURAS': []
             }
 
             for ec in examenes:
@@ -120,8 +122,8 @@ class EnviarCorreoSerializer(serializers.Serializer):
         help_text="ID del cargo del trabajador"
     )
     tipo_examen = serializers.ChoiceField(
-        choices=['INGRESO', 'PERIODICO', 'RETIRO', 'ESPECIAL', 'POST_INCAPACIDAD'],
-        help_text="Tipo de examen: INGRESO, PERIODICO, RETIRO, ESPECIAL o POST_INCAPACIDAD"
+        choices=['INGRESO', 'PERIODICO', 'RETIRO', 'ESPECIAL', 'POST_INCAPACIDAD', 'ALTURAS'],
+        help_text="Tipo de examen: INGRESO, PERIODICO, RETIRO, ESPECIAL, POST_INCAPACIDAD o ALTURAS"
     )
     examenes_ids = serializers.ListField(
         child=serializers.IntegerField(),
@@ -132,12 +134,15 @@ class EnviarCorreoSerializer(serializers.Serializer):
     documento_trabajador = serializers.CharField(max_length=50)
     correo_destino = serializers.EmailField(required=False, allow_blank=True)
     ciudad = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    solicitante_extra_id = serializers.IntegerField(required=False, allow_null=True, help_text="ID del colaborador extra a incluir como solicitante en el envío")
 
 
 class ReporteCorreoSerializer(serializers.ModelSerializer):
     """Serializer para listar correos enviados en el reporte"""
     enviado_por_nombre = serializers.SerializerMethodField()
     trabajadores_count = serializers.SerializerMethodField()
+    trabajadores_ids = serializers.SerializerMethodField()
+    estado_nombre = serializers.SerializerMethodField()
 
     class Meta:
         model = CorreoExamenEnviado
@@ -148,16 +153,37 @@ class ReporteCorreoSerializer(serializers.ModelSerializer):
             'fecha_envio',
             'enviado_por_nombre',
             'trabajadores_count',
+            'trabajadores_ids',
+            'estado_nombre',
             'enviado_correctamente']
         read_only_fields = fields
 
     def get_enviado_por_nombre(self, obj):
         # Ajuste a nombre del campo real en Colaboradores
-        return obj.enviado_por.nombrecolaborador if obj.enviado_por else "N/A"
+        if obj.enviado_por:
+            return f"{obj.enviado_por.nombrecolaborador} {obj.enviado_por.apellidocolaborador}"
+        return "N/A"
 
     def get_trabajadores_count(self, obj):
         """Cantidad de trabajadores en este correo"""
-        return obj.registros_examenes.count() if hasattr(obj, 'registros_examenes') else 0
+        return obj.trabajadores.count()
+
+    def get_trabajadores_ids(self, obj):
+        """Lista de trabajadores con id, nombre y estado"""
+        return list(obj.trabajadores.values('id', 'nombre_trabajador', 'estado_trabajador'))
+
+    def get_estado_nombre(self, obj):
+        """Estado general del correo basado en el estado de sus trabajadores.
+        Si todos los trabajadores están completados -> 'Completado'
+        Si no hay trabajadores -> 'Sin trabajadores'
+        Si alguno está pendiente -> 'No Completado'
+        """
+        trabajadores = obj.trabajadores.all()
+        if not trabajadores.exists():
+            return 'Sin trabajadores'
+        if trabajadores.filter(estado_trabajador=0).exists():
+            return 'No Completado'
+        return 'Completado'
 
 
 class DetalleCorreoSerializer(serializers.ModelSerializer):
@@ -174,7 +200,9 @@ class DetalleCorreoSerializer(serializers.ModelSerializer):
 
     def get_enviado_por_nombre(self, obj):
         # Ajuste a nombre del campo real en Colaboradores
-        return obj.enviado_por.nombrecolaborador if obj.enviado_por else "N/A"
+        if obj.enviado_por:
+            return f"{obj.enviado_por.nombrecolaborador} {obj.enviado_por.apellidocolaborador}"
+        return "N/A"
 
 
 class RegistroExamenesSerializer(serializers.ModelSerializer):
@@ -279,6 +307,7 @@ class EnviarCorreoMasivoSerializer(serializers.Serializer):
             "Si es True, adjunta un Excel con el detalle"
         )
     )
+    solicitante_extra_id = serializers.IntegerField(required=False, allow_null=True, help_text="ID del colaborador extra a incluir como solicitante en el envío masivo")
 
     def validate_archivo_csv(self, file):
         """Valida que el archivo sea CSV"""
@@ -317,8 +346,7 @@ class DetalleCorreoMasivoSerializer(serializers.ModelSerializer):
     """Serializer para ver detalle de un envío masivo con sus trabajadores"""
     trabajadores = RegistroExamenesSerializer(many=True, read_only=True)
     estado = serializers.SerializerMethodField()
-    enviado_por_nombre = serializers.CharField(
-        source='enviado_por.nombrecolaborador', read_only=True)
+    enviado_por_nombre = serializers.SerializerMethodField()
 
     class Meta:
         model = CorreoExamenEnviado
@@ -338,6 +366,12 @@ class DetalleCorreoMasivoSerializer(serializers.ModelSerializer):
 
     def get_estado(self, obj):
         return "Enviado" if obj.enviado_correctamente else "Pendiente"
+
+    def get_enviado_por_nombre(self, obj):
+        # Incluye nombre y apellido del colaborador que envió el correo
+        if obj.enviado_por:
+            return f"{obj.enviado_por.nombrecolaborador} {obj.enviado_por.apellidocolaborador}"
+        return "N/A"
 
 
 class ActualizarEstadoTrabajadorSerializer(serializers.ModelSerializer):
@@ -468,8 +502,9 @@ class ReporteCorreoDetalladoSerializer(serializers.ModelSerializer):
         ]
     
     def get_enviado_por_nombre(self, obj):
-        return obj.enviado_por.nombrecolaborador if obj.enviado_por else "N/A"
-    
+        if obj.enviado_por:
+            return f"{obj.enviado_por.nombrecolaborador} {obj.enviado_por.apellidocolaborador}"
+        return "N/A"
     def get_trabajadores_count(self, obj):
         return obj.registros_examenes.count()
     

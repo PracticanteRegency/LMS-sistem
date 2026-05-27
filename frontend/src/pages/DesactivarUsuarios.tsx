@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import CapListService from "../services/Capacitaciones.js";
 import Perfil from "../services/perfil.js";
 import styles from "./Styles/CrearCapacitacion.module.css";
+import FileUploadError from "../components/FileUploadError";
 
 export default function DesactivarUsuarios() {
   const navigate = useNavigate();
@@ -13,7 +14,7 @@ export default function DesactivarUsuarios() {
   const [success, setSuccess] = useState<string | null>(null);
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [usuariosIds, setUsuariosIds] = useState<number[]>([]);
-  const [csvWarnings, setCsvWarnings] = useState<string | null>(null);
+  const [fileUploadError, setFileUploadError] = useState<{ message: string; type: 'error' | 'success' | 'warning' } | null>(null);
 
   // Cargar usuarios desde CSV
   const handleCsvUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -24,21 +25,23 @@ export default function DesactivarUsuarios() {
       setLoading(true);
       setError(null);
       setSuccess(null);
-      setCsvWarnings(null);
+      setFileUploadError(null);
 
       const response: any = await CapListService.cargarColaboradores(file);
       const encontrados = response.colaboradores_encontrados || response.colaboradores || (Array.isArray(response) ? response : []);
-      const no_encontrados = response.colaboradores_no_encontrados || [];
-
-      if (no_encontrados && no_encontrados.length) {
-        setCsvWarnings(`Advertencia: ${no_encontrados.length} colaboradores no encontrados: ${no_encontrados.join(', ')}`);
-      }
 
       setUsuarios(encontrados || []);
       setUsuariosIds((encontrados || []).map((c: any) => c.id));
+
     } catch (err: any) {
       console.error('Error al procesar CSV:', err);
-      setError(err?.message || 'Error al procesar el archivo CSV');
+      
+      // Mostrar solo lo que el backend responde
+      const message = err.response?.data?.error || err.response?.data?.message || err.message || 'Error desconocido';
+      setFileUploadError({
+        message,
+        type: 'error'
+      });
     } finally {
       setLoading(false);
       try { (e.target as HTMLInputElement).value = ''; } catch {}
@@ -79,7 +82,6 @@ export default function DesactivarUsuarios() {
       setTimeout(() => {
         setUsuarios([]);
         setUsuariosIds([]);
-        setCsvWarnings(null);
       }, 2000);
 
     } catch (err: any) {
@@ -116,7 +118,6 @@ export default function DesactivarUsuarios() {
       setTimeout(() => {
         setUsuarios([]);
         setUsuariosIds([]);
-        setCsvWarnings(null);
       }, 2000);
 
     } catch (err: any) {
@@ -173,7 +174,7 @@ export default function DesactivarUsuarios() {
             📁 Subir CSV
             <input
               type="file"
-              accept=".csv, .xlsx"
+              accept=".csv"
               onChange={handleCsvUpload}
               disabled={loading}
               style={{ display: "none" }}
@@ -186,7 +187,15 @@ export default function DesactivarUsuarios() {
         {success && <p className={styles.successMessage}>
           {success}
         </p>}
-        {csvWarnings && <p className={styles.error}>⚠️ {csvWarnings}</p>}
+
+        {/* Componente mejorado para mostrar errores/advertencias de carga de archivos */}
+        {fileUploadError && (
+          <FileUploadError
+            error={fileUploadError.type === 'error' ? fileUploadError.message : null}
+            type={fileUploadError.type}
+            onClose={() => setFileUploadError(null)}
+          />
+        )}
 
         {usuarios.length > 0 && (
           <div className={styles.colaboradoresTable}>
@@ -207,7 +216,7 @@ export default function DesactivarUsuarios() {
               </thead>
               <tbody>
                 {usuarios.map((usuario, index) => (
-                  <tr key={usuario.id}>
+                  <tr key={`${usuario.id}-${index}`}>
                     <td>{index + 1}</td>
                     <td><strong>{usuario.nombre || "N/A"}</strong></td>
                     <td>{usuario.apellido || "N/A"}</td>

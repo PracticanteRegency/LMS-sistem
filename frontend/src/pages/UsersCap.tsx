@@ -23,6 +23,7 @@ export default function UsersCap() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [downloadingReport, setDownloadingReport] = useState(false);
+  const [showReportOptions, setShowReportOptions] = useState(false);
   const pageSize = 20;
   const [filterCompleted, setFilterCompleted] = useState<'all'|'yes'|'no'>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -59,7 +60,24 @@ export default function UsersCap() {
         return;
       }
       const data: any = await CapListService.GetUsersCapacitacion(id);
-      setUsers(data.results || []);
+      let users = data.results || [];
+      
+      // Detectar y filtrar IDs duplicados (protección adicional)
+      const seenIds = new Set();
+      const uniqueUsers = users.filter((u: UserCap) => {
+        if (seenIds.has(u.id)) {
+          console.warn(`⚠️ Usuario duplicado detectado - ID: ${u.id}, Nombre: ${u.nombre}`);
+          return false;
+        }
+        seenIds.add(u.id);
+        return true;
+      });
+      
+      if (users.length !== uniqueUsers.length) {
+        console.warn(`⚠️ Se encontraron ${users.length - uniqueUsers.length} usuarios duplicados y fueron removidos`);
+      }
+      
+      setUsers(uniqueUsers);
     } catch (err: any) {
       setError("Error al cargar usuarios");
     } finally {
@@ -67,7 +85,7 @@ export default function UsersCap() {
     }
   };
 
-  const handleDescargarReporte = async () => {
+  const handleDescargarReporte = async (includeQuestions: boolean) => {
     if (!id) {
       alert("ID de capacitación no especificado");
       return;
@@ -75,13 +93,15 @@ export default function UsersCap() {
 
     try {
       setDownloadingReport(true);
-      const blob = await CapListService.descargarReporteCapacitacion(id);
+      setShowReportOptions(false);
+      const blob = await CapListService.descargarReporteCapacitacion(id, includeQuestions);
       
       // Crear URL para descargar el archivo
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `reporte_capacitacion_${id}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      const reportType = includeQuestions ? 'con_preguntas' : 'sin_preguntas';
+      link.download = `reporte_capacitacion_${id}_${reportType}_${new Date().toISOString().split('T')[0]}.xlsx`;
       document.body.appendChild(link);
       link.click();
       window.URL.revokeObjectURL(url);
@@ -98,16 +118,34 @@ export default function UsersCap() {
     <div className={styles.container}>
       <div className={styles.header}>
         <div className={styles.headerContent}>
-          <h1 style={{fontSize:'2rem', fontWeight:800, marginBottom:8}}>Usuarios de la capacitación</h1>
-          <div style={{display:'flex', gap:12, alignItems:'center'}}>
-            <button 
-              className={styles.btnReport}
-              onClick={handleDescargarReporte}
-              disabled={downloadingReport}
-              title="Descargar reporte de capacitación en Excel"
-            >
-              {downloadingReport ? '⏳ Descargando...' : '📊 Generar Reporte'}
-            </button>
+          <h1 className={styles.headerTitle}>Usuarios de la capacitación</h1>
+          <div className={styles.headerActions}>
+            <div className={styles.reportDropdownContainer}>
+              <button 
+                className={styles.btnReport}
+                onClick={() => setShowReportOptions(!showReportOptions)}
+                disabled={downloadingReport}
+                title="Descargar reporte de capacitación en Excel"
+              >
+                {downloadingReport ? '⏳ Descargando...' : '📊 Generar Reporte'}
+              </button>
+              {showReportOptions && (
+                <div className={styles.reportDropdownMenu}>
+                  <button
+                    onClick={() => handleDescargarReporte(false)}
+                    className={styles.reportDropdownItem}
+                  >
+                    Sin preguntas y respuestas
+                  </button>
+                  <button
+                    onClick={() => handleDescargarReporte(true)}
+                    className={styles.reportDropdownItem}
+                  >
+                    Con preguntas y respuestas
+                  </button>
+                </div>
+              )}
+            </div>
             <button className={styles.btnBack} onClick={() => navigate(-1)}>
               ← Volver
             </button>
@@ -120,12 +158,11 @@ export default function UsersCap() {
         <p className={styles.error}>{error}</p>
       ) : (
         <>
-          <div style={{display:'flex', gap:16, marginBottom:16, flexWrap:'wrap', alignItems:'center'}}>
+          <div className={styles.filterSection}>
             <select
               value={filterCompleted}
               onChange={e => setFilterCompleted(e.target.value as 'all'|'yes'|'no')}
-              className={styles.select}
-              style={{minWidth:140}}
+              className={`${styles.select} ${styles.filterSelect}`}
             >
               <option value="all">Todos</option>
               <option value="yes">Completados</option>
@@ -133,18 +170,16 @@ export default function UsersCap() {
             </select>
             <input
               type="text"
-              className={styles.input}
-              style={{minWidth:180}}
+              className={`${styles.input} ${styles.filterInput}`}
               placeholder="Buscar por nombre, apellido o cédula..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
             />
-            <span style={{fontSize:13, color:'#666', fontWeight:500}}>
+            <span className={styles.filterCount}>
               {filteredUsers.length} resultados
             </span>
           </div>
-          <div style={{ position: 'relative' }}>
-            <div className={styles.tableWrapper}>
+          <div className={styles.tableWrapper}>
             <table className={styles.table}>
               <thead className={styles.thead}>
                 <tr>
@@ -159,8 +194,8 @@ export default function UsersCap() {
               <tbody className={styles.tbody}>
                 {filteredUsers
                   .slice((page - 1) * pageSize, page * pageSize)
-                  .map(u => (
-                    <tr key={u.id}>
+                  .map((u, idx) => (
+                    <tr key={`${u.id}-${(page - 1) * pageSize + idx}`}>
                       <td className={styles.tdNombre}>{u.nombre}</td>
                       <td className={styles.tdApellido}>{u.apellido}</td>
                       <td className={styles.tdCedula}>{u.cedula}</td>
@@ -194,7 +229,6 @@ export default function UsersCap() {
             <button className={styles.pageBtn} disabled={page >= Math.ceil(filteredUsers.length / pageSize)} onClick={() => setPage(page + 1)}>
               Siguiente →
             </button>
-          </div>
           </div>
         </>
       )}

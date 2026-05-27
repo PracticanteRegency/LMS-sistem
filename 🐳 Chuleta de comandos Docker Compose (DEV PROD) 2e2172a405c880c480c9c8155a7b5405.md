@@ -206,6 +206,10 @@ docker exec -it nginx ping backend
 
 ```bash
 docker network connect shared_net backend
+docker network connect shared_net frontend
+docker network connect shared_net celery_worker
+
+
 ```
 
 ---
@@ -326,4 +330,12 @@ Este archivo es tu **chuleta oficial del proyecto** 🚀
 
 ```bash
 docker compose -f docker-compose.dev.yml exec redis redis-cli FLUSHALL
+```
+
+# bajar y montar un contenedor especifico
+
+```bash
+docker compose -f docker-compose.dev.yml stop backend
+docker compose -f docker-compose.dev.yml rm -f backend
+docker compose -f docker-compose.dev.yml up -d --build backend
 ```

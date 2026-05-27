@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./Styles/Capacitaciones.module.css";
 import CapListService from "../services/Capacitaciones.js";
+import { getUserRole } from "../services/auth";
 
 interface Capacitacion {
   id: number;
@@ -33,6 +34,7 @@ export default function Capacitaciones() {
   const menuRefs = useRef<{ [key: number]: HTMLDivElement | null }>({});
   const [menuCoords, setMenuCoords] = useState<{ [key: number]: { top: number; left: number } }>({});
   const navigate = useNavigate();
+  const userRole = Number(getUserRole());
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportFechaInicio, setReportFechaInicio] = useState("");
   const [reportFechaFin, setReportFechaFin] = useState("");
@@ -185,6 +187,10 @@ export default function Capacitaciones() {
       } finally {
         setLoading(false);
       }
+      return;
+    }
+    if (action === "Replicar") {
+      navigate("/CrearCapacitacion", { state: { replicarId: cap.id } });
       return;
     }
     if (action === "Eliminar") {
@@ -364,39 +370,50 @@ export default function Capacitaciones() {
                                 zIndex: 2147483647,
                               }}
                             >
+                              {userRole !== 3 && (
+                                <button
+                                  className={`${styles.btn} ${styles.btn}`}
+                                  onClick={() => handleAction("Ver", cap)}
+                                >
+                                  Ver
+                                </button>
+                              )}
+                              {userRole !== 3 && (
+                                <button
+                                  className={`${styles.btn} ${styles.btn}`}
+                                  onClick={() => handleAction("Editar", cap)}
+                                >
+                                  Editar
+                                </button>
+                              )}
                               <button
                                 className={`${styles.btn} ${styles.btn}`}
-                                onClick={() => handleAction("Ver", cap)}
+                                onClick={() => handleAction("Replicar", cap)}
                               >
-                                Ver
+                                Replicar
                               </button>
-                              <button
-                                className={`${styles.btn} ${styles.btn}`}
-                                onClick={() => handleAction("Editar", cap)}
-                              >
-                                Editar
-                              </button>
-
                               <button
                                 className={`${styles.btn} ${styles.btn}`}
                                 onClick={() => handleAction("EditarColaboradores", cap)}
                               >
                                 Editar colaboradores
                               </button>
-
+                              {userRole !== 3 && (
                                 <button
                                   className={`${styles.btn} ${styles.btn}`}
                                   onClick={() => handleAction("ToggleEstado", cap)}
                                 >
                                   {cap.estado === 0 ? 'Activar' : 'Desactivar'}
                                 </button>
-
-                              <button
-                                className={`${styles.btn} ${styles.btn}`}
-                                onClick={() => handleAction("Eliminar", cap)}
-                              >
-                                Eliminar
-                              </button>
+                              )}
+                              {userRole !== 3 && (
+                                <button
+                                  className={`${styles.btn} ${styles.btn}`}
+                                  onClick={() => handleAction("Eliminar", cap)}
+                                >
+                                  Eliminar
+                                </button>
+                              )}
                               
                             </div>
                           )}

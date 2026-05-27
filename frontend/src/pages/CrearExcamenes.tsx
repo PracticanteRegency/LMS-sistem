@@ -13,6 +13,7 @@ const TIPOS_EXAMEN = [
   { value: "RETIRO", label: "Examen de Retiro" },
   { value: "ESPECIAL", label: "Examen Especial" },
   { value: "POST_INCAPACIDAD", label: "Examen Post-Incapacidad" },
+  { value: "ALTURAS", label: "Examen con énfasis en alturas"}
 ];
 
 const CrearExamenes: React.FC = () => {
