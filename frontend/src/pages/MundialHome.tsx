@@ -110,15 +110,89 @@ function BannerMarquee() {
 // All data from backend API
 
 /* ===== HERO ===== */
+const BANNER_IMAGES = ["/Baner/principal/imagen1.png", "/Baner/principal/imagen2.png"];
+
+const PREMIOS = [
+  {
+    puesto: 1,
+    label: "Primer Puesto",
+    premio: "Viaje a Cartagena",
+    icon: "✈️",
+    color: "#FFD700",
+    shadow: "rgba(255,215,0,0.4)",
+    desc: "Un viaje para disfrutar el paraíso de la Ciudad Amurallada",
+  },
+  {
+    puesto: 2,
+    label: "Segundo Puesto",
+    premio: "Televisor",
+    icon: "📺",
+    color: "#C0C0C0",
+    shadow: "rgba(192,192,192,0.4)",
+    desc: "Smart TV de última generación para vivir cada partido como en el estadio",
+  },
+  {
+    puesto: 3,
+    label: "Tercer Puesto",
+    premio: "Barra de Sonido",
+    icon: "🔊",
+    color: "#CD7F32",
+    shadow: "rgba(205,127,50,0.4)",
+    desc: "Soundbar de alta fidelidad para una experiencia de audio inmersiva",
+  },
+];
+
 function Hero() {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [showPremios, setShowPremios] = useState(false);
+  const [activeCard, setActiveCard] = useState<number | null>(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % BANNER_IMAGES.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (showPremios) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [showPremios]);
+
   return (
     <section className={styles.hero}>
-      <div className={styles.heroBg} />
+      {/* Slider de imágenes */}
+      {BANNER_IMAGES.map((img, i) => (
+        <div
+          key={img}
+          className={`${styles.heroSlide} ${i === currentSlide ? styles.heroSlideActive : ""}`}
+          style={{ backgroundImage: `url(${img})` }}
+        />
+      ))}
+      {/* Overlay oscuro para legibilidad del texto */}
+      <div className={styles.heroOverlay} />
+
       <div className={styles.heroDots}>
         <div className={styles.heroDot} />
         <div className={styles.heroDot} />
         <div className={styles.heroDot} />
         <div className={styles.heroDot} />
+      </div>
+
+      {/* Indicadores de slide */}
+      <div className={styles.heroIndicators}>
+        {BANNER_IMAGES.map((_, i) => (
+          <button
+            key={i}
+            className={`${styles.heroIndicatorDot} ${i === currentSlide ? styles.heroIndicatorDotActive : ""}`}
+            onClick={() => setCurrentSlide(i)}
+            aria-label={`Ir a imagen ${i + 1}`}
+          />
+        ))}
       </div>
 
       <div className={styles.heroContent}>
@@ -147,7 +221,61 @@ function Hero() {
           <a href="#como-funciona" className={styles.btnOutlineLg}>
             Ver Cómo Funciona
           </a>
+          <button
+            type="button"
+            className={styles.btnPremiosLg}
+            onClick={() => setShowPremios(true)}
+          >
+            🏆 Ver Premiación
+          </button>
         </div>
+
+        {/* Modal Premiación */}
+        {showPremios && (
+          <div className={styles.premiosOverlay} onClick={() => setShowPremios(false)}>
+            <div className={styles.premiosModal} onClick={(e) => e.stopPropagation()}>
+              <button
+                className={styles.premiosCloseBtn}
+                onClick={() => setShowPremios(false)}
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+
+              <div className={styles.premiosHeader}>
+                <span className={styles.premiosTrophy}>🏆</span>
+                <h2 className={styles.premiosTitle}>Premiación</h2>
+                <p className={styles.premiosSubtitle}>MICampeonato — Mundial 2026</p>
+              </div>
+
+              <div className={styles.premiosCards}>
+                {PREMIOS.map((p) => (
+                  <div
+                    key={p.puesto}
+                    className={`${styles.premioCard} ${activeCard === p.puesto ? styles.premioCardActive : ""}`}
+                    style={{ "--premio-color": p.color, "--premio-shadow": p.shadow } as any}
+                    onMouseEnter={() => setActiveCard(p.puesto)}
+                    onMouseLeave={() => setActiveCard(null)}
+                  >
+                    <div className={styles.premioRankBadge} style={{ background: p.color }}>
+                      {p.puesto}°
+                    </div>
+                    <div className={styles.premioIcon}>{p.icon}</div>
+                    <div className={styles.premioInfo}>
+                      <span className={styles.premioLabel}>{p.label}</span>
+                      <span className={styles.premioNombre}>{p.premio}</span>
+                      <span className={styles.premioDesc}>{p.desc}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <p className={styles.premiosCierre}>
+                ¡Acumula puntos y escala en el ranking para ganar!
+              </p>
+            </div>
+          </div>
+        )}
 
         <div className={styles.heroStats}>
           <div className={styles.heroStatCard}>
@@ -563,6 +691,64 @@ function SpecialPredictionsSection({ initialSpecialPredictions = [], initialTeam
     </section>
   );
 }
+/* ===== COLABORADORES GALLERY ===== */
+const COLABORADORES_IMAGES = [
+  "/Baner/secundiario/imagen1.png",
+  "/Baner/secundiario/imagen2.jpeg",
+  "/Baner/secundiario/imagen3.jpeg",
+  "/Baner/secundiario/imagen4.jpeg",
+  "/Baner/secundiario/imagen5.jpeg",
+  "/Baner/secundiario/imagen6.jpeg",
+  "/Baner/secundiario/imagen7.jpeg",
+  "/Baner/secundiario/imagen8.jpeg",
+  "/Baner/secundiario/imagen9.jpeg",
+  "/Baner/secundiario/imagen10.jpeg",
+  "/Baner/secundiario/imagen11.jpeg",
+  "/Baner/secundiario/imagen12.jpeg",
+  "/Baner/secundiario/imagen13.jpeg",
+  "/Baner/secundiario/imagen14.jpeg",
+];
+
+function ColaboradoresGallery() {
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+
+  const handleImgError = (src: string) => {
+    setFailedImages((prev: Set<string>) => new Set(prev).add(src));
+  };
+
+  const visibleImages = COLABORADORES_IMAGES.filter((src) => !failedImages.has(src));
+
+  if (visibleImages.length === 0) return null;
+
+  return (
+    <section className={styles.colabSection}>
+      <div className={styles.colabHeader}>
+        <span className={styles.colabPillIcon}>📸</span>
+        <div>
+          <h2 className={styles.colabTitle}>Nuestros Colaboradores</h2>
+          <p className={styles.colabSubtitle}>Sintiendo la Pasión MiCampeonato</p>
+        </div>
+      </div>
+
+      <div className={styles.colabTrackWrapper}>
+        <div className={styles.colabTrack}>
+          {[...visibleImages, ...visibleImages].map((src, i) => (
+            <div key={`${src}-${i}`} className={styles.colabCard}>
+              <img
+                src={src}
+                alt={`Colaborador ${(i % visibleImages.length) + 1}`}
+                className={styles.colabImg}
+                onError={() => handleImgError(src)}
+                loading="lazy"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function RankingSection({ initialPlayers = [] }: { initialPlayers?: RankingEntry[] }) {
   const [userRank, setUserRank] = useState<RankingEntry | null>(null);
   const [top10List, setTop10List] = useState<RankingEntry[]>([]);
@@ -839,6 +1025,7 @@ export default function MundialHome() {
       <Hero />
       <MatchesSection initialMatches={matches} />
       <SpecialPredictionsSection initialSpecialPredictions={specialPredictions} initialTeams={equipos} initialUserPredictions={userSpecialPredictions} onSuccess={() => { setShowSuccess(true); setTimeout(() => setShowSuccess(false), 1800); }} />
+      <ColaboradoresGallery />
       <RankingSection initialPlayers={players} />
       <HowItWorks steps={steps} />
       {/* ===== SUCCESS MODAL ===== */}

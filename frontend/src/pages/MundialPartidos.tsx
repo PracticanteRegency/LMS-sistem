@@ -478,7 +478,7 @@ export default function MundialPartidos() {
               {/* Step 1: Who wins? */}
               <div className={styles.stepSection}>
                 <p className={styles.stepLabel}>🏁 Paso 1: ¿Quién gana el partido?</p>
-                <div className={`${styles.winnerGrid} ${(selectedMatch.fase || selectedMatch.phase) === "Grupos" ? styles.groupsPhase : ''}`}>
+                <div className={styles.winnerGrid}>
                   <button
                     type="button"
                     onClick={() => setWinner("home")}
@@ -493,21 +493,17 @@ export default function MundialPartidos() {
                     {winner === "home" && <span className={styles.checkIcon}>✓</span>}
                   </button>
 
-                  {(selectedMatch.fase || selectedMatch.phase) !== "Grupos" ? (
-                    <button
-                      type="button"
-                      onClick={() => setWinner("draw")}
-                      className={`${styles.winnerOption} ${styles.winnerOptionDraw} ${
-                        winner === "draw" ? styles.winnerOptionSelected : ""
-                      }`}
-                    >
-                      <span className={styles.winnerFlag}>=</span>
-                      <span className={styles.winnerLabel}>Empate</span>
-                      {winner === "draw" && <span className={styles.checkIcon}>✓</span>}
-                    </button>
-                  ) : (
-                    <div className={styles.winnerVsSeparator}>VS</div>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setWinner("draw")}
+                    className={`${styles.winnerOption} ${styles.winnerOptionDraw} ${
+                      winner === "draw" ? styles.winnerOptionSelected : ""
+                    }`}
+                  >
+                    <span className={styles.winnerFlag}>=</span>
+                    <span className={styles.winnerLabel}>Empate</span>
+                    {winner === "draw" && <span className={styles.checkIcon}>✓</span>}
+                  </button>
 
                   <button
                     type="button"
@@ -593,8 +589,8 @@ export default function MundialPartidos() {
                   )}
               </div>
 
-              {/* Step 3: Penalty shootout (only if draw) */}
-              {winner === "draw" && (
+              {/* Step 3: Penalty shootout (only if draw in knockout phase) */}
+              {winner === "draw" && (selectedMatch.fase || selectedMatch.phase) !== "Grupos" && (
                 <div className={styles.stepSection}>
                   <p className={styles.stepLabel}>🔥 Paso 3: Penaltis/Desempate (Opcional)</p>
                   <p className={styles.stepDescription}>Si crees que el partido se decide por penaltis, ingresa los goles predichos.</p>
