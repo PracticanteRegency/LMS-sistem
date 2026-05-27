@@ -167,15 +167,15 @@ export default function CrearCapacitacion(): React.ReactElement {
           titulo: data.titulo || prev.titulo,
           descripcion: data.descripcion || prev.descripcion,
           imagen: normalizeDataUrl(data.imagen) || "",
-          fecha_inicio: data.fecha_inicio ? (data.fecha_inicio.split("T")[0]) : prev.fecha_inicio,
-          fecha_fin: data.fecha_fin ? (data.fecha_fin.split("T")[0]) : prev.fecha_fin,
+          fecha_inicio: "",
+          fecha_fin: "",
           tipo: data.tipo || prev.tipo,
           imagenFile: null,
           imagenPreview: normalizeDataUrl(data.imagen) || "",
         }));
 
         setModulos(normalizeModulos(data.modulos));
-        // No cargar colaboradores — el usuario los debe cargar manualmente
+        // No cargar colaboradores ni fechas — el usuario los debe ingresar manualmente
       } catch (e) {
         console.error('Error cargando capacitación para replicar', e);
       } finally {
@@ -816,9 +816,11 @@ const handleRespuestaChange = async (
       formDataMultipart.append('fecha_inicio', payloadBasico.fecha_inicio);
       formDataMultipart.append('fecha_fin', payloadBasico.fecha_fin);
 
-      // Imagen principal como archivo si hay una nueva seleccionada
+      // Imagen principal: archivo nuevo si se seleccionó, URL existente si no
       if (payloadBasico.imagenFile) {
         formDataMultipart.append('imagen', payloadBasico.imagenFile);
+      } else if (formData.imagen) {
+        formDataMultipart.append('imagen', formData.imagen);
       }
 
       // Agregar archivos de lecciones, preguntas y respuestas directamente al FormData
