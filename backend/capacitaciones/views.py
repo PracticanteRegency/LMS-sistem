@@ -344,9 +344,9 @@ class CrearCapacitacionView(APIView):
                 data['imagen'] = url_imagen
                 archivos_creados.append(url_imagen)
                 logger.info(f"Imagen procesada exitosamente: {url_imagen}")
-            else:
-                logger.warning("No se proporcionó imagen en el POST")
-                data['imagen'] = ''  # Asegurar que no sea NULL
+            elif not data.get('imagen'):
+                # Solo vaciar si no vino una URL existente en el cuerpo del formulario
+                data['imagen'] = ''
             
             # Procesar archivos de lecciones y preguntas
             for modulo_idx, modulo_data in enumerate(modulos_data):
