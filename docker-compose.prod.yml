@@ -68,11 +68,21 @@ services:
   redis:
     image: redis:7-alpine
     container_name: redis
+    restart: always
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
+    # maxmemory: evita que Redis consuma toda la RAM del servidor
+    # allkeys-lru: desaloja claves menos usadas cuando se llega al límite
+    # timeout: cierra conexiones idle después de 5 min (evita conexiones colgadas)
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru --timeout 300
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     networks:
       - shared_net
 
