@@ -707,7 +707,6 @@ const COLABORADORES_IMAGES = [
   "/Baner/secundiario/imagen12.jpeg",
   "/Baner/secundiario/imagen13.jpeg",
   "/Baner/secundiario/imagen14.jpeg",
-  "/Baner/secundiario/imagen15.jpeg",
 ];
 
 function ColaboradoresGallery() {
