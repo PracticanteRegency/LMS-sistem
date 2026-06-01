@@ -11,6 +11,12 @@ redis_host = os.environ.get('REDIS_HOST', 'localhost')
 app.conf.broker_url = f'redis://{redis_host}:6379/0'
 app.conf.result_backend = f'redis://{redis_host}:6379/0'
 
+# Reconexión automática al broker cuando Redis se cae o reinicia
+app.conf.broker_connection_retry_on_startup = True
+app.conf.broker_connection_retry = True
+app.conf.broker_connection_max_retries = 10
+app.conf.broker_transport_options = {'socket_timeout': 5, 'socket_connect_timeout': 5}
+
 app.config_from_object('django.conf:settings', namespace='CELERY')
 app.autodiscover_tasks(['notificaciones', 'capacitaciones', 'examenes'])
 

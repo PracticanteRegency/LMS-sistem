@@ -263,6 +263,11 @@ else:
                 'CLIENT_CLASS': 'django_redis.client.DefaultClient',
                 'PARSER_KWARGS': {'decode_responses': True},
                 'CONNECTION_POOL_KWARGS': {'max_connections': 50},
+                # Timeouts para evitar conexiones colgadas que agotan el pool
+                'SOCKET_CONNECT_TIMEOUT': 5,
+                'SOCKET_TIMEOUT': 5,
+                # Degradación graceful: cache miss en lugar de crash cuando Redis cae
+                'IGNORE_EXCEPTIONS': True,
             }
         }
     }
