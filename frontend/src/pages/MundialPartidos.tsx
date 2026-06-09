@@ -399,7 +399,7 @@ export default function MundialPartidos() {
                         </div>
                         {isEstadoFinalizado(match.estado) && (match as any).resultado && (
                           <div className={styles.realResultLabel}>
-                            Real: {(match as any).resultado.goles_local}-{(match as any).resultado.goles_visitante}
+                            Real: {(match as any).resultado.local}-{(match as any).resultado.visitante}
                           </div>
                         )}
                       </div>
@@ -412,7 +412,7 @@ export default function MundialPartidos() {
                         </div>
                         {isEstadoFinalizado(match.estado) && (match as any).resultado && (
                           <div className={styles.realResultLabel}>
-                            Real: {(match as any).resultado.goles_local}-{(match as any).resultado.goles_visitante}
+                            Real: {(match as any).resultado.local}-{(match as any).resultado.visitante}
                           </div>
                         )}
                       </div>
