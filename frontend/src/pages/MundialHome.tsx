@@ -827,10 +827,12 @@ function RankingSection({ initialPlayers = [] }: { initialPlayers?: RankingEntry
                 return (
                   <div
                     key={`${player.name}-${idx}`}
-                    className={`${player.rank <= 3 ? styles.rankingRowTop : styles.rankingRow} ${isCurrentUser ? styles.rankingRowCurrentUser : ""}`}
+                    className={`${player.rank > 0 && player.rank <= 3 ? styles.rankingRowTop : styles.rankingRow} ${isCurrentUser ? styles.rankingRowCurrentUser : ""}`}
                   >
                     <div className={styles.rankingRank}>
-                      {rankEmoji ? (
+                      {player.rank === 0 ? (
+                        <span className={styles.rankingRankUndefined}>—</span>
+                      ) : rankEmoji ? (
                         <span className={styles.rankingRankEmoji}>{rankEmoji}</span>
                       ) : (
                         <span>{player.rank}</span>

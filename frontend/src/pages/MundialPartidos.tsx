@@ -397,12 +397,24 @@ export default function MundialPartidos() {
                           <span className={styles.scoreSeparator}>-</span>
                           <span className={styles.scoreValue}>{pred.away}</span>
                         </div>
+                        {isEstadoFinalizado(match.estado) && (match as any).resultado && (
+                          <div className={styles.realResultLabel}>
+                            Real: {(match as any).resultado.goles_local}-{(match as any).resultado.goles_visitante}
+                          </div>
+                        )}
                       </div>
                     ) : (
-                      <div className={`${styles.scoreBox} ${styles.scorePending}`}>
-                        <span className={styles.scoreValue}>?</span>
-                        <span className={styles.scoreSeparator}>-</span>
-                        <span className={styles.scoreValue}>?</span>
+                      <div className={styles.scoreBoxContainer}>
+                        <div className={`${styles.scoreBox} ${styles.scorePending}`}>
+                          <span className={styles.scoreValue}>?</span>
+                          <span className={styles.scoreSeparator}>-</span>
+                          <span className={styles.scoreValue}>?</span>
+                        </div>
+                        {isEstadoFinalizado(match.estado) && (match as any).resultado && (
+                          <div className={styles.realResultLabel}>
+                            Real: {(match as any).resultado.goles_local}-{(match as any).resultado.goles_visitante}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

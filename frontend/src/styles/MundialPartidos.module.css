@@ -1461,6 +1461,17 @@
   order: 2;
 }
 
+.realResultLabel {
+  font-size: 10px;
+  color: var(--muted-foreground);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 1px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
 .scoreSeparator {
   font-size: 14px;
   color: var(--muted-foreground);

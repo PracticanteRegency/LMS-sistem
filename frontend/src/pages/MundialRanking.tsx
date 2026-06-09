@@ -76,7 +76,7 @@ function RankingMundialSection({ initialPlayers = [] }: { initialPlayers?: Ranki
                 <p className={styles.podiumName}>{fullList[1].name}</p>
                 <p className={styles.podiumPoints}>{fullList[1].points} pts</p>
                 <div className={styles.podiumBarSecond}>
-                  <span className={styles.podiumBarNumberOther}>2</span>
+                  <span className={styles.podiumBarNumberOther}>{fullList[1].rank || "—"}</span>
                 </div>
               </div>
             )}
@@ -87,7 +87,7 @@ function RankingMundialSection({ initialPlayers = [] }: { initialPlayers?: Ranki
               <p className={styles.podiumName}>{fullList[0].name}</p>
               <p className={styles.podiumPoints}>{fullList[0].points} pts</p>
               <div className={styles.podiumBarFirst}>
-                <span className={styles.podiumBarNumberFirst}>1</span>
+                <span className={styles.podiumBarNumberFirst}>{fullList[0].rank || "—"}</span>
               </div>
             </div>
             {/* 3rd Place */}
@@ -97,7 +97,7 @@ function RankingMundialSection({ initialPlayers = [] }: { initialPlayers?: Ranki
                 <p className={styles.podiumName}>{fullList[2].name}</p>
                 <p className={styles.podiumPoints}>{fullList[2].points} pts</p>
                 <div className={styles.podiumBarThird}>
-                  <span className={styles.podiumBarNumberOther}>3</span>
+                  <span className={styles.podiumBarNumberOther}>{fullList[2].rank || "—"}</span>
                 </div>
               </div>
             )}
@@ -115,12 +115,14 @@ function RankingMundialSection({ initialPlayers = [] }: { initialPlayers?: Ranki
               return (
                 <div
                   key={`mundial-${player.name}-${idx}`}
-                  className={`${player.rank <= 3 ? styles.rankingRowTop : styles.rankingRow} ${
+                  className={`${player.rank > 0 && player.rank <= 3 ? styles.rankingRowTop : styles.rankingRow} ${
                     userRank?.rank === player.rank ? styles.rankingRowCurrentUser : ""
                   }`}
                 >
                   <div className={styles.rankingRank}>
-                    {rankEmoji ? (
+                    {player.rank === 0 ? (
+                      <span style={{ fontSize: "0.7rem", color: "#888" }}>Por definirse</span>
+                    ) : rankEmoji ? (
                       <span className={styles.rankingRankEmoji}>{rankEmoji}</span>
                     ) : (
                       <span>{player.rank}</span>

@@ -181,9 +181,9 @@ def evaluar_resultado_partido(partido, goles_local, goles_visitante,
 def recalcular_posiciones_ranking(edicion):
     """
     Recalcula y guarda las posiciones del ranking para una edición.
-    Criterio: mayor puntaje primero. Empate: quien predijo primero.
-    Solo muestra las posiciones 1-N con todos los participantes.
-    Asegura que NO haya posiciones duplicadas.
+    Criterio: mayor puntaje primero, luego más aciertos exactos.
+    Empate real (mismos puntos Y mismos aciertos exactos): comparten la misma posición.
+    El siguiente grupo recibe la posición = posición del grupo anterior + tamaño del grupo.
     """
     from .models import RankingMundial
     rankings = list(
@@ -191,22 +191,31 @@ def recalcular_posiciones_ranking(edicion):
         .filter(edicion=edicion)
         .order_by("-puntos_totales", "-aciertos_exactos", "fecha_primera_prediccion")
     )
-    
-    # Asignar posiciones secuenciales sin duplicados
-    for i, ranking in enumerate(rankings, start=1):
+
+    pos = 1
+    for i, ranking in enumerate(rankings):
+        if i > 0:
+            prev = rankings[i - 1]
+            # Empate real solo si coinciden los tres criterios
+            empate_total = (
+                ranking.puntos_totales == prev.puntos_totales and
+                ranking.aciertos_exactos == prev.aciertos_exactos and
+                ranking.fecha_primera_prediccion == prev.fecha_primera_prediccion
+            )
+            if not empate_total:
+                pos = i + 1
         posicion_anterior = ranking.posicion
-        ranking.posicion = i
-        ranking.tendencia = posicion_anterior - i  # positivo = subió, negativo = bajó
-    
-    # Usar bulk_update para guardar todos de una sola vez, más eficiente y seguro
+        ranking.posicion = pos
+        ranking.tendencia = posicion_anterior - pos
+
     RankingMundial.objects.bulk_update(rankings, ['posicion', 'tendencia'], batch_size=100)
 
 
 def recalcular_posiciones_ranking_especial(edicion):
     """
     Recalcula y guarda las posiciones del ranking especial para una edición.
-    Criterio: mayor puntaje de predicciones especiales primero. Empate: quien predijo primero.
-    Asegura que NO haya posiciones duplicadas.
+    Criterio: mayor puntaje primero, luego más predicciones especiales acertadas.
+    Empate real (mismos puntos Y mismos aciertos especiales): comparten la misma posición.
     """
     from .models import RankingEspecial
     rankings = list(
@@ -214,14 +223,22 @@ def recalcular_posiciones_ranking_especial(edicion):
         .filter(edicion=edicion)
         .order_by("-puntos_totales", "-predicciones_especiales_acertadas", "fecha_primera_prediccion")
     )
-    
-    # Asignar posiciones secuenciales sin duplicados
-    for i, ranking in enumerate(rankings, start=1):
+
+    pos = 1
+    for i, ranking in enumerate(rankings):
+        if i > 0:
+            prev = rankings[i - 1]
+            empate_total = (
+                ranking.puntos_totales == prev.puntos_totales and
+                ranking.predicciones_especiales_acertadas == prev.predicciones_especiales_acertadas and
+                ranking.fecha_primera_prediccion == prev.fecha_primera_prediccion
+            )
+            if not empate_total:
+                pos = i + 1
         posicion_anterior = ranking.posicion
-        ranking.posicion = i
-        ranking.tendencia = posicion_anterior - i  # positivo = subió, negativo = bajó
-    
-    # Usar bulk_update para guardar todos de una sola vez, más eficiente y seguro
+        ranking.posicion = pos
+        ranking.tendencia = posicion_anterior - pos
+
     RankingEspecial.objects.bulk_update(rankings, ['posicion', 'tendencia'], batch_size=100)
 
 
