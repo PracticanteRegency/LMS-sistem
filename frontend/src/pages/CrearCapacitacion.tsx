@@ -145,6 +145,7 @@ export default function CrearCapacitacion(): React.ReactElement {
         }));
 
         setModulos(normalizeModulos(data.modulos));
+        setTieneProgreso(!!data.tiene_progreso);
         const cols = data.colaboradores || [];
         setColaboradores(cols);
         setColaboradoresFiltrados(cols);
@@ -223,6 +224,7 @@ export default function CrearCapacitacion(): React.ReactElement {
   const [colaboradoresFiltrados, setColaboradoresFiltrados] = useState<Colaborador[]>([]);
   const [searchColaborador, setSearchColaborador] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
+  const [tieneProgreso, setTieneProgreso] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [fileUploadError, setFileUploadError] = useState<FileUploadErrorType | null>(null);
   const today = new Date().toISOString().split("T")[0];
@@ -775,18 +777,22 @@ const handleRespuestaChange = async (
       // ============ NUEVO: ENVIAR TODO EN UN SOLO POST CON FormData ============
       // Construir el payload con estructura normalizada (sin archivos)
       const modulosParaEnviar = structuredClone(modulos).map((m) => ({
+        ...(m.id ? { id: m.id } : {}),
         nombre_modulo: m.nombre_modulo,
         lecciones: (m.lecciones || []).map((l: any) => ({
+          ...(l.id ? { id: l.id } : {}),
           titulo_leccion: l.titulo_leccion,
           descripcion: l.descripcion,
           duracion: l.duracion,
           tipo_leccion: l.tipo_leccion,
           url: l.url || "", // Mantener cadena vacía si no hay URL (BD requiere valor)
           preguntas: (l.preguntas || []).map((p: any) => ({
+            ...(p.id ? { id: p.id } : {}),
             pregunta: p.pregunta,
             tipo_pregunta: p.tipo_pregunta,
             url_multimedia: p.url_multimedia || "", // Mantener cadena vacía
             respuestas: (p.respuestas || []).map((r: any) => ({
+              ...(r.id ? { id: r.id } : {}),
               valor: r.valor,
               es_correcto: r.es_correcto,
               url_imagen: r.url_imagen || "", // Mantener cadena vacía
@@ -1129,6 +1135,9 @@ const handleRespuestaChange = async (
               type="button"
               className={styles.btnAgregarModulo}
               onClick={agregarModulo}
+              disabled={tieneProgreso}
+              title={tieneProgreso ? "No se pueden agregar módulos: esta capacitación ya tiene progreso registrado por colaboradores." : undefined}
+              style={tieneProgreso ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
             >
               + Agregar Módulo
             </button>
@@ -1167,6 +1176,9 @@ const handleRespuestaChange = async (
                       [moduloIndex]: true,
                     }));
                   }}
+                  disabled={tieneProgreso}
+                  title={tieneProgreso ? "No se pueden agregar lecciones: esta capacitación ya tiene progreso registrado por colaboradores." : undefined}
+                  style={tieneProgreso ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
                 >
                   + agregar leccion
                 </button>
@@ -1558,6 +1570,9 @@ const handleRespuestaChange = async (
                                     type="button"
                                     className={styles.btnAgregarLeccion}
                                     onClick={() => agregarPregunta(moduloIndex, leccionIndex)}
+                                    disabled={tieneProgreso}
+                                    title={tieneProgreso ? "No se pueden agregar preguntas: esta capacitación ya tiene progreso registrado por colaboradores." : undefined}
+                                    style={tieneProgreso ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
                                   >
                                     + Agregar pregunta
                                   </button>

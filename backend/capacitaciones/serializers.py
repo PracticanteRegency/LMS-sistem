@@ -2,7 +2,7 @@ from django.utils import timezone
 from rest_framework import serializers
 from django.db import transaction
 from .utils import enviar_correo_capacitacion_creada_batch
-from .models import Capacitaciones, Modulos, progresoCapacitaciones, Lecciones, PreguntasLecciones, Respuestas, progresolecciones, progresoModulo
+from .models import Capacitaciones, Modulos, progresoCapacitaciones, Lecciones, PreguntasLecciones, Respuestas, progresolecciones, progresoModulo, RespuestasColaboradores
 from usuarios.models import Colaboradores
 import logging
 
@@ -130,6 +130,7 @@ class CapacitacionDetalleSerializer(serializers.ModelSerializer):
     modulos = ModuloSerializer(many=True, source='modulos_set', read_only=True)
     colaboradores = serializers.SerializerMethodField()
     imagen = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    tiene_progreso = serializers.SerializerMethodField()
 
     class Meta:
         model = Capacitaciones
@@ -144,13 +145,17 @@ class CapacitacionDetalleSerializer(serializers.ModelSerializer):
             'fecha_fin',
             'modulos',
             'colaboradores',
-            'tipo'
+            'tipo',
+            'tiene_progreso',
         ]
 
     def get_colaboradores(self, obj):
         progres = progresoCapacitaciones.objects.filter(capacitacion=obj).select_related('colaborador')
         colaboradores = [p.colaborador for p in progres]
         return ColaboradorSerializer(colaboradores, many=True).data
+
+    def get_tiene_progreso(self, obj):
+        return progresoCapacitaciones.objects.filter(capacitacion=obj, progreso__gt=0).exists()
     
     def to_internal_value(self, data):
         """Normalizar los datos de entrada antes de validar"""
@@ -280,52 +285,152 @@ class CrearCapacitacionSerializer(serializers.ModelSerializer):
                 setattr(instance, attr, value)
             instance.save()
 
-            # Reemplazar módulos y lecciones si se envía 'modulos'
+            # Sincronizar módulos/lecciones/preguntas/respuestas usando IDs.
+            # Si el item tiene id → actualizar en lugar.
+            # Si no tiene id → crear nuevo.
+            # IDs que ya no aparecen → borrar solo esos (con su progreso asociado).
             if modulos_data is not None:
-                # PRIMERO: Eliminar todos los registros de progreso relacionados con módulos de esta capacitación
-                modulos_ids = Modulos.objects.filter(idcapacitacion=instance).values_list('id', flat=True)
-                if modulos_ids:
-                    progresoModulo.objects.filter(modulo__in=modulos_ids).delete()
-                
-                # LUEGO: Borrar módulos existentes y su cascade de lecciones/preguntas
-                Modulos.objects.filter(idcapacitacion=instance).delete()
-                for modulo_data in modulos_data:
-                    lecciones_data = modulo_data.get('lecciones', [])
-                    modulo = Modulos.objects.create(
-                        idcapacitacion=instance,
-                        nombremodulo=modulo_data.get('nombre_modulo')
-                    )
-                    for leccion_data in lecciones_data:
-                        preguntas_data = leccion_data.get('preguntas', [])
-                        # Mantener URL como es (puede ser cadena vacía, pero no None)
-                        leccion_url = leccion_data.get('url') or ""
-                        leccion = Lecciones.objects.create(
-                            idmodulo=modulo,
-                            tituloleccion=leccion_data.get('titulo_leccion'),
-                            tipoleccion=leccion_data.get('tipo_leccion'),
-                            url=leccion_url,
-                            duracion=leccion_data.get('duracion') or None,
-                        )
-                        if str(leccion.tipoleccion).lower() == 'formulario':
-                            for pregunta_data in preguntas_data:
-                                respuestas_data = pregunta_data.get('respuestas', [])
-                                # Mantener URL como es (puede ser cadena vacía, pero no None)
-                                pregunta_url = pregunta_data.get('url_multimedia') or ""
-                                pregunta = PreguntasLecciones.objects.create(
-                                    id_leccion=leccion,
-                                    pregunta=pregunta_data.get('pregunta'),
-                                    tipopregunta=pregunta_data.get('tipo_pregunta'),
-                                    urlmultimedia=pregunta_url
+                # Bloquear adición de módulos/lecciones/preguntas nuevos si ya hay progreso
+                tiene_progreso = progresoCapacitaciones.objects.filter(
+                    capacitacion=instance, progreso__gt=0
+                ).exists()
+                if tiene_progreso:
+                    for md in modulos_data:
+                        if not md.get('id'):
+                            raise serializers.ValidationError(
+                                {'modulos': 'No se pueden agregar módulos nuevos: la capacitación ya tiene progreso registrado por colaboradores.'}
+                            )
+                        for ld in md.get('lecciones', []):
+                            if not ld.get('id'):
+                                raise serializers.ValidationError(
+                                    {'modulos': 'No se pueden agregar lecciones nuevas: la capacitación ya tiene progreso registrado por colaboradores.'}
                                 )
-                                for respuesta_data in respuestas_data:
-                                    # Mantener URL como es (puede ser cadena vacía, pero no None)
-                                    respuesta_url = respuesta_data.get('url_imagen') or ""
-                                    Respuestas.objects.create(
-                                        idpregunta=pregunta,
-                                        valor=respuesta_data.get('valor'),
-                                        escorrecto=respuesta_data.get('es_correcto', 0),
-                                        urlimagen=respuesta_url
+                            for pd in ld.get('preguntas', []):
+                                if not pd.get('id'):
+                                    raise serializers.ValidationError(
+                                        {'modulos': 'No se pueden agregar preguntas nuevas: la capacitación ya tiene progreso registrado por colaboradores.'}
                                     )
+
+                incoming_modulo_ids = set()
+
+                for modulo_data in modulos_data:
+                    modulo_id = modulo_data.get('id')
+                    if modulo_id:
+                        try:
+                            modulo = Modulos.objects.get(pk=modulo_id, idcapacitacion=instance)
+                            modulo.nombremodulo = modulo_data.get('nombre_modulo', modulo.nombremodulo)
+                            modulo.save()
+                        except Modulos.DoesNotExist:
+                            modulo = Modulos.objects.create(
+                                idcapacitacion=instance,
+                                nombremodulo=modulo_data.get('nombre_modulo')
+                            )
+                    else:
+                        modulo = Modulos.objects.create(
+                            idcapacitacion=instance,
+                            nombremodulo=modulo_data.get('nombre_modulo')
+                        )
+                    incoming_modulo_ids.add(modulo.id)
+
+                    incoming_leccion_ids = set()
+                    for leccion_data in modulo_data.get('lecciones', []):
+                        leccion_id = leccion_data.get('id')
+                        if leccion_id:
+                            try:
+                                leccion = Lecciones.objects.get(pk=leccion_id, idmodulo=modulo)
+                                leccion.tituloleccion = leccion_data.get('titulo_leccion', leccion.tituloleccion)
+                                leccion.tipoleccion = leccion_data.get('tipo_leccion', leccion.tipoleccion)
+                                leccion.url = leccion_data.get('url') or ""
+                                leccion.duracion = leccion_data.get('duracion') or None
+                                leccion.save()
+                            except Lecciones.DoesNotExist:
+                                leccion = Lecciones.objects.create(
+                                    idmodulo=modulo,
+                                    tituloleccion=leccion_data.get('titulo_leccion'),
+                                    tipoleccion=leccion_data.get('tipo_leccion'),
+                                    url=leccion_data.get('url') or "",
+                                    duracion=leccion_data.get('duracion') or None,
+                                )
+                        else:
+                            leccion = Lecciones.objects.create(
+                                idmodulo=modulo,
+                                tituloleccion=leccion_data.get('titulo_leccion'),
+                                tipoleccion=leccion_data.get('tipo_leccion'),
+                                url=leccion_data.get('url') or "",
+                                duracion=leccion_data.get('duracion') or None,
+                            )
+                        incoming_leccion_ids.add(leccion.id)
+
+                        if str(leccion.tipoleccion).lower() == 'formulario':
+                            incoming_pregunta_ids = set()
+                            for pregunta_data in leccion_data.get('preguntas', []):
+                                pregunta_id = pregunta_data.get('id')
+                                if pregunta_id:
+                                    try:
+                                        pregunta = PreguntasLecciones.objects.get(pk=pregunta_id, id_leccion=leccion)
+                                        pregunta.pregunta = pregunta_data.get('pregunta', pregunta.pregunta)
+                                        pregunta.tipopregunta = pregunta_data.get('tipo_pregunta', pregunta.tipopregunta)
+                                        pregunta.urlmultimedia = pregunta_data.get('url_multimedia') or ""
+                                        pregunta.save()
+                                    except PreguntasLecciones.DoesNotExist:
+                                        pregunta = PreguntasLecciones.objects.create(
+                                            id_leccion=leccion,
+                                            pregunta=pregunta_data.get('pregunta'),
+                                            tipopregunta=pregunta_data.get('tipo_pregunta'),
+                                            urlmultimedia=pregunta_data.get('url_multimedia') or "",
+                                        )
+                                else:
+                                    pregunta = PreguntasLecciones.objects.create(
+                                        id_leccion=leccion,
+                                        pregunta=pregunta_data.get('pregunta'),
+                                        tipopregunta=pregunta_data.get('tipo_pregunta'),
+                                        urlmultimedia=pregunta_data.get('url_multimedia') or "",
+                                    )
+                                incoming_pregunta_ids.add(pregunta.id)
+
+                                incoming_respuesta_ids = set()
+                                for respuesta_data in pregunta_data.get('respuestas', []):
+                                    respuesta_id = respuesta_data.get('id')
+                                    if respuesta_id:
+                                        try:
+                                            respuesta = Respuestas.objects.get(pk=respuesta_id, idpregunta=pregunta)
+                                            respuesta.valor = respuesta_data.get('valor', respuesta.valor)
+                                            respuesta.escorrecto = respuesta_data.get('es_correcto', respuesta.escorrecto)
+                                            respuesta.urlimagen = respuesta_data.get('url_imagen') or ""
+                                            respuesta.save()
+                                        except Respuestas.DoesNotExist:
+                                            respuesta = Respuestas.objects.create(
+                                                idpregunta=pregunta,
+                                                valor=respuesta_data.get('valor'),
+                                                escorrecto=respuesta_data.get('es_correcto', 0),
+                                                urlimagen=respuesta_data.get('url_imagen') or "",
+                                            )
+                                    else:
+                                        respuesta = Respuestas.objects.create(
+                                            idpregunta=pregunta,
+                                            valor=respuesta_data.get('valor'),
+                                            escorrecto=respuesta_data.get('es_correcto', 0),
+                                            urlimagen=respuesta_data.get('url_imagen') or "",
+                                        )
+                                    incoming_respuesta_ids.add(respuesta.id)
+
+                                # Borrar respuestas eliminadas (cascade maneja RespuestasColaboradores si hay FK)
+                                Respuestas.objects.filter(idpregunta=pregunta).exclude(id__in=incoming_respuesta_ids).delete()
+
+                            # Borrar preguntas eliminadas y sus respuestas de colaboradores
+                            preguntas_a_borrar = PreguntasLecciones.objects.filter(id_leccion=leccion).exclude(id__in=incoming_pregunta_ids)
+                            RespuestasColaboradores.objects.filter(idpregunta__in=preguntas_a_borrar).delete()
+                            preguntas_a_borrar.delete()
+
+                    # Borrar lecciones eliminadas junto a su progreso
+                    lecciones_a_borrar = Lecciones.objects.filter(idmodulo=modulo).exclude(id__in=incoming_leccion_ids)
+                    progresolecciones.objects.filter(idleccion__in=lecciones_a_borrar).delete()
+                    lecciones_a_borrar.delete()
+
+                # Borrar módulos eliminados junto a su progreso
+                modulos_a_borrar = Modulos.objects.filter(idcapacitacion=instance).exclude(id__in=incoming_modulo_ids)
+                progresoModulo.objects.filter(modulo__in=modulos_a_borrar).delete()
+                modulos_a_borrar.delete()
 
             # Sincronizar colaboradores si se envía la lista
             added = []
