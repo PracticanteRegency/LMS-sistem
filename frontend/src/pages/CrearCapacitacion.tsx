@@ -39,6 +39,7 @@ interface Leccion {
 
 
 interface Modulo {
+  id?: number;
   nombre_modulo: string;
   lecciones: Leccion[];
 }
