@@ -3485,7 +3485,10 @@ class ActualizarEstadoExamenesMasivoView(APIView):
             try:
                 reg = RegistroExamenes.objects.get(id=tid)
                 estado_anterior = reg.estado_trabajador
-                reg.estado_trabajador = 0 if reg.estado_trabajador == 1 else 1
+                # Se fija explícitamente a Completado (no se invierte el estado actual)
+                # para evitar revertir a Pendiente trabajadores que ya estaban completados
+                # cuando se seleccionan junto con otros en una acción masiva.
+                reg.estado_trabajador = 1
                 reg.save()
 
                 # No sincronizamos RegistroExamenesEnviados: el estado del trabajador

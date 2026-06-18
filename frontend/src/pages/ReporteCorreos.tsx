@@ -555,9 +555,9 @@ export default function ReporteCorreos() {
                               className={styles.changeStateButton}
                               onClick={() => handleCambiarEstado(reporte.id, reporte)}
                               disabled={completingId === reporte.id || !reporte.trabajadores_ids?.length}
-                              title="Cambiar estado de trabajadores"
+                              title="Marcar todos los trabajadores de este correo como completados"
                             >
-                              {completingId === reporte.id ? "Procesando..." : "⚙️ Cambiar Estado"}
+                              {completingId === reporte.id ? "Procesando..." : "✅ Marcar Completado"}
                             </button>
                           </div>
                         </td>

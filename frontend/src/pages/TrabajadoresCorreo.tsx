@@ -252,7 +252,7 @@ export default function TrabajadoresCorreo() {
                   disabled={loading}
                   style={{ padding: '8px 24px', fontWeight: 600 }}
                 >
-                  Cambiar estado de seleccionados
+                  Marcar seleccionados como completados
                 </button>
               </div>
             )}
