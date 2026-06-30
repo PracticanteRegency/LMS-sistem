@@ -163,10 +163,11 @@ export default function MundialPartidos() {
       setWinner(null);
     }
     
-    // Load penalty shootout data if it exists
-    if (fullPrediction && fullPrediction.predice_penaltis) {
-      setPenaltisHome(fullPrediction.penaltis_local || 0);
-      setPenaltisAway(fullPrediction.penaltis_visitante || 0);
+    // Load penalty shootout data — prefer predictions state (updated after save) over initial API load
+    const penaltySource = existing || fullPrediction;
+    if (penaltySource?.predice_penaltis) {
+      setPenaltisHome(penaltySource.penaltis_local || 0);
+      setPenaltisAway(penaltySource.penaltis_visitante || 0);
     } else {
       setPenaltisHome(0);
       setPenaltisAway(0);
@@ -207,10 +208,17 @@ export default function MundialPartidos() {
       }
       
       await upsertPrediccion(predictionData);
-      // Update local state
+      // Update local state — incluir datos de penales para que la re-edición los cargue correctamente
       setPredictions({
         ...predictions,
-        [selectedMatch.id]: { home: homeScore, away: awayScore, winner },
+        [selectedMatch.id]: {
+          home: homeScore,
+          away: awayScore,
+          winner,
+          predice_penaltis: winner === "draw" && (penaltisHome !== 0 || penaltisAway !== 0),
+          penaltis_local: penaltisHome,
+          penaltis_visitante: penaltisAway,
+        },
       });
       setSelectedMatch(null);
       setShowSuccess(true);

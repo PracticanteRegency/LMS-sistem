@@ -251,7 +251,7 @@ def notificar_capacitacion_por_vencer_7_dias():
 def desactivar_capacitaciones():
     """
     Desactiva capacitaciones que vencen hoy.
-    Se ejecuta cada día a las 23:59.
+    Se ejecuta cada día a las 23:59 (hora Bogotá), es decir al final del día de la fecha máxima.
     """
     hoy = timezone.now().date()
 

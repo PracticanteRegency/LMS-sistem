@@ -2502,7 +2502,7 @@ class ReporteCapacitacionesView(APIView):
                 # Determinar estado: Completada, No Completado (si pasó fecha fin) o En Progreso
                 if progreso.completada == 1:
                     estado = "Completada"
-                elif capacitacion.fecha_fin and timezone.now() > capacitacion.fecha_fin:
+                elif capacitacion.estado == 0:
                     estado = "No Completado"
                 else:
                     estado = "En Progreso"

@@ -112,7 +112,7 @@ class TestTareasAutomatizadas(TestCase):
             tipo="Seminario"
         )
         
-        # Crear capacitación que vence hoy
+        # Crear capacitación que vence hoy (debe permanecer activa todo el día de vencimiento)
         cls.cap_hoy_vence = Capacitaciones.objects.create(
             titulo="Capacitación Vence Hoy",
             descripcion="Test",
@@ -121,6 +121,18 @@ class TestTareasAutomatizadas(TestCase):
             fecha_creacion=hoy - timedelta(days=21),
             fecha_inicio=hoy - timedelta(days=19),
             fecha_fin=hoy,
+            tipo="Evento"
+        )
+
+        # Crear capacitación que venció ayer (debe cerrarse hoy)
+        cls.cap_vencio_ayer = Capacitaciones.objects.create(
+            titulo="Capacitación Venció Ayer",
+            descripcion="Test",
+            imagen="",
+            estado=1,
+            fecha_creacion=hoy - timedelta(days=22),
+            fecha_inicio=hoy - timedelta(days=20),
+            fecha_fin=hoy - timedelta(days=1),
             tipo="Evento"
         )
         
@@ -203,24 +215,30 @@ class TestTareasAutomatizadas(TestCase):
         print("   ✅ Capacitación activada y correos enviados correctamente")
     
     def test_desactivar_capacitaciones(self):
-        """Test para desactivar capacitaciones que vencen hoy"""
+        """Test para desactivar capacitaciones que vencen hoy (se cierran al final del día, 23:59)"""
         print("\n🧪 Test: desactivar_capacitaciones")
-        
-        # Antes: capacitación activa
+
+        # Antes: ambas capacitaciones activas
         self.cap_hoy_vence.refresh_from_db()
+        self.cap_vencio_ayer.refresh_from_db()
         self.assertEqual(self.cap_hoy_vence.estado, 1)
-        
-        # Ejecutar tarea
+        self.assertEqual(self.cap_vencio_ayer.estado, 1)
+
+        # Ejecutar tarea (simula la corrida de las 23:59 del día de vencimiento)
         resultado = desactivar_capacitaciones()
-        
-        # Después: capacitación desactivada
+
+        # Después: la que vence hoy se cierra al final del día
         self.cap_hoy_vence.refresh_from_db()
         self.assertEqual(self.cap_hoy_vence.estado, 0)
-        
+
+        # La que venció ayer también está cerrada
+        self.cap_vencio_ayer.refresh_from_db()
+        self.assertEqual(self.cap_vencio_ayer.estado, 0)
+
         # Verificar que se completó sin errores
         self.assertIsNone(resultado)
-        
-        print("   ✅ Capacitación desactivada correctamente")
+
+        print("   ✅ Capacitaciones desactivadas correctamente al cierre del día de vencimiento")
     
     def test_notificar_jefes_por_colaboradores_sin_progreso(self):
         """Test para notificar a jefes sobre colaboradores sin progreso"""

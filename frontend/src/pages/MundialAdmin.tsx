@@ -242,9 +242,9 @@ export default function MundialAdmin() {
     setResultMatch(match);
     setResultHome(match.result?.home ?? 0);
     setResultAway(match.result?.away ?? 0);
-    setWentToPenalties(false);
-    setPenaltiesHome(0);
-    setPenaltiesAway(0);
+    setWentToPenalties(match.fue_a_penaltis ?? false);
+    setPenaltiesHome(match.penaltis_local ?? 0);
+    setPenaltiesAway(match.penaltis_visitante ?? 0);
     setShowResultModal(true);
   };
 
