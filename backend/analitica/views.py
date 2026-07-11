@@ -324,6 +324,7 @@ class ProyectoCreateView(APIView):
         serializer = ProyectoSerializer(data=proyecto_data)
         if serializer.is_valid():
             proyecto = serializer.save()
+            cache.delete('cargo_empresa_examenes_data')
             return Response(
                 {"message": "Proyecto creado", "proyecto": ProyectoSerializer(proyecto).data},
                 status=status.HTTP_201_CREATED
@@ -349,6 +350,7 @@ class VerProyectoView(APIView):
         serializer = ProyectoSerializer(proyecto, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            cache.delete('cargo_empresa_examenes_data')
             return Response({"message": "Proyecto actualizado", "proyecto": serializer.data})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -359,6 +361,7 @@ class VerProyectoView(APIView):
 
         proyecto.estadoproyecto = 0 if proyecto.estadoproyecto == 1 else 1
         proyecto.save(update_fields=["estadoproyecto"])
+        cache.delete('cargo_empresa_examenes_data')
 
         return Response({"message": "Estado actualizado"})
 
@@ -485,6 +488,7 @@ class CentroOperativoCreateView(APIView):
             serializer = CentroOpSerializer(data=request.data)
             if serializer.is_valid():
                 centro = serializer.save()
+                cache.delete('cargo_empresa_examenes_data')
                 return Response(
                     {"message": "Centro operativo creado", "centro_operativo": serializer.data},
                     status=status.HTTP_201_CREATED
@@ -509,6 +513,7 @@ class VerCentroOperativoView(APIView):
         serializer = CentroOpSerializer(centro, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
+            cache.delete('cargo_empresa_examenes_data')
             return Response({"message": "Centro actualizado", "centro_operativo": serializer.data})
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -519,6 +524,7 @@ class VerCentroOperativoView(APIView):
 
         centro.estadocentrop = 0 if centro.estadocentrop == 1 else 1
         centro.save(update_fields=["estadocentrop"])
+        cache.delete('cargo_empresa_examenes_data')
 
         return Response({"message": "Estado actualizado"})
 
