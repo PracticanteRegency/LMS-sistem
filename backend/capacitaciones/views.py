@@ -1343,6 +1343,7 @@ class DescargarCertificadoView(APIView):
             if curso_text and len(str(curso_text)) > int(max_width):
                 # Texto largo: utilizar la Y para curso largo
                 curso_pos['y'] = '115.5'
+                curso_pos['font-size'] = '3.5'  # Reducir tamaño de fuente para texto largo
             else:
                 # Texto corto o vacío: usar la Y por defecto para curso corto
                 curso_pos['y'] = '118.5'
