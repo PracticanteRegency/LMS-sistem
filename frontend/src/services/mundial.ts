@@ -55,6 +55,9 @@ export interface Prediction {
   home: number;
   away: number;
   winner: WinnerChoice;
+  predice_penaltis?: boolean;
+  penaltis_local?: number;
+  penaltis_visitante?: number;
 }
 
 export interface RankingEntry {
