@@ -2866,5 +2866,5 @@ class InduccionesView(APIView):
     Solo usuarios tipo 3+ (staff) pueden acceder.
     """
     def get(self, request, *args, **kwargs):
-            inducciones = Capacitaciones.objects.filter(tipo__in=["INDUCCIÓN CORPORATIVA", "ENCUESTA"]).values('id', 'titulo', 'tipo', 'estado', 'descripcion').order_by('tipo', 'titulo')
+            inducciones = Capacitaciones.objects.filter(tipo__in=["INDUCCIÓN CORPORATIVA", "ENCUESTA"],estado=1).values('id', 'titulo', 'tipo', 'estado', 'descripcion').order_by('tipo', 'titulo')
             return Response(list(inducciones), status=status.HTTP_200_OK)
