@@ -2436,6 +2436,7 @@ class ReporteCapacitacionesView(APIView):
                 "Nombre",
                 "Apellido",
                 "Correo",
+                "Estado Colaborador",
                 "% Completación",
                 "Fecha Registro",
                 "Fecha Completación",
@@ -2474,8 +2475,8 @@ class ReporteCapacitacionesView(APIView):
                 colaborador = progreso.colaborador
                 
                 # Solo incluir colaboradores activos
-                if colaborador.estadocolaborador != 1:
-                    continue
+                #if colaborador.estadocolaborador != 1:
+                    #continue
                 
                 # Obtener datos de las relaciones
                 centro_op = colaborador.centroop.nombrecentrop if colaborador.centroop else 'N/A'
@@ -2496,9 +2497,15 @@ class ReporteCapacitacionesView(APIView):
                 ws.cell(row=row, column=8).value = colaborador.nombrecolaborador
                 ws.cell(row=row, column=9).value = colaborador.apellidocolaborador
                 ws.cell(row=row, column=10).value = colaborador.correocolaborador
-                ws.cell(row=row, column=11).value = float(progreso.progreso)
-                ws.cell(row=row, column=12).value = progreso.fecha_registro.strftime('%d/%m/%Y %H:%M') if progreso.fecha_registro else 'N/A'
-                ws.cell(row=row, column=13).value = progreso.fecha_completada.strftime('%d/%m/%Y %H:%M') if progreso.fecha_completada else 'N/A'
+
+                if colaborador.estadocolaborador==1:
+                    ws.cell(row=row, column=11).value ="Activo"
+                else:
+                    ws.cell(row=row, column=11).value ="Inactivo"
+                
+                ws.cell(row=row, column=12).value = float(progreso.progreso)
+                ws.cell(row=row, column=13).value = progreso.fecha_registro.strftime('%d/%m/%Y %H:%M') if progreso.fecha_registro else 'N/A'
+                ws.cell(row=row, column=14).value = progreso.fecha_completada.strftime('%d/%m/%Y %H:%M') if progreso.fecha_completada else 'N/A'
                 
                 # Determinar estado: Completada, No Completado (si pasó fecha fin) o En Progreso
                 if progreso.completada == 1:
@@ -2507,7 +2514,7 @@ class ReporteCapacitacionesView(APIView):
                     estado = "No Completado"
                 else:
                     estado = "En Progreso"
-                ws.cell(row=row, column=14).value = estado
+                ws.cell(row=row, column=15).value = estado
                 
                 # Si se incluyen preguntas, agregar respuestas del colaborador
                 if include_questions:
@@ -2538,10 +2545,10 @@ class ReporteCapacitacionesView(APIView):
                 for col in range(1, num_cols + 1):
                     cell = ws.cell(row=row, column=col)
                     cell.border = border
-                    if col == 10:  # Porcentaje
+                    if col == 12:  # Porcentaje
                         cell.alignment = center_alignment
                         cell.number_format = '0.00"%"'
-                    elif col in [11, 12]:  # Fechas
+                    elif col in [13, 14]:  # Fechas
                         cell.alignment = center_alignment
                     elif col == 13:  # Estado Avance
                         cell.alignment = center_alignment
@@ -2559,10 +2566,11 @@ class ReporteCapacitacionesView(APIView):
             ws.column_dimensions['H'].width = 15  # Nombre
             ws.column_dimensions['I'].width = 15  # Apellido
             ws.column_dimensions['J'].width = 25  # Correo
-            ws.column_dimensions['K'].width = 16  # % Completación
-            ws.column_dimensions['L'].width = 18  # Fecha Registro
-            ws.column_dimensions['M'].width = 18  # Fecha Completación
-            ws.column_dimensions['N'].width = 14  # Estado Avance
+            ws.column_dimensions['K'].width = 14  # estado colaborador
+            ws.column_dimensions['L'].width = 25  # % Completación
+            ws.column_dimensions['M'].width = 18  # Fecha Registro
+            ws.column_dimensions['N'].width = 18  # Fecha Completación
+            ws.column_dimensions['O'].width = 14  # Estado Avance
             
             # Ajustar ancho para columnas de preguntas y respuestas
             #if include_questions:
@@ -2698,6 +2706,7 @@ class ReporteCapacitacionesView(APIView):
                 "Nombre",
                 "Apellido",
                 "Correo",
+                "Estado Colaborador",
                 "% Completación",
                 "Estado Avance"
             ]
@@ -2738,8 +2747,8 @@ class ReporteCapacitacionesView(APIView):
                         colaborador = progreso.colaborador
 
                         # Saltar colaboradores desactivados
-                        if colaborador.estadocolaborador != 1:
-                            continue
+                        #if colaborador.estadocolaborador != 1:
+                            #continue
 
                         # Obtener datos de las relaciones
                         centro_op = colaborador.centroop.nombrecentrop if colaborador.centroop else 'N/A'
@@ -2770,7 +2779,12 @@ class ReporteCapacitacionesView(APIView):
                         ws.cell(row=row, column=15).value = colaborador.nombrecolaborador
                         ws.cell(row=row, column=16).value = colaborador.apellidocolaborador
                         ws.cell(row=row, column=17).value = colaborador.correocolaborador
-                        ws.cell(row=row, column=18).value = float(progreso.progreso)
+                        if colaborador.estadocolaborador==1:
+                            ws.cell(row=row, column=18).value ="Activo"
+                        else:
+                            ws.cell(row=row, column=18).value ="Inactivo"
+
+                        ws.cell(row=row, column=19).value = float(progreso.progreso)
 
                         # Determinar estado: Completada, No Completado (si pasó fecha fin) o En Progreso
                         if progreso.completada == 1:
@@ -2779,16 +2793,16 @@ class ReporteCapacitacionesView(APIView):
                             estado = "No Completado"
                         else:
                             estado = "En Progreso"
-                        ws.cell(row=row, column=19).value = estado
+                        ws.cell(row=row, column=20).value = estado
 
                         # Aplicar bordes y formato
                         for col in range(1, 20):
                             cell = ws.cell(row=row, column=col)
                             cell.border = border
-                            if col in [7, 18]:  # Porcentajes
+                            if col in [7, 19]:  # Porcentajes
                                 cell.alignment = center_alignment
                                 cell.number_format = '0.00"%"'
-                            elif col in [4, 19]:  # Duración Total y Estado
+                            elif col in [4, 20]:  # Duración Total y Estado
                                 cell.alignment = center_alignment
                             else:
                                 cell.alignment = Alignment(vertical='center')
@@ -2826,8 +2840,9 @@ class ReporteCapacitacionesView(APIView):
             ws.column_dimensions['O'].width = 18  # Nombre
             ws.column_dimensions['P'].width = 18  # Apellido
             ws.column_dimensions['Q'].width = 25  # Correo
-            ws.column_dimensions['R'].width = 16  # % Completación
-            ws.column_dimensions['S'].width = 14  # Estado Avance
+            ws.column_dimensions['R'].width = 14  # estado colaborador
+            ws.column_dimensions['S'].width = 16  # % Completación
+            ws.column_dimensions['T'].width = 14  # Estado Avance
 
             # Habilitar filtros (facilita filtrado en Excel)
             try:
