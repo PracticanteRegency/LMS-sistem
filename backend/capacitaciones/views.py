@@ -2518,7 +2518,7 @@ class ReporteCapacitacionesView(APIView):
                 
                 # Si se incluyen preguntas, agregar respuestas del colaborador
                 if include_questions:
-                    col_offset = 14
+                    col_offset = 15
                     respuestas_colaborador = RespuestasColaboradores.objects.filter(
                         idcolaborador=colaborador
                     ).select_related('idpregunta', 'idrespuesta')
