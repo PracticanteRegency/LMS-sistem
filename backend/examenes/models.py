@@ -208,6 +208,35 @@ class RegistroExamenes(models.Model):
         return f"{self.nombre_trabajador} ({self.documento_trabajador}) - {self.empresa}"
 
 
+class HistorialEstadoRegistroExamen(models.Model):
+    """
+    Tabla de auditoría: registra qué colaborador marcó un
+    RegistroExamenes como Completado y en qué fecha/hora.
+    Se crea un registro cada vez que estado_trabajador pasa a 1.
+    """
+    registro_examen = models.ForeignKey(
+        RegistroExamenes,
+        on_delete=models.CASCADE,
+        related_name='historial_estados',
+        help_text="Registro de examen del trabajador que cambió de estado"
+    )
+    colaborador = models.ForeignKey(
+        Colaboradores,
+        on_delete=models.PROTECT,
+        related_name='cambios_estado_examenes',
+        help_text="Colaborador que realizó el cambio de estado a Completado"
+    )
+    fecha_cambio = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Historial de Estado de Registro de Examen'
+        verbose_name_plural = 'Historial de Estados de Registros de Exámenes'
+        ordering = ['-fecha_cambio']
+
+    def __str__(self):
+        return f"{self.registro_examen.nombre_trabajador} completado por {self.colaborador} el {self.fecha_cambio}"
+
+
 class ExamenTrabajador(models.Model):
     """
     Tabla de relación muchos a muchos entre RegistroExamenes y Examen.
@@ -235,3 +264,5 @@ class ExamenTrabajador(models.Model):
 
     def __str__(self):
         return f"{self.registro_examen.nombre_trabajador} - {self.examen.nombre}"
+
+
