@@ -11,6 +11,7 @@ from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from django.http import HttpResponse
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from django.utils import timezone
 import io
 import uuid
@@ -1543,6 +1544,7 @@ class ImprimirReporteCorreosView(APIView):
 
             # Iniciar queryset base - ahora usamos RegistroExamenes
             # OPTIMIZADO: Prefetch de exámenes enviados para evitar N+1 en el loop
+            from .models import HistorialEstadoRegistroExamen
             queryset = RegistroExamenes.objects.filter(
                 estado_trabajador=1
             ).select_related(
@@ -1555,6 +1557,11 @@ class ImprimirReporteCorreosView(APIView):
                         examen__activo=True
                     ).select_related('examen'),
                     to_attr='examenes_enviados_precargados'
+                ),
+                Prefetch(
+                    'historial_estados',
+                    queryset=HistorialEstadoRegistroExamen.objects.select_related('colaborador').order_by('-fecha_cambio'),
+                    to_attr='historial_precargado'
                 )
             )
 
@@ -1669,7 +1676,7 @@ class ImprimirReporteCorreosView(APIView):
             )
 
             # Título del reporte
-            num_cols = 13 + len(nombres_examenes)  # 13 columnas base (incluyendo "Enviado Por") + exámenes
+            num_cols = 15 + len(nombres_examenes)  # 15 columnas base (incluye "Enviado Por", "Completado Por" y "Fecha Completado") + exámenes
             ws.merge_cells(f'A1:{get_column_letter(num_cols)}1')
             ws['A1'] = "REPORTE DETALLADO DE EXÁMENES POR TRABAJADOR"
             ws['A1'].font = Font(bold=True, size=14)
@@ -1715,7 +1722,9 @@ class ImprimirReporteCorreosView(APIView):
                 "Cédula",
                 "Ciudad",
                 "Tipo Examen",
-                "Total Exámenes"] + nombres_examenes
+                "Total Exámenes",
+                "Completado Por",
+                "Fecha Completado"] + nombres_examenes
             for col_num, header in enumerate(headers, start=1):
                 cell = ws.cell(row=row, column=col_num, value=header)
                 cell.fill = header_fill
@@ -1754,6 +1763,19 @@ class ImprimirReporteCorreosView(APIView):
                     apellido_col = getattr(colaborador, 'apellidocolaborador', '')
                     enviado_por_nombre = f"{nombre_col} {apellido_col}".strip()
 
+                # Colaborador y fecha en que se marcó el examen como Completado
+                # (registros completados antes de existir esta auditoría quedan vacíos)
+                completado_por_nombre = ''
+                fecha_completado_str = ''
+                historial = getattr(registro, 'historial_precargado', [])
+                if historial:
+                    ultimo_cambio = historial[0]
+                    col_completo = ultimo_cambio.colaborador
+                    nombre_completo = getattr(col_completo, 'nombrecolaborador', '')
+                    apellido_completo = getattr(col_completo, 'apellidocolaborador', '')
+                    completado_por_nombre = f"{nombre_completo} {apellido_completo}".strip()
+                    fecha_completado_str = ultimo_cambio.fecha_cambio.astimezone(ZoneInfo('America/Bogota')).strftime('%d/%m/%Y %H:%M')
+
                 # OPTIMIZADO: Usar exámenes precargados con Prefetch (sin query adicional)
                 examenes_enviados = getattr(registro, 'examenes_enviados_precargados', [])
 
@@ -1785,7 +1807,9 @@ class ImprimirReporteCorreosView(APIView):
                     registro.documento_trabajador,
                     registro.ciudad or '',
                     registro.tipo_examen or '',
-                    total_examenes_trabajador  # Total horizontal por trabajador
+                    total_examenes_trabajador,  # Total horizontal por trabajador
+                    completado_por_nombre,
+                    fecha_completado_str
                 ]
 
                 # Agregar X para cada examen activo enviado (una X por examen único)
@@ -1831,8 +1855,15 @@ class ImprimirReporteCorreosView(APIView):
             cell_total_vertical.alignment = center_alignment
             cell_total_vertical.border = border_style
 
+            # "Completado Por" y "Fecha Completado" (14-15) no tienen total numérico,
+            # solo se les aplica el mismo estilo de fila para que no queden en blanco
+            for col in range(14, 16):
+                cell = ws.cell(row=row, column=col)
+                cell.fill = totales_fill
+                cell.border = border_style
+
             # Totales verticales por cada columna de examen
-            col_inicio_examenes = 14  # Columna donde empiezan los exámenes (ahora 14 por Enviado Por)
+            col_inicio_examenes = 16  # Columna donde empiezan los exámenes (después de Completado Por / Fecha Completado)
             gran_total_examenes = 0  # Para el total general
             
             for col_num, nombre_examen in enumerate(nombres_examenes, start=col_inicio_examenes):
@@ -1888,6 +1919,8 @@ class ImprimirReporteCorreosView(APIView):
             ws.column_dimensions['J'].width = 15  # Ciudad
             ws.column_dimensions['K'].width = 18  # Tipo Examen
             ws.column_dimensions['L'].width = 12  # Total Exámenes
+            ws.column_dimensions['N'].width = 28  # Completado Por
+            ws.column_dimensions['O'].width = 18  # Fecha Completado
 
             # Columnas de exámenes
             for col_num in range(col_inicio_examenes, col_inicio_examenes + len(nombres_examenes)):
@@ -3474,7 +3507,7 @@ class ActualizarEstadoExamenesMasivoView(APIView):
 
         trabajador_ids = serializer.validated_data['trabajador_ids']
 
-        from .models import RegistroExamenes
+        from .models import RegistroExamenes, HistorialEstadoRegistroExamen
         actualizados = []
         no_encontrados = []
         cambios = []
@@ -3490,6 +3523,13 @@ class ActualizarEstadoExamenesMasivoView(APIView):
                 # cuando se seleccionan junto con otros en una acción masiva.
                 reg.estado_trabajador = 1
                 reg.save()
+
+                # Solo se audita cuando realmente hubo transición a Completado
+                if estado_anterior != 1:
+                    HistorialEstadoRegistroExamen.objects.create(
+                        registro_examen=reg,
+                        colaborador=request.user.idcolaboradoru,
+                    )
 
                 # No sincronizamos RegistroExamenesEnviados: el estado del trabajador
                 # es ahora la fuente de verdad (decoupled). Solo registramos el cambio
