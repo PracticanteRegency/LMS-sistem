@@ -81,9 +81,9 @@ export default function App() {
               } />
 
 
-            {/* Ruta para ver usuarios de una capacitación, solo para roles 1 y 4 */}
+            {/* Ruta para ver usuarios de una capacitación: roles 1, 3 y 4 */}
             <Route path="/capacitaciones/:id/users-cap" element={
-              <AdminRoute><UsersCap /></AdminRoute>
+              <AdminOrExamenesRoute><UsersCap /></AdminOrExamenesRoute>
             } />
 
             <Route path="/capacitaciones/:id/colaboradores" element={
