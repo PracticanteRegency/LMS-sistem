@@ -370,14 +370,12 @@ export default function Capacitaciones() {
                                 zIndex: 2147483647,
                               }}
                             >
-                              {userRole !== 3 && (
                                 <button
                                   className={`${styles.btn} ${styles.btn}`}
                                   onClick={() => handleAction("Ver", cap)}
                                 >
                                   Ver
                                 </button>
-                              )}
                               {userRole !== 3 && (
                                 <button
                                   className={`${styles.btn} ${styles.btn}`}
