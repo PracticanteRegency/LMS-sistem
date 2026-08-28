@@ -948,7 +948,7 @@ class ActualizarRolUsuarioView(APIView):
                     status=400
                 )
             
-            if nuevo_rol not in [0, 1, 2, 3, 4]:
+            if nuevo_rol not in [0, 1, 2, 3, 4, 5]:
                 return Response(
                     {"error": "El tipousuario debe ser 0, 1, 2, 3 o 4"},
                     status=400

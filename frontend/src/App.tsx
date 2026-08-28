@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { AdminRoute } from "./AdminRoute.tsx";
 import { AdminOrExamenesRoute } from "./AdminOrExamenesRoute.tsx";
+import { AdminOrAuditorRoute } from "./AdminOrAuditor.tsx";
 import { AuthContext } from "./context/AuthContext";
 import { getUser, isAuthenticated } from "./services/auth.ts";
 
@@ -77,13 +78,13 @@ export default function App() {
               <AdminRoute><Dashboard /></AdminRoute>
             }/>
             <Route path="/capacitaciones/list" element={
-              <AdminOrExamenesRoute><Capacitaciones /></AdminOrExamenesRoute>
+              <AdminOrAuditorRoute><Capacitaciones /></AdminOrAuditorRoute>
               } />
 
 
             {/* Ruta para ver usuarios de una capacitación: roles 1, 3 y 4 */}
             <Route path="/capacitaciones/:id/users-cap" element={
-              <AdminOrExamenesRoute><UsersCap /></AdminOrExamenesRoute>
+              <AdminOrAuditorRoute><UsersCap /></AdminOrAuditorRoute>
             } />
 
             <Route path="/capacitaciones/:id/colaboradores" element={
@@ -104,9 +105,11 @@ export default function App() {
             <Route path="/usuarios/crear" element={
               <ProtectedRoute><CrearUsuario /></ProtectedRoute>
             }/>
+            {/* Crear / Replicar: admin, superadmin y usuario especial (rol 3, solo para replicar) */}
             <Route path="/CrearCapacitacion" element={
-              <AdminRoute><CrearCapacitacion /></AdminRoute>
+              <AdminOrExamenesRoute><CrearCapacitacion /></AdminOrExamenesRoute>
             }/>
+            {/* Editar capacitación existente: solo admin y superadmin */}
             <Route path="/CrearCapacitacion/:id" element={
               <AdminRoute><CrearCapacitacion /></AdminRoute>
             }/>

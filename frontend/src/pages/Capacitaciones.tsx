@@ -282,12 +282,14 @@ export default function Capacitaciones() {
             >
               {downloadingReport ? "⏳ Descargando..." : "📊 Generar Reporte"}
             </button>
-            <button
-              className={styles.btnCreate}
-              onClick={() => navigate("/CrearCapacitacion")}
-            >
-              + Crear Capacitación
-            </button>
+           {userRole !== 5 && userRole !== 3 && (
+              <button
+                className={styles.btnCreate}
+                onClick={() => navigate("/CrearCapacitacion")}
+              >
+                + Crear Capacitación
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -376,7 +378,7 @@ export default function Capacitaciones() {
                                 >
                                   Ver
                                 </button>
-                              {userRole !== 3 && (
+                              {userRole !== 3 && userRole !== 5 && (
                                 <button
                                   className={`${styles.btn} ${styles.btn}`}
                                   onClick={() => handleAction("Editar", cap)}
@@ -384,19 +386,24 @@ export default function Capacitaciones() {
                                   Editar
                                 </button>
                               )}
-                              <button
+                              {userRole !== 5 && (
+                                 <button
                                 className={`${styles.btn} ${styles.btn}`}
                                 onClick={() => handleAction("Replicar", cap)}
                               >
                                 Replicar
                               </button>
+                              )}
+                             
+                             {userRole !== 5 && (
                               <button
                                 className={`${styles.btn} ${styles.btn}`}
                                 onClick={() => handleAction("EditarColaboradores", cap)}
                               >
                                 Editar colaboradores
                               </button>
-                              {userRole !== 3 && (
+                              )}
+                              {userRole !== 3 && userRole !== 5 && (
                                 <button
                                   className={`${styles.btn} ${styles.btn}`}
                                   onClick={() => handleAction("ToggleEstado", cap)}
@@ -404,7 +411,7 @@ export default function Capacitaciones() {
                                   {cap.estado === 0 ? 'Activar' : 'Desactivar'}
                                 </button>
                               )}
-                              {userRole !== 3 && (
+                              {userRole !== 3 && userRole !== 5 && (
                                 <button
                                   className={`${styles.btn} ${styles.btn}`}
                                   onClick={() => handleAction("Eliminar", cap)}

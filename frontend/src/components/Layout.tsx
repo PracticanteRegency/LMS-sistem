@@ -16,6 +16,7 @@ export default function Layout() {
     if (role === 4) setUserType(4); // superadmin UI (todo acceso)
     else if (role === 1) setUserType(2); // admin UI
     else if (role === 3) setUserType(3); // staff especial UI
+    else if (role === 5) setUserType(5); // auditor: solo ver capacitaciones
     else setUserType(1); // usuario normal
     // set user id for components that need it
     try { setUserId(getUserId()); } catch { setUserId(null); }

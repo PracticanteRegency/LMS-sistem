@@ -271,13 +271,13 @@ export default function Usuarios() {
 
   const handleCambiarRol = async (user: Usuario) => {
     const nuevoRol = prompt(
-      "Ingresa el nuevo tipo de usuario (0=Usuario, 1=Admin Capacitaciones, 3=Admin Examenes, 4=SuperAdmin):"
+      "Ingresa el nuevo tipo de usuario (0=Usuario, 1=Admin Capacitaciones, 3=Admin Examenes, 4=SuperAdmin, 5=Admin Auditoria):"
     );
     
     if (nuevoRol === null) return;
     
     const rol = parseInt(nuevoRol);
-    if (isNaN(rol) || ![0, 1, 3, 4].includes(rol)) {
+    if (isNaN(rol) || ![0, 1, 3, 4, 5].includes(rol)) {
       setError("Tipo de usuario inválido");
       setTimeout(() => setError(null), 3000);
       return;
@@ -373,7 +373,9 @@ export default function Usuarios() {
             >
               📤 Registrar Masivo
             </button>
-            <button
+
+            {userRole !=3  && (
+             <button
               className={styles.btnReport}
               onClick={handleDescargarReporte}
               title="Descargar reporte de todos los usuarios en Excel"
@@ -381,7 +383,11 @@ export default function Usuarios() {
             >
               📊 Descargar Reporte
             </button>
-            <button
+
+            )}
+
+            {userRole !=3  && (
+              <button
               className={styles.btnReport}
               onClick={() => navigate("/desactivar-usuarios")}
               title="Desactivar múltiples usuarios"
@@ -389,6 +395,8 @@ export default function Usuarios() {
             >
               🚫 Desactivar Usuarios
             </button>
+            )}
+            
           </div>
         </div>
       </div>
@@ -479,18 +487,23 @@ export default function Usuarios() {
                               zIndex: 2147483647,
                             }}
                           >
-                            <button
+                            {(userRole === 1 || userRole === 4) && (
+                             <button
                               className={`${styles.btn} ${styles.btn}`}
                               onClick={() => handleAction("Ver", u)}
                             >
                               Ver
                             </button>
-                            <button
+                            )}
+                            {(userRole === 1 || userRole === 4) && (
+                             <button
                               className={`${styles.btn} ${styles.btn}`}
                               onClick={() => navigate(`/user/editar/${u.id_colaborador}`)}
                             >
                               Editar
                             </button>
+                            )}
+                            
                             {(userRole === 1 || userRole === 3 || userRole === 4) && (
                               <button
                                 className={`${styles.btn} ${styles.btn}`}

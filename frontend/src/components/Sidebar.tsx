@@ -15,7 +15,7 @@ import styles from "./Navbar.module.css";
   const isSuperAdmin = userType === 4;
   const isAdmin = userType === 2 || isSuperAdmin;
   // allow specific user IDs to see Usuarios menu
-  const allowedUserIdsForUsuarios = new Set([1, 3, 4]);
+  const allowedUserIdsForUsuarios = new Set([1, 3, 4, 2, 5]);
   const canSeeUsuarios = isAdmin || (typeof userId === 'number' && allowedUserIdsForUsuarios.has(userId));
 
     return (
@@ -88,7 +88,17 @@ import styles from "./Navbar.module.css";
                   </ul>
                 </li>
               </>
-            ) : (
+            ) : userType === 5 ? (
+              <>
+                <li className={styles.menuSection}>
+                  <span className={styles.sectionTitle}>Capacitaciones</span>
+                  <ul className={styles.submenu}>
+                    <li><Link to="/capacitaciones/list" className={styles.submenuItem}>Capacitaciones</Link></li>
+                    <li><Link to="/" className={styles.submenuItem}>Mis Capacitaciones</Link></li>
+                  </ul>
+                </li>
+              </>
+            ):  (
               <li className={styles.menuSection}>
                 <span className={styles.sectionTitle}>Capacitaciones</span>
                 <Link to="/" className={styles.submenuItem}>Mis Capacitaciones</Link>

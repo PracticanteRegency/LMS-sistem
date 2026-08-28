@@ -147,7 +147,7 @@ class IsSuperAdmin(BasePermission):
             return False
         tipousuario = getattr(request.user, 'tipousuario', None)
         # Permitir tanto admin (1) como super admin (4)
-        return tipousuario in [1, 2, 3, 4]
+        return tipousuario in [1, 2, 3, 4, 5]
 
 
 class IsGestionEmpresarial(BasePermission):
@@ -156,6 +156,7 @@ class IsGestionEmpresarial(BasePermission):
     - 1: Administrador
     - 3: Usuario Especial
     - 4: Super Admin
+    - 4: Super auditoria
     """
     message = "No tiene permisos para acceder a Gestión Empresarial."
 

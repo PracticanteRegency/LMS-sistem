@@ -89,7 +89,9 @@ def invalidate_capacitacion_cache(capacitacion_id=None, colaborador_id=None):
 
 
 class CrearCapacitacionView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    # Admin/SuperAdmin: acceso completo. Usuario Especial (rol 3): puede crear/replicar
+    # (POST); el PATCH de edición sigue bloqueado por la validación interna is_staff.
+    permission_classes = [IsAuthenticated, IsAdminUser | IsUsuarioEspecial]
     """Crear o editar una capacitación (Solo Admin y SuperAdmin)
        GET with `capacitacion_id`: retorna datos para edición
        POST: crea nueva capacitación
