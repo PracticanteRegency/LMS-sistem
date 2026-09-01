@@ -314,6 +314,7 @@ export default function CrearUsuario() {
                 <option value="0">USUARIO</option>
                 <option value="1">ADMIN CAPACITACIONES</option>
                 <option value="3">ADMIN EXAMENES</option>
+                <option value="5">AUDITORIA</option>
               </select>
             </div>
             <div className={styles.completoRow}>

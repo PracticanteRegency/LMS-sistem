@@ -5,6 +5,15 @@ import styles from "./Styles/perfil.module.css";
 import perfilService from "../services/perfil.js";
 // @ts-ignore
 import CapListService from "../services/Capacitaciones.js";
+import { normalizeDataUrl } from "../utils/media";
+
+interface MediaItem {
+  key: string;
+  modulo: string;
+  titulo: string;
+  tipo: "video" | "imagen" | "pdf";
+  url: string;
+}
 
 interface Capacitacion {
   id_capacitacion: number;
@@ -43,9 +52,64 @@ export default function Perfil() {
   const [downloading, setDownloading] = useState<Record<number, boolean>>({});
   const [activeTab, setActiveTab] = useState<"capacitaciones" | "certificados" | "informacion">("capacitaciones");
 
+  // Estado del modal "Ver multimedia"
+  const [multimediaCap, setMultimediaCap] = useState<Capacitacion | null>(null);
+  const [multimediaItems, setMultimediaItems] = useState<MediaItem[]>([]);
+  const [multimediaLoading, setMultimediaLoading] = useState(false);
+  const [multimediaError, setMultimediaError] = useState<string | null>(null);
+  const [multimediaSelected, setMultimediaSelected] = useState(0);
+
   useEffect(() => {
     loadPerfil();
   }, []);
+
+  const getYouTubeId = (url: string): string | null => {
+    if (!url || typeof url !== "string") return null;
+    if (url.includes("youtube.com/watch?v=")) return url.split("v=")[1]?.split("&")[0] || null;
+    if (url.includes("youtu.be/")) return url.split("youtu.be/")[1]?.split("?")[0] || null;
+    if (url.includes("youtube.com/embed/")) return url.split("embed/")[1]?.split("?")[0] || null;
+    return null;
+  };
+
+  const handleVerMultimedia = async (cap: Capacitacion) => {
+    setMultimediaCap(cap);
+    setMultimediaItems([]);
+    setMultimediaError(null);
+    setMultimediaSelected(0);
+    setMultimediaLoading(true);
+    try {
+      const data: any = await CapListService.getCapacitacionById(cap.id_capacitacion);
+      const modulos: any[] = Array.isArray(data?.modulos) ? data.modulos : [];
+      const items: MediaItem[] = [];
+      modulos.forEach((mod, mIdx) => {
+        const lecciones: any[] = Array.isArray(mod?.lecciones) ? mod.lecciones : [];
+        lecciones.forEach((lec, lIdx) => {
+          const tipo = String(lec?.tipo_leccion || "").toLowerCase();
+          if ((tipo === "video" || tipo === "imagen" || tipo === "pdf") && lec?.url) {
+            items.push({
+              key: `${mIdx}-${lIdx}`,
+              modulo: mod?.nombre_modulo || `Módulo ${mIdx + 1}`,
+              titulo: lec?.titulo_leccion || `Lección ${lIdx + 1}`,
+              tipo: tipo as MediaItem["tipo"],
+              url: String(lec.url),
+            });
+          }
+        });
+      });
+      setMultimediaItems(items);
+    } catch (err: any) {
+      console.error("Error al cargar multimedia:", err);
+      setMultimediaError(err?.message || "No se pudo cargar la multimedia de la capacitación");
+    } finally {
+      setMultimediaLoading(false);
+    }
+  };
+
+  const closeMultimedia = () => {
+    setMultimediaCap(null);
+    setMultimediaItems([]);
+    setMultimediaError(null);
+  };
 
   const loadPerfil = async () => {
     try {
@@ -306,9 +370,17 @@ export default function Perfil() {
 
                 {/* Botón según estado y completada */}
                 {cap.completada ? (
-                  <button className={styles.buttonCompletada} disabled>
-                    Capacitación completada
-                  </button>
+                  <>
+                    <button className={styles.buttonCompletada} disabled>
+                      Capacitación completada
+                    </button>
+                    <button
+                      className={styles.buttonMultimedia}
+                      onClick={() => handleVerMultimedia(cap)}
+                    >
+                      🎬 Ver multimedia
+                    </button>
+                  </>
                 ) : cap.estado_capacitacion !== 1 ? (
                   <button className={styles.buttonFinalizada} disabled>
                     Capacitación desactivada
@@ -399,6 +471,94 @@ export default function Perfil() {
           </div>
         )}
       </div>
+
+      {/* Modal: Ver multimedia de una capacitación completada */}
+      {multimediaCap && (
+        <div className={styles.modalOverlay} onClick={closeMultimedia}>
+          <div className={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>🎬 Multimedia — {multimediaCap.nombre_capacitacion}</h3>
+              <button className={styles.modalClose} onClick={closeMultimedia} aria-label="Cerrar">
+                ✕
+              </button>
+            </div>
+
+            {multimediaLoading ? (
+              <div className={styles.modalLoading}>Cargando multimedia...</div>
+            ) : multimediaError ? (
+              <div className={styles.modalLoading}>{multimediaError}</div>
+            ) : multimediaItems.length === 0 ? (
+              <div className={styles.modalLoading}>Esta capacitación no tiene archivos multimedia.</div>
+            ) : (
+              <div className={styles.modalBody}>
+                <div className={styles.mediaList}>
+                  {multimediaItems.map((item, idx) => (
+                    <button
+                      key={item.key}
+                      className={`${styles.mediaListItem} ${idx === multimediaSelected ? styles.mediaListItemActive : ""}`}
+                      onClick={() => setMultimediaSelected(idx)}
+                    >
+                      <span className={styles.mediaTypeBadge}>
+                        {item.tipo === "video" ? "▶ VIDEO" : item.tipo === "pdf" ? "PDF" : "IMG"}
+                      </span>
+                      <span className={styles.mediaItemText}>
+                        <strong>{item.titulo}</strong>
+                        <span className={styles.mediaItemModulo}>{item.modulo}</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className={styles.mediaViewer}>
+                  {(() => {
+                    const item = multimediaItems[multimediaSelected];
+                    if (!item) return null;
+
+                    if (item.tipo === "imagen") {
+                      return <img src={normalizeDataUrl(item.url, "image")} alt={item.titulo} />;
+                    }
+
+                    if (item.tipo === "pdf") {
+                      const pdfUrl = normalizeDataUrl(item.url, "pdf");
+                      return (
+                        <>
+                          <iframe src={pdfUrl} title={item.titulo} className={styles.mediaFrame} />
+                          <a className={styles.mediaOpenLink} href={pdfUrl} target="_blank" rel="noreferrer">
+                            Abrir PDF en nueva pestaña ↗
+                          </a>
+                        </>
+                      );
+                    }
+
+                    // video
+                    const ytId = getYouTubeId(item.url);
+                    if (ytId) {
+                      return (
+                        <iframe
+                          src={`https://www.youtube.com/embed/${ytId}`}
+                          title={item.titulo}
+                          className={styles.mediaFrame}
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
+                        />
+                      );
+                    }
+                    return (
+                      <video className={styles.mediaVideo} controls src={normalizeDataUrl(item.url, "video")}>
+                        Tu navegador no soporta el elemento de video.
+                      </video>
+                    );
+                  })()}
+
+                  {multimediaItems[multimediaSelected] && (
+                    <p className={styles.mediaViewerTitle}>{multimediaItems[multimediaSelected].titulo}</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

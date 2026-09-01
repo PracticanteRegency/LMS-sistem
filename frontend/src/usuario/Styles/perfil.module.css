@@ -41,6 +41,227 @@
   margin: 0 auto;
 }
 
+/* Botón "Ver multimedia" en tarjetas de capacitaciones completadas */
+.buttonMultimedia {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px 16px;
+  background: #1565c0;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  transition: background-color 0.2s ease;
+}
+
+.buttonMultimedia:hover {
+  background: #0d47a1;
+}
+
+/* Modal de multimedia */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 16px;
+}
+
+.modalCard {
+  background: #fff;
+  border-radius: 10px;
+  width: 100%;
+  max-width: 1000px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  background: #262626;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modalClose {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  flex-shrink: 0;
+}
+
+.modalLoading {
+  padding: 48px 24px;
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+}
+
+.modalBody {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.mediaList {
+  width: 250px;
+  flex-shrink: 0;
+  border-right: 1px solid #e0e0e0;
+  background: #f5f5f5;
+  overflow-y: auto;
+}
+
+.mediaListItem {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  border-bottom: 1px solid #e6e6e6;
+  background: transparent;
+  cursor: pointer;
+  color: #262626;
+  font-size: 12px;
+}
+
+.mediaListItem:hover {
+  background: #ececec;
+}
+
+.mediaListItemActive,
+.mediaListItemActive:hover {
+  background: #C0281B;
+  color: #fff;
+}
+
+.mediaTypeBadge {
+  flex-shrink: 0;
+  min-width: 34px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 4px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.mediaListItemActive .mediaTypeBadge {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.mediaItemText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mediaItemModulo {
+  font-size: 10px;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mediaViewer {
+  flex: 1;
+  min-width: 0;
+  padding: 16px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+
+.mediaViewer img {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.mediaFrame {
+  width: 100%;
+  height: 70vh;
+  border: none;
+  border-radius: 8px;
+  background: #000;
+}
+
+.mediaVideo {
+  width: 100%;
+  max-height: 70vh;
+  border-radius: 8px;
+  background: #000;
+}
+
+.mediaOpenLink {
+  align-self: flex-start;
+  font-size: 12px;
+  color: #1565c0;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.mediaViewerTitle {
+  margin: 0;
+  align-self: flex-start;
+  font-size: 13px;
+  font-weight: 600;
+  color: #262626;
+}
+
+@media (max-width: 768px) {
+  .modalBody {
+    flex-direction: column;
+  }
+
+  .mediaList {
+    width: 100%;
+    max-height: 150px;
+    border-right: none;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .mediaFrame {
+    height: 55vh;
+  }
+}
+
 /* Profile Header */
 .profileHeader {
   background: #9a9a9a;
@@ -1075,6 +1296,32 @@ button:disabled,
   }
   .badge {
     border: none;
+  }
+
+  .modalCard {
+    background: #1e1e1e;
+    color: #e0e0e0;
+  }
+  .modalLoading {
+    color: #999;
+  }
+  .mediaList {
+    background: #252525;
+    border-right-color: #333;
+    border-bottom-color: #333;
+  }
+  .mediaListItem {
+    color: #e0e0e0;
+    border-bottom-color: #333;
+  }
+  .mediaListItem:hover {
+    background: #2f2f2f;
+  }
+  .mediaViewer {
+    background: #1e1e1e;
+  }
+  .mediaViewerTitle {
+    color: #f0f0f0;
   }
 }
 
