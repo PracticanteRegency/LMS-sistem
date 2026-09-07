@@ -1,6 +1,5 @@
 # Media files (uploads, generated files)
 media/
-!.env
 
 # Python
 __pycache__/
@@ -40,7 +39,11 @@ env/
 db.sqlite3
 celerybeat-schedule
 
-# Environment variables
+# Environment variables (contienen credenciales, no versionar)
+.env
+*.env
+.env.*
+!.env.example
 .env.local
 .env.*.local
 
