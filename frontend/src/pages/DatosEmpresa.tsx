@@ -724,7 +724,6 @@ export default function DatosEmpresa() {
 												sel.empresaId === proyectoEmpresaTemp && sel.unidadId === u.idunidad
 											)
 										)
-										.slice(0, 8)
 										.map((u) => (
 											<button
 												key={u.idunidad}
@@ -1079,7 +1078,6 @@ export default function DatosEmpresa() {
 							<div className={styles.searchResults}>
 								{getUnidadesByEmpresa(editEmpresaTemp)
 									.filter((u) => u.nombreunidad.toLowerCase().includes(editUnidadSearch.toLowerCase()))
-									.slice(0, 8)
 									.map((u) => (
 										<button
 											key={u.idunidad}
