@@ -45,7 +45,7 @@ class Proyecto(models.Model):
 
 class Centroop(models.Model):
     idcentrop = models.AutoField(db_column='idCentrOp', primary_key=True)  # Field name made lowercase.
-    nombrecentrop = models.CharField(db_column='nombreCentrOp', max_length=30)  # Field name made lowercase.
+    nombrecentrop = models.CharField(db_column='nombreCentrOp', max_length=50)  # Field name made lowercase.
     estadocentrop = models.IntegerField(db_column='estadoCentrOp')  # Field name made lowercase.
     id_proyecto = models.ForeignKey(Proyecto, models.DO_NOTHING, db_column='Id_proyecto')  # Field name made lowercase.
 
