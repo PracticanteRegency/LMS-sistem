@@ -2364,10 +2364,10 @@ class EnviarCorreoMasivoView(APIView):
                 unidades_map[(u.nombreunidad.lower().strip(), u.id_empresa_id)].append(u)
             
             # Precargar proyectos con su unidad (nombre_lower, unidad_id) -> objeto
-            proyectos_map = {
-                (p.nombreproyecto.lower().strip(), p.id_unidad_id): p
-                for p in Proyecto.objects.select_related('id_unidad').all()
-            }
+            # Puede haber varios proyectos con el mismo nombre bajo la misma unidad
+            proyectos_map = defaultdict(list)
+            for p in Proyecto.objects.select_related('id_unidad').order_by('idproyecto').all():
+                proyectos_map[(p.nombreproyecto.lower().strip(), p.id_unidad_id)].append(p)
             
             # Precargar centros con su proyecto (nombre_lower, proyecto_id) -> objeto
             centros_map = {
@@ -2520,48 +2520,50 @@ class EnviarCorreoMasivoView(APIView):
                                 f"Línea {idx}: Unidad '{unidad_name}' no encontrada para empresa '{empresa.nombre_empresa}'")
                             continue
 
-                    # Buscar proyecto probando TODAS las unidades candidatas
-                    # Sin importar cuál unidad duplicada contenga el proyecto,
-                    # lo que importa es que empresa + proyecto + centro coincidan.
-                    proyecto = None
-                    unidad = None
+                    # Reunir TODOS los proyectos candidatos (todas las unidades
+                    # duplicadas y todos los proyectos homónimos). Lo que importa
+                    # es que empresa + proyecto + centro coincidan, así que el
+                    # proyecto elegido es el que realmente contiene el centro.
+                    proyecto_norm = self._normalize_text(proyecto_name)
+                    proyectos_candidatos = []  # (unidad, proyecto)
                     for unidad_candidata in unidades_candidatas:
-                        # Búsqueda exacta
-                        proyecto = proyectos_map.get((proyecto_name.lower(), unidad_candidata.idunidad))
-                        if proyecto:
-                            unidad = unidad_candidata
-                            break
+                        exactos = proyectos_map.get((proyecto_name.lower(), unidad_candidata.idunidad), [])
+                        if exactos:
+                            proyectos_candidatos.extend((unidad_candidata, p) for p in exactos)
+                            continue
                         # Búsqueda normalizada (sin acentos)
-                        for (nombre_bd, uni_id), proy_obj in proyectos_map.items():
-                            if uni_id == unidad_candidata.idunidad and self._normalize_text(proyecto_name) == self._normalize_text(nombre_bd):
-                                proyecto = proy_obj
-                                unidad = unidad_candidata
-                                break
-                        if proyecto:
-                            break
+                        for (nombre_bd, uni_id), proy_list in proyectos_map.items():
+                            if uni_id == unidad_candidata.idunidad and proyecto_norm == self._normalize_text(nombre_bd):
+                                proyectos_candidatos.extend((unidad_candidata, p) for p in proy_list)
 
-                    if not unidad:
-                        # Usar la primera unidad (menor ID) como fallback para el registro
-                        unidad = unidades_candidatas[0]
-
-                    if not proyecto:
+                    if not proyectos_candidatos:
                         errores_validacion.append(
                             f"Línea {idx}: Proyecto '{proyecto_name}' no encontrado para empresa '{empresa.nombre_empresa}' bajo unidad '{unidad_name}'")
                         continue
 
                     # OPTIMIZADO: Buscar centro usando mapa precargado
-                    centro = centros_map.get((centro_name.lower(), proyecto.idproyecto))
-                    if not centro:
-                        # Intentar búsqueda normalizada
-                        for (nombre_bd, proy_id), cent_obj in centros_map.items():
-                            if proy_id == proyecto.idproyecto and self._normalize_text(centro_name) == self._normalize_text(nombre_bd):
-                                centro = cent_obj
-                                break
+                    centro_norm = self._normalize_text(centro_name)
+                    unidad = proyecto = centro = None
+                    for unidad_candidata, proyecto_candidato in proyectos_candidatos:
+                        centro = centros_map.get((centro_name.lower(), proyecto_candidato.idproyecto))
                         if not centro:
-                            errores_validacion.append(
-                                f"Línea {idx}: Centro '{centro_name}' no encontrado para proyecto '{proyecto.nombreproyecto}'"
-                            )
-                            continue
+                            # Intentar búsqueda normalizada
+                            for (nombre_bd, proy_id), cent_obj in centros_map.items():
+                                if proy_id == proyecto_candidato.idproyecto and centro_norm == self._normalize_text(nombre_bd):
+                                    centro = cent_obj
+                                    break
+                        if centro:
+                            unidad, proyecto = unidad_candidata, proyecto_candidato
+                            break
+
+                    if not centro:
+                        unidad, proyecto = proyectos_candidatos[0]
+                        errores_validacion.append(
+                            f"Línea {idx}: Centro '{centro_name}' no encontrado para proyecto '{proyecto.nombreproyecto}' "
+                            f"(se revisaron {len(proyectos_candidatos)} proyecto(s) con ese nombre: "
+                            f"ids {', '.join(str(p.idproyecto) for _, p in proyectos_candidatos)})"
+                        )
+                        continue
 
                     # OPTIMIZADO: Buscar cargo usando mapa precargado
                     cargo = cargos_map.get(cargo_name.lower())
