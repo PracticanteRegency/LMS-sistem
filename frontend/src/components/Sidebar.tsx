@@ -39,7 +39,7 @@ import styles from "./Navbar.module.css";
         >
           <ul>
             {/* Mi Campeonato Menu */}
-            <li className={styles.menuSection}>
+            {/*<li className={styles.menuSection}>
               <span className={styles.sectionTitle}>Mi Campeonato</span>
               <ul className={styles.submenu}>
                 <li><Link to="/mundial" className={styles.submenuItem}>Inicio</Link></li>
@@ -47,7 +47,7 @@ import styles from "./Navbar.module.css";
                   <li><Link to="/mundial/admin" className={styles.submenuItem}>Administracion</Link></li>
                 )}
               </ul>
-            </li>
+            </li>*/}
 
             {isAdmin ? (
               <>
